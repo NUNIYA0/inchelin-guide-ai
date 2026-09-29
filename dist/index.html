@@ -756,7 +756,7 @@
     let activeSuggestions = [];
     let lastAIRequest = null;
     let historyMenuId = null;
-    const AI_API_ENDPOINT = String(window.INCHELIN_AI_API_ENDPOINT || '').trim();
+    const AI_API_ENDPOINT = '/api/chat';
 
     const LEGAL_CONTENT = {
       terms: { title: '이용약관', html: '<h3>제1조 목적</h3><p>본 약관은 Inchelin Guide AI 서비스 이용에 필요한 기본 사항과 이용자와 서비스 간의 권리·의무를 정합니다.</p><h3>서비스 이용</h3><p>이용자는 정확한 가입 정보를 제공하고 계정 정보를 안전하게 관리해야 합니다. 서비스는 안정적인 운영을 위해 기능을 개선하거나 일부 내용을 변경할 수 있습니다.</p><h3>이용 시 유의사항</h3><p>AI가 제공하는 내용은 이해를 돕기 위한 참고 정보이며, 중요한 판단 전에는 관련 원문과 전문가의 확인이 필요합니다.</p>' },
@@ -826,19 +826,9 @@
       const state = getLocalTimeState();
       const latestQuestion = [...nextMessages].reverse().find(message => message.role === 'user')?.content || '';
       const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
-      const systemPrompt = [
-        '당신은 Inchelin Guide AI입니다. 사용자가 좋은 한 끼를 찾도록 친절하고 구체적으로 돕습니다.',
-        '이전 대화의 조건과 답변을 이어서 이해하세요. 짧은 후속 답변도 앞선 사용자 의도와 결합해 해석하세요.',
-        `Current local datetime: ${state.localDateTime}`,
-        `Timezone: ${state.timeZone}`,
-        `Current meal period: ${state.periodLabel}`,
-        userSpecifiedTime
-          ? '사용자가 직접 지정한 시간이나 날짜 조건을 현재 시간보다 우선하세요.'
-          : '사용자가 시간을 지정하지 않았다면 현재 로컬 시간대를 고려하세요.'
-      ].join('\n');
       return {
         conversationId: currentId,
-        messages: [{ role: 'system', content: systemPrompt }, ...nextMessages],
+        messages: nextMessages,
         context: {
           currentLocalDatetime: state.localDateTime,
           timezone: state.timeZone,
@@ -850,46 +840,12 @@
         }
       };
     }
-    function createFallbackAnswer(request) {
-      const userMessages = request.messages.filter(message => message.role === 'user').map(message => message.content);
-      const latest = userMessages.at(-1) || '';
-      const fullContext = userMessages.join(' ');
-      if (/^(안녕|안녕하세요|하이)[!?.\s]*$/i.test(latest)) {
-        return '안녕하세요! 맛있는 한 끼를 함께 찾아드릴게요. 오늘은 어떤 식사를 생각하고 계세요?';
-      }
-      if (/한식/.test(fullContext) && /(부모님|가족)/.test(fullContext) && /(저녁|오늘)/.test(fullContext)) {
-        return '오늘 저녁에 부모님과 드실 한식을 찾고 계시는군요. 대화하기 편한 한정식이나 깔끔한 갈비·불고기 식당이 잘 맞아요. 원하시는 지역과 주차 필요 여부를 알려주시면 조건을 이어서 더 좁혀드릴게요.';
-      }
-      if (/(부모님|가족)/.test(latest) && /(저녁|오늘)/.test(fullContext)) {
-        return '오늘 저녁에 부모님과 함께 가실 곳으로 찾아볼게요. 부모님이 좋아하시는 음식 종류와 원하는 지역, 주차가 필요한지도 알려주세요.';
-      }
-      if (/(오늘.*저녁|저녁.*먹)/.test(latest)) {
-        return '오늘 저녁 식사로 찾아볼게요. 누구와 함께 가는지, 좋아하는 음식이나 원하는 분위기가 있는지 알려주시면 더 잘 맞춰드릴 수 있어요.';
-      }
-      const lead = request.context.userSpecifiedTime
-        ? '말씀하신 시간이나 날짜 조건을 우선해서 추천할게요.'
-        : `현재 ${request.context.currentMealPeriod} 시간대에 잘 맞는 선택을 중심으로 추천할게요.`;
-      return `${lead} ${CONTENT.answer}`;
-    }
-    function waitFor(ms, signal) {
-      return new Promise((resolve, reject) => {
-        const timer = setTimeout(resolve, ms);
-        signal?.addEventListener('abort', () => {
-          clearTimeout(timer);
-          reject(new DOMException('Aborted', 'AbortError'));
-        }, { once: true });
-      });
-    }
     function extractAssistantText(data) {
       const content = data?.message?.content ?? data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.response ?? data?.content;
       if (Array.isArray(content)) return content.map(item => item?.text || item?.content || '').join('').trim();
       return typeof content === 'string' ? content.trim() : '';
     }
     async function requestAssistant(request, signal) {
-      if (!AI_API_ENDPOINT) {
-        await waitFor(900, signal);
-        return createFallbackAnswer(request);
-      }
       const response = await fetch(AI_API_ENDPOINT, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
