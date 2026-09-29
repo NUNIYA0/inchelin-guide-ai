@@ -483,7 +483,7 @@
       h1 { margin-bottom: clamp(24px, 6vw, 38px); font-size: clamp(24px, 7vw, 32px); line-height: 1.3; text-wrap: balance; }
       .composer { width: 100%; min-height: 96px; padding: 14px 13px 10px 15px; border-radius: 23px; box-shadow: 0 8px 24px rgba(0,0,0,.065), 0 1px 4px rgba(0,0,0,.035); }
       .composer:focus-within { box-shadow: 0 10px 28px rgba(0,0,0,.08); }
-      textarea { min-width: 0; height: 42px; font-size: clamp(14px, 3.8vw, 16px); overflow-wrap: break-word; }
+      textarea { min-width: 0; height: 52px; font-size: clamp(14px, 3.8vw, 16px); overflow-wrap: break-word; }
       .send { width: 40px; height: 40px; flex: 0 0 40px; }
       .suggestions { width: 100%; margin-top: clamp(14px, 4vw, 20px); }
       .suggestion { width: 100%; min-height: 48px; padding: 13px 2px; gap: 12px; align-items: flex-start; font-size: clamp(14px, 3.8vw, 15px); line-height: 1.45; }
@@ -560,9 +560,9 @@
 
       <section class="workspace">
         <div class="welcome" id="welcome">
-          <h1 id="welcomeTitle">업무에 대해 무엇이 궁금하신가요?</h1>
+          <h1 id="welcomeTitle">맛있는 한 끼, 같이 찾아볼까요?</h1>
           <form class="composer" id="welcomeForm">
-            <textarea id="welcomeInput" aria-label="질문 입력" placeholder="데이터와 업무에 관해 물어보세요" rows="1"></textarea>
+            <textarea id="welcomeInput" aria-label="질문 입력" placeholder="먹고 싶은 메뉴나 분위기를 편하게 말해보세요" rows="1"></textarea>
             <div class="composer-actions">
               <button class="icon-btn plus task-trigger" type="button" aria-label="추가 메뉴" aria-expanded="false">＋</button>
               <button class="send" id="welcomeSend" type="submit" aria-label="질문 보내기" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
@@ -653,16 +653,43 @@
   <script>
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
     const CONTENT = {
-      title: '업무에 대해 무엇이 궁금하신가요?',
-      placeholder: '데이터와 업무에 관해 물어보세요',
-      suggestions: [
-        { label: '이번 주 핵심 성과를 한눈에 정리해 주세요.', prompt: '이번 주 핵심 성과와 변화, 다음에 확인할 일을 한눈에 정리해 주세요.' },
-        { label: '고객 피드백에서 반복되는 이슈는 무엇인가요?', prompt: '최근 고객 피드백에서 반복되는 이슈와 우선순위를 분석해 주세요.' },
-        { label: '다음 회의에서 확인해야 할 질문을 추천해 주세요.', prompt: '다음 회의에서 의사결정에 도움이 될 핵심 질문을 추천해 주세요.' },
-        { label: '보고서 초안을 간결한 문장으로 바꿔 주세요.', prompt: '보고서 초안을 핵심만 남긴 간결한 문장으로 다듬어 주세요.' }
-      ],
-      answer: '확인한 내용을 바탕으로 정리하면, 먼저 목표와 기준을 명확히 한 뒤 현재 수치와 이전 기간의 변화를 비교하는 것이 좋습니다. 반복되는 패턴은 영향도와 시급성으로 나누고, 다음 행동에는 담당자와 확인 시점을 함께 적어 두세요. 연결할 실제 데이터가 준비되면 이 구조에 맞춰 근거와 수치를 포함한 답변을 제공할 수 있습니다.'
+      title: '맛있는 한 끼, 같이 찾아볼까요?',
+      placeholder: '먹고 싶은 메뉴나 분위기를 편하게 말해보세요',
+      answer: '말씀하신 조건에 맞춰 메뉴의 분위기와 식사 무게감, 이용하기 좋은 시간대를 함께 고려해 추천해 드릴게요. 위치와 인원, 예산을 알려주시면 더 구체적으로 좁혀볼 수 있어요.'
     };
+    const TIME_SUGGESTIONS = {
+      morning: [
+        '오늘 아침 뭐 먹으면 좋을까?',
+        '가볍게 먹기 좋은 메뉴 추천해줘',
+        '든든한 아침 식사 추천해줘',
+        '아침에 가기 좋은 식당 찾아줘'
+      ],
+      lunch: [
+        '오늘 점심 뭐 먹으면 좋을까?',
+        '부담 없이 먹기 좋은 메뉴 추천해줘',
+        '동료들과 가기 좋은 점심 맛집 찾아줘',
+        '빠르게 먹기 좋은 식당 추천해줘'
+      ],
+      afternoon: [
+        '지금 가볍게 먹기 좋은 메뉴 있을까?',
+        '간단하게 먹기 좋은 곳 추천해줘',
+        '커피랑 같이 즐기기 좋은 디저트 추천해줘',
+        '조용하게 쉬기 좋은 곳 찾아줘'
+      ],
+      evening: [
+        '오늘 저녁 뭐 먹을까?',
+        '분위기 좋은 저녁 맛집 추천해줘',
+        '가족이랑 가기 좋은 식당 찾아줘',
+        '든든하게 먹기 좋은 메뉴 추천해줘'
+      ],
+      lateNight: [
+        '지금 먹기 좋은 야식 추천해줘',
+        '늦게까지 하는 식당 찾아줘',
+        '가볍게 먹을 수 있는 메뉴 추천해줘',
+        '지금 주문하거나 먹기 좋은 메뉴 알려줘'
+      ]
+    };
+    const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
       ['문서 요약', '긴 문서의 핵심과 확인 사항 정리', 'work', '요'],
       ['회의 준비', '안건과 결정이 필요한 질문 추천', 'work', '회'],
@@ -710,6 +737,9 @@
     let verificationAttempts = 0;
     let resendSeconds = 0;
     let resendTimer;
+    let activeSuggestionKey = '';
+    let activeSuggestions = [];
+    let lastAIRequest = null;
 
     const LEGAL_CONTENT = {
       terms: { title: '이용약관', html: '<h3>제1조 목적</h3><p>본 약관은 Inchelin Guide AI 서비스 이용에 필요한 기본 사항과 이용자와 서비스 간의 권리·의무를 정합니다.</p><h3>서비스 이용</h3><p>이용자는 정확한 가입 정보를 제공하고 계정 정보를 안전하게 관리해야 합니다. 서비스는 안정적인 운영을 위해 기능을 개선하거나 일부 내용을 변경할 수 있습니다.</p><h3>이용 시 유의사항</h3><p>AI가 제공하는 내용은 이해를 돕기 위한 참고 정보이며, 중요한 판단 전에는 관련 원문과 전문가의 확인이 필요합니다.</p>' },
@@ -719,8 +749,68 @@
 
     $('#welcomeTitle').textContent = CONTENT.title;
     $('#welcomeInput').placeholder = CONTENT.placeholder;
-    $('#suggestions').innerHTML = CONTENT.suggestions.map((q, i) => `<button class="suggestion" data-index="${i}" type="button"><span>${q.label}</span><span>↗</span></button>`).join('');
+    refreshTimeSuggestions(true);
     $('#guideList').innerHTML = GUIDES.map(([title, answer]) => `<div class="guide-item"><button type="button">${title}</button><div class="guide-answer">${answer}</div></div>`).join('');
+
+    function getMealPeriod(date = new Date()) {
+      const hour = date.getHours();
+      if (hour >= 5 && hour < 11) return 'morning';
+      if (hour >= 11 && hour < 14) return 'lunch';
+      if (hour >= 14 && hour < 17) return 'afternoon';
+      if (hour >= 17 && hour < 21) return 'evening';
+      return 'lateNight';
+    }
+    function formatLocalISOString(date) {
+      const pad = value => String(value).padStart(2, '0');
+      const offsetMinutes = -date.getTimezoneOffset();
+      const sign = offsetMinutes >= 0 ? '+' : '-';
+      const offsetHours = pad(Math.floor(Math.abs(offsetMinutes) / 60));
+      const offsetRemainder = pad(Math.abs(offsetMinutes) % 60);
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}${sign}${offsetHours}:${offsetRemainder}`;
+    }
+    function getLocalTimeState(date = new Date()) {
+      const period = getMealPeriod(date);
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Etc/Unknown';
+      return { period, periodLabel: PERIOD_LABELS[period], timeZone, localDateTime: formatLocalISOString(date) };
+    }
+    function refreshTimeSuggestions(force = false) {
+      const state = getLocalTimeState();
+      const nextKey = `${state.timeZone}:${state.period}`;
+      if (!force && nextKey === activeSuggestionKey) return;
+      activeSuggestionKey = nextKey;
+      activeSuggestions = TIME_SUGGESTIONS[state.period].map(text => ({ label: text, prompt: text }));
+      const container = $('#suggestions');
+      container.dataset.period = state.period;
+      container.dataset.timezone = state.timeZone;
+      container.innerHTML = activeSuggestions.map((q, i) => `<button class="suggestion" data-index="${i}" type="button"><span>${q.label}</span><span>↗</span></button>`).join('');
+    }
+    function hasExplicitTimeCondition(question) {
+      return /(오늘|내일|모레|어제|주말|평일|아침|브런치|점심|오후|저녁|야식|밤|새벽|오전|정오|\d{1,2}\s*시|\d{1,2}[./-]\d{1,2})/.test(question);
+    }
+    function buildAIRequest(question) {
+      const state = getLocalTimeState();
+      const userSpecifiedTime = hasExplicitTimeCondition(question);
+      return {
+        message: question,
+        context: {
+          currentLocalDatetime: state.localDateTime,
+          timezone: state.timeZone,
+          currentMealPeriod: state.periodLabel,
+          userSpecifiedTime,
+          instruction: userSpecifiedTime
+            ? '사용자가 직접 지정한 시간이나 날짜 조건을 현재 시간보다 우선해서 답변하세요.'
+            : '사용자의 현재 로컬 시간대를 고려해 식사 상황에 맞는 답변을 하세요.'
+        }
+      };
+    }
+    function createFallbackAnswer(request) {
+      const lead = request.context.userSpecifiedTime
+        ? '말씀하신 시간이나 날짜 조건을 우선해서 추천할게요.'
+        : `현재 ${request.context.currentMealPeriod} 시간대에 잘 맞는 선택을 중심으로 추천할게요.`;
+      return `${lead} ${CONTENT.answer}`;
+    }
+    setInterval(() => refreshTimeSuggestions(), 60000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeSuggestions(); });
 
     function showToast(text) {
       const toast = $('#toast');
@@ -860,7 +950,7 @@
       if (generating) setGenerating(false);
       saveConversation();
     }
-    function generateAnswer() {
+    function generateAnswer(request) {
       setGenerating(true);
       const status = document.createElement('div');
       status.className = 'message status';
@@ -870,7 +960,7 @@
       generationTimers = [
         setTimeout(() => label.textContent = '관련 자료와 핵심 근거를 확인하고 있어요', 650),
         setTimeout(() => label.textContent = '확인한 내용으로 답변을 작성하고 있어요', 1350),
-        setTimeout(() => { status.remove(); addMessage('ai', CONTENT.answer); setGenerating(false); saveConversation(); }, 2200)
+        setTimeout(() => { status.remove(); addMessage('ai', createFallbackAnswer(request)); setGenerating(false); saveConversation(); }, 2200)
       ];
     }
     function ask(question) {
@@ -885,7 +975,8 @@
       $('#welcomeInput').value = '';
       $('#chatInput').value = '';
       saveConversation();
-      generateAnswer();
+      lastAIRequest = buildAIRequest(value);
+      generateAnswer(lastAIRequest);
     }
     function showGuide() {
       stopGeneration(false);
@@ -909,7 +1000,7 @@
     });
     $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); ask($('#welcomeInput').value); });
     $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else ask($('#chatInput').value); });
-    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const input = $('#welcomeInput'); input.value = CONTENT.suggestions[Number(button.dataset.index)].prompt; resizeInput(input); input.focus(); });
+    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const item = activeSuggestions[Number(button.dataset.index)]; if (!item) return; const input = $('#welcomeInput'); input.value = item.prompt; resizeInput(input); input.focus(); });
     $('#historyList').addEventListener('click', event => { const open = event.target.closest('[data-open-history]'); const menu = event.target.closest('[data-history-menu]'); if (open) openHistory(open.dataset.openHistory); if (menu) manageHistory(menu.dataset.historyMenu); });
     $('#sidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
     $('#mobileSidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
