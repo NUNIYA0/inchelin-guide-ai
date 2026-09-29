@@ -240,11 +240,14 @@
     .chat-view { width: min(760px, 100%); height: 100%; display: none; flex-direction: column; }
     .chat-view.active { display: flex; }
     .messages { flex: 1; overflow: auto; padding: 20px 6px 24px; scrollbar-width: thin; }
-    .message { max-width: 82%; margin: 0 0 20px; line-height: 1.65; font-size: 15px; }
+    .message { max-width: 82%; margin: 0 0 20px; line-height: 1.65; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
     .message.user { margin-left: auto; border-radius: 18px 18px 4px 18px; background: #f1f1f1; padding: 11px 15px; }
     .message.ai { color: #303030; }
     .message.ai::before { content: "A"; width: 27px; height: 27px; display: grid; place-items: center; border-radius: 9px; background: #000; color: white; font-size: 12px; font-weight: 800; margin-bottom: 8px; }
     .message.status { color: #555; display: flex; align-items: center; gap: 10px; }
+    .message.error { color: #555; }
+    .retry-button { display: block; margin-top: 10px; padding: 7px 11px; border: 1px solid #d8d8d8; border-radius: 9px; background: #fff; color: #333; font: inherit; font-size: 13px; cursor: pointer; }
+    .retry-button:hover { background: #f7f7f7; }
     .thinking-dots { flex: 0 0 auto; min-width: 40px; height: 26px; padding: 0 9px; display: flex; align-items: center; justify-content: center; gap: 3px; border-radius: 999px; background: #f1f1f1; }
     .thinking-dots i { width: 4px; height: 4px; border-radius: 50%; background: #aaa; animation: blink 1.1s infinite; }
     .thinking-dots i:nth-child(2) { animation-delay: .15s; }
@@ -701,7 +704,7 @@
       ['분석 데이터 연결', '지표와 대시보드 데이터를 불러옵니다', 'data', 'A']
     ].map((p, i) => ({ id: i + 1, name: p[0], desc: p[1], type: p[2], icon: p[3] }));
     const GUIDES = [
-      ['처음 이용하기', '추천 질문을 선택하면 입력창에 질문이 채워집니다. 문장을 수정한 뒤 전송 버튼을 누르세요.'],
+      ['처음 이용하기', '추천 질문을 선택하면 일반 질문과 같은 방식으로 바로 대화를 시작합니다. 직접 입력한 질문도 전송 버튼으로 이어서 물어볼 수 있습니다.'],
       ['회원가입', '시작하기 또는 로그인 버튼을 눌러 계정 화면을 열 수 있습니다. 현재 데모에서는 가입 없이 계속하기도 가능합니다.'],
       ['채팅 기록', '완료된 대화는 이 브라우저에 자동 저장됩니다. 사이드바에서 다시 열거나 이름을 바꾸고 삭제할 수 있습니다.'],
       ['플러그인', '입력창의 + 버튼에서 플러그인을 열고 필요한 업무 기능을 선택하거나 고정할 수 있습니다.'],
@@ -714,7 +717,7 @@
     const welcome = $('#welcome');
     const chatView = $('#chatView');
     const guidePanel = $('#guidePanel');
-    const messages = $('#messages');
+    const messagesEl = $('#messages');
     const sidebar = $('#sidebar');
     const main = $('#main');
     const scrim = $('#scrim');
@@ -724,7 +727,9 @@
     let generationTimers = [];
     let generating = false;
     let currentId = null;
-    let histories = JSON.parse(localStorage.getItem('insight-ai-history') || '[]');
+    let chatMessages = [];
+    let activeRequestController = null;
+    let histories = readStoredConversations();
     let pinned = JSON.parse(localStorage.getItem('insight-ai-pins') || '[]');
     let activeFilter = 'all';
     let selectedPlan = '';
@@ -740,6 +745,7 @@
     let activeSuggestionKey = '';
     let activeSuggestions = [];
     let lastAIRequest = null;
+    const AI_API_ENDPOINT = String(window.INCHELIN_AI_API_ENDPOINT || '').trim();
 
     const LEGAL_CONTENT = {
       terms: { title: '이용약관', html: '<h3>제1조 목적</h3><p>본 약관은 Inchelin Guide AI 서비스 이용에 필요한 기본 사항과 이용자와 서비스 간의 권리·의무를 정합니다.</p><h3>서비스 이용</h3><p>이용자는 정확한 가입 정보를 제공하고 계정 정보를 안전하게 관리해야 합니다. 서비스는 안정적인 운영을 위해 기능을 개선하거나 일부 내용을 변경할 수 있습니다.</p><h3>이용 시 유의사항</h3><p>AI가 제공하는 내용은 이해를 돕기 위한 참고 정보이며, 중요한 판단 전에는 관련 원문과 전문가의 확인이 필요합니다.</p>' },
@@ -787,11 +793,41 @@
     function hasExplicitTimeCondition(question) {
       return /(오늘|내일|모레|어제|주말|평일|아침|브런치|점심|오후|저녁|야식|밤|새벽|오전|정오|\d{1,2}\s*시|\d{1,2}[./-]\d{1,2})/.test(question);
     }
-    function buildAIRequest(question) {
+    function normalizeMessage(message) {
+      const role = message?.role || (message?.type === 'ai' ? 'assistant' : message?.type);
+      const content = String(message?.content ?? message?.text ?? '').trim();
+      if (!['user', 'assistant'].includes(role) || !content) return null;
+      return { role, content };
+    }
+    function readStoredConversations() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('insight-ai-history') || '[]');
+        if (!Array.isArray(stored)) return [];
+        return stored.map(item => ({
+          ...item,
+          messages: Array.isArray(item.messages) ? item.messages.map(normalizeMessage).filter(Boolean) : []
+        })).filter(item => item.id && item.messages.length);
+      } catch (_) {
+        return [];
+      }
+    }
+    function buildAIRequest(nextMessages) {
       const state = getLocalTimeState();
-      const userSpecifiedTime = hasExplicitTimeCondition(question);
+      const latestQuestion = [...nextMessages].reverse().find(message => message.role === 'user')?.content || '';
+      const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
+      const systemPrompt = [
+        '당신은 Inchelin Guide AI입니다. 사용자가 좋은 한 끼를 찾도록 친절하고 구체적으로 돕습니다.',
+        '이전 대화의 조건과 답변을 이어서 이해하세요. 짧은 후속 답변도 앞선 사용자 의도와 결합해 해석하세요.',
+        `Current local datetime: ${state.localDateTime}`,
+        `Timezone: ${state.timeZone}`,
+        `Current meal period: ${state.periodLabel}`,
+        userSpecifiedTime
+          ? '사용자가 직접 지정한 시간이나 날짜 조건을 현재 시간보다 우선하세요.'
+          : '사용자가 시간을 지정하지 않았다면 현재 로컬 시간대를 고려하세요.'
+      ].join('\n');
       return {
-        message: question,
+        conversationId: currentId,
+        messages: [{ role: 'system', content: systemPrompt }, ...nextMessages],
         context: {
           currentLocalDatetime: state.localDateTime,
           timezone: state.timeZone,
@@ -804,10 +840,55 @@
       };
     }
     function createFallbackAnswer(request) {
+      const userMessages = request.messages.filter(message => message.role === 'user').map(message => message.content);
+      const latest = userMessages.at(-1) || '';
+      const fullContext = userMessages.join(' ');
+      if (/^(안녕|안녕하세요|하이)[!?.\s]*$/i.test(latest)) {
+        return '안녕하세요! 맛있는 한 끼를 함께 찾아드릴게요. 오늘은 어떤 식사를 생각하고 계세요?';
+      }
+      if (/한식/.test(fullContext) && /(부모님|가족)/.test(fullContext) && /(저녁|오늘)/.test(fullContext)) {
+        return '오늘 저녁에 부모님과 드실 한식을 찾고 계시는군요. 대화하기 편한 한정식이나 깔끔한 갈비·불고기 식당이 잘 맞아요. 원하시는 지역과 주차 필요 여부를 알려주시면 조건을 이어서 더 좁혀드릴게요.';
+      }
+      if (/(부모님|가족)/.test(latest) && /(저녁|오늘)/.test(fullContext)) {
+        return '오늘 저녁에 부모님과 함께 가실 곳으로 찾아볼게요. 부모님이 좋아하시는 음식 종류와 원하는 지역, 주차가 필요한지도 알려주세요.';
+      }
+      if (/(오늘.*저녁|저녁.*먹)/.test(latest)) {
+        return '오늘 저녁 식사로 찾아볼게요. 누구와 함께 가는지, 좋아하는 음식이나 원하는 분위기가 있는지 알려주시면 더 잘 맞춰드릴 수 있어요.';
+      }
       const lead = request.context.userSpecifiedTime
         ? '말씀하신 시간이나 날짜 조건을 우선해서 추천할게요.'
         : `현재 ${request.context.currentMealPeriod} 시간대에 잘 맞는 선택을 중심으로 추천할게요.`;
       return `${lead} ${CONTENT.answer}`;
+    }
+    function waitFor(ms, signal) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(resolve, ms);
+        signal?.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new DOMException('Aborted', 'AbortError'));
+        }, { once: true });
+      });
+    }
+    function extractAssistantText(data) {
+      const content = data?.message?.content ?? data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.response ?? data?.content;
+      if (Array.isArray(content)) return content.map(item => item?.text || item?.content || '').join('').trim();
+      return typeof content === 'string' ? content.trim() : '';
+    }
+    async function requestAssistant(request, signal) {
+      if (!AI_API_ENDPOINT) {
+        await waitFor(900, signal);
+        return createFallbackAnswer(request);
+      }
+      const response = await fetch(AI_API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal
+      });
+      if (!response.ok) throw new Error(`AI request failed: ${response.status}`);
+      const answer = extractAssistantText(await response.json());
+      if (!answer) throw new Error('AI response did not include assistant content.');
+      return answer;
     }
     setInterval(() => refreshTimeSuggestions(), 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeSuggestions(); });
@@ -867,27 +948,51 @@
     function newChat() {
       stopGeneration(false);
       currentId = null;
-      messages.innerHTML = '';
+      chatMessages = [];
+      messagesEl.innerHTML = '';
       showWelcome();
       $('#welcomeInput').value = '';
       resizeInput($('#welcomeInput'));
       if (window.innerWidth <= 768) setSidebar(false);
       $('#welcomeInput').focus();
     }
-    function addMessage(type, text, extra = '') {
+    function isNearConversationBottom() {
+      return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
+    }
+    function renderMessage(message, extra = '', follow = false) {
       const item = document.createElement('div');
-      item.className = `message ${type} ${extra}`.trim();
-      item.textContent = text;
-      messages.appendChild(item);
-      messages.scrollTop = messages.scrollHeight;
+      item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
+      item.textContent = message.content;
+      messagesEl.appendChild(item);
+      if (follow) requestAnimationFrame(() => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' }));
       return item;
+    }
+    function appendMessage(role, content, { save = true } = {}) {
+      const message = normalizeMessage({ role, content });
+      if (!message) return null;
+      const shouldFollow = isNearConversationBottom();
+      chatMessages = [...chatMessages, message];
+      const item = renderMessage(message, '', shouldFollow);
+      if (save) saveConversation();
+      return item;
+    }
+    function renderConversation() {
+      messagesEl.innerHTML = '';
+      chatMessages.forEach(message => renderMessage(message));
+      requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
     }
     function saveConversation() {
       if (!currentId) return;
-      const data = [...messages.querySelectorAll('.message:not(.status)')].map(el => ({ type: el.classList.contains('user') ? 'user' : 'ai', text: el.textContent }));
-      if (!data.length) return;
+      if (!chatMessages.length) return;
       const existing = histories.find(h => h.id === currentId);
-      const record = { id: currentId, title: existing?.title || data[0].text.slice(0, 26), messages: data, updated: Date.now() };
+      const firstQuestion = chatMessages.find(message => message.role === 'user')?.content || '새 대화';
+      const record = {
+        id: currentId,
+        title: existing?.title || firstQuestion.slice(0, 26),
+        messages: chatMessages,
+        createdAt: existing?.createdAt || Date.now(),
+        updatedAt: Date.now()
+      };
       histories = [record, ...histories.filter(h => h.id !== currentId)].slice(0, 20);
       localStorage.setItem('insight-ai-history', JSON.stringify(histories));
       renderHistory();
@@ -902,8 +1007,8 @@
       if (!history) return;
       stopGeneration(false);
       currentId = id;
-      messages.innerHTML = '';
-      history.messages.forEach(m => addMessage(m.type, m.text));
+      chatMessages = history.messages.map(normalizeMessage).filter(Boolean);
+      renderConversation();
       welcome.style.display = 'none';
       guidePanel.classList.remove('active');
       chatView.classList.add('active');
@@ -944,24 +1049,57 @@
     function stopGeneration(showMessage = true) {
       generationTimers.forEach(clearTimeout);
       generationTimers = [];
-      const status = messages.querySelector('.message.status');
+      activeRequestController?.abort();
+      activeRequestController = null;
+      const status = messagesEl.querySelector('.message.status');
       if (status) status.remove();
-      if (generating && showMessage) addMessage('ai', '답변 생성을 중단했습니다. 질문을 다듬어 다시 보내 주세요.');
+      if (generating && showMessage) appendMessage('assistant', '답변 생성을 중단했습니다. 질문을 다듬어 다시 보내 주세요.');
       if (generating) setGenerating(false);
-      saveConversation();
     }
-    function generateAnswer(request) {
+    function showRequestError(request) {
+      const shouldFollow = isNearConversationBottom();
+      const item = document.createElement('div');
+      item.className = 'message ai error';
+      const text = document.createElement('span');
+      text.textContent = '답변을 불러오지 못했어요. 다시 시도해 주세요.';
+      const retry = document.createElement('button');
+      retry.type = 'button';
+      retry.className = 'retry-button';
+      retry.textContent = '다시 시도';
+      retry.addEventListener('click', () => { item.remove(); generateAnswer(request); });
+      item.append(text, retry);
+      messagesEl.appendChild(item);
+      if (shouldFollow) messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+    }
+    async function generateAnswer(request) {
       setGenerating(true);
+      activeRequestController = new AbortController();
+      const controller = activeRequestController;
+      const shouldFollow = isNearConversationBottom();
       const status = document.createElement('div');
       status.className = 'message status';
       status.innerHTML = '<span class="thinking-dots"><i></i><i></i><i></i></span><span>질문의 뜻을 파악하고 있어요</span>';
-      messages.appendChild(status);
+      messagesEl.appendChild(status);
       const label = status.querySelector('span:last-child');
       generationTimers = [
         setTimeout(() => label.textContent = '관련 자료와 핵심 근거를 확인하고 있어요', 650),
-        setTimeout(() => label.textContent = '확인한 내용으로 답변을 작성하고 있어요', 1350),
-        setTimeout(() => { status.remove(); addMessage('ai', createFallbackAnswer(request)); setGenerating(false); saveConversation(); }, 2200)
+        setTimeout(() => label.textContent = '확인한 내용으로 답변을 작성하고 있어요', 1350)
       ];
+      if (shouldFollow) messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+      try {
+        const answer = await requestAssistant(request, controller.signal);
+        if (controller.signal.aborted) return;
+        status.remove();
+        appendMessage('assistant', answer);
+      } catch (error) {
+        status.remove();
+        if (error?.name !== 'AbortError') showRequestError(request);
+      } finally {
+        generationTimers.forEach(clearTimeout);
+        generationTimers = [];
+        if (activeRequestController === controller) activeRequestController = null;
+        if (generating) setGenerating(false);
+      }
     }
     function ask(question) {
       const value = question.trim();
@@ -971,11 +1109,12 @@
       guidePanel.classList.remove('active');
       chatView.classList.add('active');
       main.classList.add('chat-mode');
-      addMessage('user', value);
+      appendMessage('user', value);
       $('#welcomeInput').value = '';
       $('#chatInput').value = '';
-      saveConversation();
-      lastAIRequest = buildAIRequest(value);
+      resizeInput($('#welcomeInput'));
+      resizeInput($('#chatInput'));
+      lastAIRequest = buildAIRequest(chatMessages);
       generateAnswer(lastAIRequest);
     }
     function showGuide() {
@@ -996,11 +1135,17 @@
     ['welcomeInput', 'chatInput'].forEach(id => {
       const input = document.getElementById(id);
       input.addEventListener('input', () => resizeInput(input));
-      input.addEventListener('keydown', event => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); input.closest('form').requestSubmit(); } });
+      input.addEventListener('keydown', event => {
+        if (event.isComposing || event.keyCode === 229) return;
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          input.closest('form').requestSubmit();
+        }
+      });
     });
     $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); ask($('#welcomeInput').value); });
     $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else ask($('#chatInput').value); });
-    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const item = activeSuggestions[Number(button.dataset.index)]; if (!item) return; const input = $('#welcomeInput'); input.value = item.prompt; resizeInput(input); input.focus(); });
+    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const item = activeSuggestions[Number(button.dataset.index)]; if (!item) return; ask(item.prompt); });
     $('#historyList').addEventListener('click', event => { const open = event.target.closest('[data-open-history]'); const menu = event.target.closest('[data-history-menu]'); if (open) openHistory(open.dataset.openHistory); if (menu) manageHistory(menu.dataset.historyMenu); });
     $('#sidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
     $('#mobileSidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
