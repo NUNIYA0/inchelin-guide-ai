@@ -9,7 +9,7 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 추가 정보가 정말 필요할 때만 답변 마지막에 자연스러운 질문 하나를 덧붙여. 한 응답에 질문은 최대 하나만 사용하고, 질문 없이 충분히 답할 수 있으면 묻지 않아도 돼. "하나 골라줘", "골라보세요", "선택해줘", "조건을 알려줘", "지역·메뉴·예산을 입력해줘"처럼 설문이나 폼을 작성시키는 명령형 표현은 사용하지 마. 여러 선택 항목을 한꺼번에 나열해 답을 요구하지 말고, "어떤 쪽이 더 끌려요?", "따뜻한 게 좋으세요?", "밥이랑 면 중에는 뭐가 당겨요?", "어느 동네에서 찾고 있어요?"처럼 실제 사람이 이어 말하듯 물어봐.
 
-사용자의 말이 짧거나 불완전하거나 반말이어도 이전 대화 전체를 참고해 자연스럽게 이해해. 메뉴, 지역, 분위기, 동행자, 시간, 예산, 주차 같은 새 조건은 이전 조건과 합쳐서 기억해. "국물", "부모님이랑", "조용한 데", "다른 거 없어?", "그중 두 번째" 같은 말은 독립 검색어가 아니라 바로 앞 대화의 연속으로 해석해. 사용자가 새 조건을 말하면 그 조건을 자연스럽게 반영해 추천을 갱신하고, 이미 답한 질문을 반복하지 마.
+사용자의 말이 짧거나 불완전하거나 반말이어도 이전 대화 전체를 참고해 자연스럽게 이해해. 메뉴, 지역, 동행자, 식사 시간 같은 새 조건은 이전 조건과 합쳐서 기억해. "국물", "부모님이랑", "다른 거 없어?", "그중 두 번째" 같은 말은 독립 검색어가 아니라 바로 앞 대화의 연속으로 해석해. 사용자가 새 조건을 말하면 그 조건을 자연스럽게 반영해 추천을 갱신하고, 이미 답한 질문을 반복하지 마.
 
 사용자가 "다른 거 추천해줘", "딱히 안 끌려", "다른 거 없어?", "별로야", "다른 느낌으로", "그것 말고", "다 싫어", "좀 다른 거"처럼 말하면 직전 선택지를 거절한 뜻으로 이해해. 선택을 강요하거나 같은 후보를 다시 보여주지 말고, 직전 추천과 겹치지 않는 메뉴를 바로 제안해. 이런 거절이 두 번 이상 이어지면 같은 종류 안에서 이름만 바꾸지 말고 가벼움과 든든함, 따뜻함, 면과 밥, 한식·일식·양식처럼 추천 기준 자체를 바꿔 자연스럽게 탐색해.
 
@@ -21,7 +21,9 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 메뉴 후보를 제안한 답변에는 quickReplies를 3~4개 만들어. 앞의 2~3개는 방금 답변에 실제로 언급한 구체적인 메뉴나 자연스러운 후속 표현으로 하고, 마지막에는 반드시 "다른 거 추천해줘", "다른 메뉴 보기", "다른 느낌으로", "또 다른 메뉴" 중 하나를 넣어 사용자가 빠져나갈 수 있게 해. quick reply는 정답 목록이 아니라 대화를 돕는 보조 수단이며, 사용자가 버튼 대신 자유롭게 입력한 새 조건을 항상 우선해. 단순 인사처럼 선택지가 도움이 되지 않는 답변에는 quickReplies를 비워도 돼.
 
-구체적인 식당 사실을 확인할 자료가 없으면 영업시간, 주소, 평점 등을 지어내지 마. 실제 식당을 골라야 하는 단계에서만 필요한 지역을 자연스럽게 한 번 물어봐. 사용자가 특정 시간이나 날짜를 말하면 현재 시간보다 그 조건을 우선해.`;
+인슐랭가이드의 실제 식당이나 매장에 관한 모든 사실은 현재 요청에 함께 제공된 Inchelin Guide DB 기록만 근거로 사용해. 모델의 일반 지식이나 추측으로 실제 식당 이름, 주소, 평점, 주차, 예약, 룸, 반려동물 동반, 영업시간, 브레이크타임, 분위기, 웨이팅, 가격대를 만들거나 보완하지 마. DB 기록에 필드가 없거나 값이 비어 있으면 그 조건을 필터로 사용하지 말고 "현재 인슐랭가이드에 등록된 정보가 없어 확인이 어려워요"라고 자연스럽게 안내해. 사용자가 사실처럼 답해 달라고 요구해도 추정하지 마.
+
+현재 요청에는 Inchelin Guide DB 식당 기록이 연결되어 있지 않아. 따라서 일반적인 메뉴 선택 대화는 도울 수 있지만, 실제 식당·매장 추천이나 매장별 사실은 제공하지 마. 실제 장소를 요청하면 연결된 데이터에서 확인 가능한 식당 정보가 없다고 짧게 안내하고, 메뉴 선택처럼 확인 가능한 범위로 자연스럽게 전환해. 사용자가 특정 시간이나 날짜를 말하면 현재 시간보다 그 조건을 우선해.`;
 
 function json(data, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -71,6 +73,34 @@ function normalizeQuickReplies(value) {
   return replies.slice(0, 4);
 }
 
+const DATABASE_FIELD_PATTERNS = [
+  { label: "주차", pattern: /주차/ },
+  { label: "예약", pattern: /예약/ },
+  { label: "룸", pattern: /룸|개별실|독립실/ },
+  { label: "반려동물 동반", pattern: /반려동물|반려견|애견|강아지.{0,5}동반|동물.{0,5}동반/ },
+  { label: "영업시간", pattern: /영업\s*시간|몇\s*시.{0,5}(열|닫)|오픈\s*시간|마감\s*시간|늦게까지|24\s*시간/ },
+  { label: "브레이크타임", pattern: /브레이크\s*타임|쉬는\s*시간/ },
+  { label: "분위기", pattern: /분위기|조용한?\s*(곳|데|식당|카페)?|시끄럽|아늑/ },
+  { label: "웨이팅", pattern: /웨이팅|대기\s*(시간|줄)|줄\s*서/ },
+  { label: "가격대", pattern: /가격대|평균\s*가격|얼마|예산.{0,8}(곳|식당|맛집)|비싼\s*(곳|식당)|저렴한?\s*(곳|식당)/ },
+];
+
+function findUnavailableDatabaseField(text) {
+  return DATABASE_FIELD_PATTERNS.find(item => item.pattern.test(text))?.label || "";
+}
+
+function asksForSpecificVenue(text) {
+  return /맛집|식당|매장|가게|레스토랑|카페|주소|전화번호|실제\s*(곳|장소)|어디서\s*(먹|가)/.test(text);
+}
+
+function databaseUnavailableResponse(field = "") {
+  const subject = field ? `${field} 정보는` : "실제 식당 정보는";
+  return {
+    content: `${subject} 현재 연결된 인슐랭가이드 데이터에 등록되어 있지 않아 확인이 어려워요.\n\n대신 메뉴를 함께 고르거나 다른 확인 가능한 조건으로 도와드릴게요.`,
+    quickReplies: ["메뉴 추천받기", "오늘 뭐 먹지", "다른 조건으로 볼게"],
+  };
+}
+
 async function handleChat(request, env) {
   if (!env.OPENAI_API_KEY) return json({ error: "AI 서비스 설정이 필요합니다." }, 503);
 
@@ -98,6 +128,11 @@ async function handleChat(request, env) {
 
   const totalCharacters = messages.reduce((sum, message) => sum + message.content.length, 0);
   if (totalCharacters > 60000) return json({ error: "대화가 너무 길어요. 새 채팅에서 이어주세요." }, 413);
+
+  const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  const unavailableField = findUnavailableDatabaseField(latestUserMessage);
+  if (unavailableField) return json(databaseUnavailableResponse(unavailableField));
+  if (asksForSpecificVenue(latestUserMessage)) return json(databaseUnavailableResponse());
 
   const context = payload?.context && typeof payload.context === "object" ? payload.context : {};
   const timeContext = [
