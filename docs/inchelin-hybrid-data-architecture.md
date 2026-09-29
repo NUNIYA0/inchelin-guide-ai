@@ -12,7 +12,7 @@
 flowchart LR
   A[Inchelin DB\n상호명 + 주소] --> B[정규화 및 identity_key 생성]
   B --> C[매장 기준 레코드]
-  C --> D[외부 소스 후보 검색]
+  C --> D[등록 매장에 한한 외부 보강 조회]
   D --> E[동일 매장 검증]
   E --> F[필드별 관측값 저장]
   F --> G[최신성·출처·교차검증 판정]
@@ -116,7 +116,7 @@ unknown
 ## 10. 수집 및 갱신 파이프라인
 
 1. Inchelin DB 스냅샷을 읽고 `identity_key`로 매장을 upsert한다.
-2. 상호명과 주소로 외부 후보를 검색한다.
+2. Inchelin DB에 등록된 매장에 한해서만 상호명과 주소로 외부 보강 후보를 조회한다. 외부 조회 결과를 신규 추천 후보로 추가하지 않는다.
 3. 주소 일치, 도메인 소유 관계, 전화번호 등으로 동일 매장 여부를 검증한다.
 4. 출처 원문과 필드별 관측값을 변경 불가능한 이력으로 저장한다.
 5. 출처 우선순위, 최신성, 교차 확인을 기준으로 해결값을 계산한다.
@@ -133,4 +133,15 @@ unknown
 5. 필드별 유효기간과 신뢰도 정책 확정
 6. 백필 작업 후 샘플 매장으로 충돌 해결 검증
 7. AI 조회 API에 `ai_place_profile`만 노출
+
+## 12. 런타임 강제 정책
+
+Worker는 `INCHELIN_DB_API_URL`의 등록 매장 API를 먼저 호출한다. 이 조회에 없는 매장은 외부 보강 API를 호출하지 않고 미등록 안내를 반환한다.
+
+- `INCHELIN_DB_API_URL`: 등록 매장 검색 API의 HTTPS 기준 URL
+- `INCHELIN_DB_API_TOKEN`: 등록 매장 API 인증 토큰
+- `INCHELIN_ENRICHMENT_API_URL`: 등록 매장 전용 보강 API의 HTTPS 기준 URL
+- `INCHELIN_ENRICHMENT_API_TOKEN`: 보강 API 인증 토큰
+
+보강 API는 `place_id`, 기준 상호명, 기준 주소와 지점을 입력받는다. 응답의 `identity_confirmed`가 참이고, 응답 상호명과 주소가 기준값과 정규화 후 정확히 일치할 때만 `confirmed` 사실을 AI 컨텍스트에 넣는다. 연결 오류가 나면 임의 추천으로 대체하지 않고 안전하게 실패한다.
 
