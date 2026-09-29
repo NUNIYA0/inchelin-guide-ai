@@ -282,8 +282,11 @@
     .eyebrow { margin-bottom: 8px; font-size: 11px; letter-spacing: .14em; font-weight: 800; color: #888; }
     .dialog h2 { margin: 0 42px 8px 0; font-size: 21px; line-height: 1.45; letter-spacing: -.025em; font-weight: 600; }
     .dialog-sub { margin: 0 0 18px; color: #666; font-size: 13.5px; line-height: 1.55; }
-    .about-copy { display: grid; gap: 16px; color: #3c3c3c; line-height: 1.75; }
+    .about-copy { display: grid; gap: 20px; color: #3c3c3c; font-size: 15.5px; line-height: 1.85; letter-spacing: -.012em; }
     .about-copy p { margin: 0; }
+    .about-copy strong { color: #111; font-weight: 700; }
+    .about-copy .about-lead { color: #292929; font-size: 16px; font-weight: 500; }
+    .about-copy .about-vision { padding-top: 18px; border-top: 1px solid #ececec; color: #242424; }
     .auth-form { display: grid; gap: 12px; }
     .auth-form label { display: grid; gap: 6px; font-size: 14.5px; line-height: 1.5; color: #333; font-weight: 700; }
     .auth-form input, .search-input { width: 100%; height: 46px; border: 1px solid #dedede; border-radius: 999px; padding: 0 15px; outline: none; font-size: 15.5px; font-weight: 400; }
@@ -518,7 +521,7 @@
     </main>
   </div>
 
-  <div class="overlay" id="aboutOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">Inchelin Guide AI</h2><p class="dialog-sub">복잡한 정보를 더 쉽게 이해하고, 더 빠르게 판단할 수 있도록.</p><div class="about-copy"><p>Inchelin Guide AI는 누구나 흩어진 정보와 데이터를 쉽게 이해하고, 필요한 다음 행동을 판단할 수 있도록 돕는 전문 AI입니다.</p><p>복잡한 자료를 이해하기 쉽게 정리하고 놓치기 쉬운 핵심 근거를 함께 보여줍니다.</p><p>질문부터 분석, 초안 작성, 데이터 연결까지 개인의 흐름에 맞춰 지속적으로 활용할 수 있는 서비스를 지향합니다.</p></div></section></div>
+  <div class="overlay" id="aboutOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">인슐랭가이드 AI 소개</h2><div class="about-copy"><p class="about-lead"><strong>인슐랭 가이드</strong>는 보험(Insurance)과 미슐* 가이드(Miche*** Guide)의 합성어로, 보험인들과 고객님이 함께 만드는 <strong>맛집 앱(App)</strong>입니다.</p><p>맛있는 한 끼는 소소한 일상을 살아가며 느끼는 커다란 기쁨입니다. 전국 방방곡곡을 누비는 보험인들과 고객님들에게 이 기쁨을 더 크고 재미있게 만들어 드리기 위해 인슐랭 가이드를 시작했습니다.</p><p class="about-vision">인슐랭 가이드는 진짜 맛있는 한 끼를 찾을 수 있는 <strong>‘맛집 앱의 보험’</strong>이 되겠습니다.</p></div></section></div>
 
   <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
     <div class="auth-view" id="loginView">
