@@ -283,7 +283,10 @@
     .auth-form { display: grid; gap: 12px; }
     .auth-form label { display: grid; gap: 6px; font-size: 14.5px; line-height: 1.5; color: #333; font-weight: 700; }
     .auth-form input, .search-input { width: 100%; height: 46px; border: 1px solid #dedede; border-radius: 999px; padding: 0 15px; outline: none; font-size: 15.5px; font-weight: 400; }
+    .auth-form input::placeholder { color: #aaa; font-weight: 300; opacity: 1; }
     .auth-form input:focus, .search-input:focus { border-color: #888; }
+    #loginView h2 { margin: 0 38px 8px; text-align: center; }
+    #loginView > .dialog-sub { text-align: center; }
     .primary-action { height: 46px; border: 0; border-radius: 999px; background: #000; color: #fff; font-size: 15.5px; font-weight: 800; cursor: pointer; }
     .auth-link { display: block; margin: 12px auto 0; border: 0; background: transparent; cursor: pointer; color: #333; font-size: 13.5px; text-decoration: underline; }
     .auth-switch { margin-top: 18px; text-align: center; color: #666; font-size: 13.5px; }
@@ -516,7 +519,7 @@
   <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
     <div class="auth-view" id="loginView">
       <h2 id="authTitle">로그인 또는 회원가입</h2><p class="dialog-sub">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.</p>
-      <form class="auth-form" id="authForm"><label>이메일 또는 휴대전화 번호<input type="text" autocomplete="username" required /></label><label>비밀번호<input type="password" autocomplete="current-password" required /></label><button class="primary-action" type="submit">로그인</button></form>
+      <form class="auth-form" id="authForm"><label>이메일 또는 휴대전화 번호<input type="text" autocomplete="username" placeholder="아이디를 입력해 주세요" required /></label><label>비밀번호<input type="password" autocomplete="current-password" placeholder="비밀번호를 입력해 주세요" required /></label><button class="primary-action" type="submit">로그인</button></form>
       <button class="auth-link" type="button" data-toast="비밀번호 찾기 안내를 준비 중입니다.">비밀번호를 잊으셨나요?</button><div class="auth-divider">또는 SNS로 로그인</div><div class="social-grid"><button disabled>카카오로 로그인 <small>준비 중</small></button><button disabled>네이버로 로그인 <small>준비 중</small></button><button disabled>Google로 로그인 <small>준비 중</small></button></div>
       <div class="auth-switch">계정이 없으신가요? <button type="button" id="openSignup">회원가입</button></div><button class="continue-button" type="button" data-close="authOverlay">가입 없이 계속하기</button>
     </div>
