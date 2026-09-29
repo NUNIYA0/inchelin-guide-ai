@@ -96,7 +96,7 @@
     }
     .sidebar.open { transform: translateX(0); }
     .sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-    .sidebar-title { display: flex; align-items: center; gap: 9px; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
+    .sidebar-title { display: flex; align-items: center; gap: 9px; font-size: 15px; font-weight: 700; letter-spacing: -.02em; }
     .sidebar-title img { width: 32px; height: 32px; object-fit: contain; flex: 0 0 auto; }
     .new-chat {
       width: 100%;
@@ -152,7 +152,7 @@
       background: #000;
       color: #fff;
       font-size: 13px;
-      font-weight: 700;
+      font-weight: 600;
       padding: 0 17px;
       cursor: pointer;
     }
@@ -167,10 +167,10 @@
     h1 {
       margin: 0 0 66px;
       text-align: center;
-      font-size: clamp(27px, 3.1vw, 34px);
-      line-height: 1.3;
-      letter-spacing: -.045em;
-      font-weight: 760;
+      font-size: 31px;
+      line-height: 1.28;
+      letter-spacing: -.035em;
+      font-weight: 600;
     }
     .composer {
       border: 1px solid #e2e2e2;
@@ -191,8 +191,8 @@
       border: 0;
       background: transparent;
       color: #171717;
-      font-size: 15px;
-      line-height: 1.55;
+      font-size: 16px;
+      line-height: 1.6;
       padding: 0;
     }
     textarea::placeholder { color: #b0b0b0; }
@@ -270,50 +270,87 @@
     .task-menu button:hover { background: #f4f4f4; }
     .overlay { position: fixed; z-index: 100; inset: 0; display: none; align-items: center; justify-content: center; padding: 22px; background: rgba(0,0,0,.32); backdrop-filter: blur(2px); }
     .overlay.open { display: flex; }
-    .dialog { position: relative; width: min(560px, 100%); max-height: min(780px, calc(100dvh - 44px)); overflow: auto; background: #fff; border-radius: 22px; box-shadow: 0 26px 80px rgba(0,0,0,.2); padding: 30px; }
+    .dialog { position: relative; width: min(560px, 100%); max-height: min(780px, calc(100dvh - 44px)); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 26px 80px rgba(0,0,0,.2); padding: 28px; }
     .dialog.wide { width: min(880px, 100%); }
+    .auth-dialog { width: min(420px, 100%); }
+    .auth-dialog.plan-mode { width: min(940px, 100%); }
     .dialog-close { position: absolute; top: 16px; right: 16px; width: 34px; height: 34px; border: 0; border-radius: 10px; background: #f1f1f1; cursor: pointer; font-size: 20px; }
     .eyebrow { margin-bottom: 8px; font-size: 11px; letter-spacing: .14em; font-weight: 800; color: #888; }
-    .dialog h2 { margin: 0 42px 7px 0; font-size: 26px; letter-spacing: -.03em; }
-    .dialog-sub { margin: 0 0 26px; color: #777; line-height: 1.55; }
+    .dialog h2 { margin: 0 42px 8px 0; font-size: 21px; line-height: 1.45; letter-spacing: -.025em; font-weight: 600; }
+    .dialog-sub { margin: 0 0 18px; color: #666; font-size: 13.5px; line-height: 1.55; }
     .about-copy { display: grid; gap: 16px; color: #3c3c3c; line-height: 1.75; }
     .about-copy p { margin: 0; }
     .auth-form { display: grid; gap: 12px; }
-    .auth-form label { display: grid; gap: 6px; font-size: 13px; color: #555; }
-    .auth-form input, .search-input { width: 100%; height: 46px; border: 1px solid #dedede; border-radius: 10px; padding: 0 13px; outline: none; }
+    .auth-form label { display: grid; gap: 6px; font-size: 14.5px; line-height: 1.5; color: #333; font-weight: 700; }
+    .auth-form input, .search-input { width: 100%; height: 46px; border: 1px solid #dedede; border-radius: 999px; padding: 0 15px; outline: none; font-size: 15.5px; font-weight: 400; }
     .auth-form input:focus, .search-input:focus { border-color: #888; }
-    .primary-action { height: 46px; border: 0; border-radius: 10px; background: #000; color: #fff; font-weight: 700; cursor: pointer; }
-    .auth-link { border: 0; background: transparent; cursor: pointer; color: #555; text-decoration: underline; }
-    .auth-switch { margin-top: 18px; text-align: center; color: #666; font-size: 13px; }
+    .primary-action { height: 46px; border: 0; border-radius: 999px; background: #000; color: #fff; font-size: 15.5px; font-weight: 800; cursor: pointer; }
+    .auth-link { display: block; margin: 12px auto 0; border: 0; background: transparent; cursor: pointer; color: #333; font-size: 13.5px; text-decoration: underline; }
+    .auth-switch { margin-top: 18px; text-align: center; color: #666; font-size: 13.5px; }
     .auth-switch button { border: 0; background: transparent; font-weight: 700; text-decoration: underline; cursor: pointer; }
-    .auth-divider { margin: 20px 0 12px; text-align: center; font-size: 12px; color: #aaa; }
-    .social-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-    .social-grid button { height: 42px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fafafa; color: #aaa; }
-    .continue-button { width: 100%; margin-top: 18px; height: 42px; border: 1px solid #dedede; border-radius: 10px; background: #fff; cursor: pointer; }
+    .auth-divider { display: flex; align-items: center; gap: 10px; margin: 14px 0 10px; text-align: center; font-size: 13px; color: #777; }
+    .auth-divider::before, .auth-divider::after { content: ""; flex: 1; height: 1px; background: #e4e4e4; }
+    .social-grid { display: grid; grid-template-columns: 1fr; gap: 8px; }
+    .social-grid button { height: 46px; padding: 0 15px; border: 0; border-radius: 10px; background: #fafafa; color: #777; font-size: 13.5px; text-align: left; }
+    .social-grid small { float: right; }
+    .continue-button { width: 100%; margin-top: 18px; height: 42px; border: 1px solid #dedede; border-radius: 999px; background: #fff; font-size: 13.5px; cursor: pointer; }
     .auth-view[hidden] { display: none; }
-    .auth-back { margin: 0 0 12px; padding: 0; border: 0; background: transparent; color: #555; cursor: pointer; }
-    .billing-toggle, .signup-method { width: fit-content; margin: 0 auto 20px; padding: 4px; display: flex; gap: 4px; border-radius: 11px; background: #f1f1f1; }
-    .billing-toggle button, .signup-method button { min-width: 76px; height: 34px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
-    .billing-toggle button.active, .signup-method button.active { background: white; box-shadow: 0 1px 5px rgba(0,0,0,.1); font-weight: 700; }
-    .plan-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
-    .plan-card { position: relative; min-height: 0; padding: 16px 52px 16px 17px; border: 1px solid #e1e1e1; border-radius: 14px; background: white; text-align: left; cursor: pointer; }
+    .auth-back { margin: 0 0 12px; padding: 0; border: 0; background: transparent; color: #333; cursor: pointer; font-size: 15px; line-height: 1.5; font-weight: 400; }
+    .billing-toggle { width: fit-content; margin: 0 0 16px; padding: 4px; display: flex; gap: 4px; border: 1px solid #dedede; border-radius: 11px; background: #f7f7f7; }
+    .signup-method { width: 100%; margin: 0 0 18px; padding: 4px; display: grid; grid-template-columns: 1fr 1fr; gap: 4px; border: 1px solid #dedede; border-radius: 12px; background: #f7f7f7; }
+    .billing-toggle button, .signup-method button { min-width: 64px; height: 34px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; font-size: 13px; font-weight: 500; }
+    .signup-method button { height: 46px; }
+    .billing-toggle button.active, .signup-method button.active { background: white; box-shadow: 0 1px 5px rgba(0,0,0,.08); }
+    .plan-grid { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+    .plan-card { position: relative; min-height: 380px; padding: 20px; border: 1px solid #dedede; border-radius: 14px; background: white; text-align: left; cursor: pointer; display: flex; flex-direction: column; }
     .plan-card:hover { border-color: #aaa; }
-    .plan-card.selected { border: 2px solid #111; padding: 15px 51px 15px 16px; }
-    .plan-card h3 { display: inline-block; min-width: 56px; margin: 0 8px 7px 0; font-size: 19px; }
-    .plan-price { font-size: 19px; font-weight: 800; }
+    .plan-card.selected { border: 2px solid #111; padding: 19px; }
+    .plan-card h3 { margin: 0 0 22px; font-size: 17px; line-height: 1.5; font-weight: 600; }
+    .plan-price-row { margin-bottom: 7px; }
+    .plan-price { font-size: 28px; line-height: 1.25; font-weight: 600; }
     .plan-unit { color: #777; font-size: 12px; }
-    .plan-copy { min-height: 0; margin: 0 0 8px; color: #666; font-size: 13px; line-height: 1.45; }
-    .plan-card ul { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: #555; font-size: 12px; line-height: 1.55; }
-    .plan-card li::before { content: "✓"; margin-right: 5px; color: #111; font-weight: 800; }
-    .plan-check { position: absolute; top: 50%; right: 18px; width: 22px; height: 22px; transform: translateY(-50%); display: grid; place-items: center; border: 1px solid #bbb; border-radius: 50%; color: transparent; font-size: 12px; }
-    .plan-card.selected .plan-check { background: #111; color: white; border-color: #111; }
-    .plan-note { margin: 14px 0; color: #888; text-align: center; font-size: 12px; }
-    .signup-continue { width: 100%; height: 46px; border: 0; border-radius: 10px; background: #111; color: white; font-weight: 700; cursor: pointer; }
+    .plan-billing { min-height: 34px; margin: 0; color: #666; font-size: 11px; line-height: 1.5; }
+    .plan-copy { min-height: 55px; margin: 8px 0 14px; color: #555; font-size: 12px; line-height: 1.55; }
+    .plan-card ul { margin: 0 0 18px; padding: 16px 0 0; border-top: 1px solid #e7e7e7; list-style: none; color: #555; font-size: 12px; line-height: 2.1; }
+    .plan-card li::before { content: "✓"; margin-right: 8px; color: #666; font-weight: 600; }
+    .plan-check { display: none; }
+    .plan-card-action { width: 100%; height: 40px; margin-top: auto; display: grid; place-items: center; border: 1px solid #dedede; border-radius: 9px; font-size: 13px; font-weight: 500; }
+    .plan-card.selected .plan-card-action { background: #111; color: #fff; border-color: #111; }
+    .plan-note { margin: 10px 0 12px; color: #666; text-align: left; font-size: 13px; }
+    .signup-continue { width: 100%; height: 46px; border: 0; border-radius: 999px; background: #111; color: white; font-size: 15.5px; font-weight: 800; cursor: pointer; }
     .signup-continue:disabled { background: #d7d7d7; color: #8b8b8b; cursor: default; }
-    .selected-plan { display: inline-flex; gap: 8px; align-items: center; margin: 0 0 20px; padding: 8px 11px; border-radius: 9px; background: #f3f3f3; font-size: 13px; }
+    .selected-plan { display: flex; justify-content: space-between; align-items: center; margin: 0 0 18px; padding: 12px 14px; border: 1px solid #e1e1e1; border-radius: 10px; background: #fafafa; font-size: 13px; }
+    .selected-plan button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; font-size: 13px; }
     .verify-row { display: grid; grid-template-columns: 1fr; gap: 10px; }
-    .verify-row input { height: 46px; border: 1px solid #dedede; border-radius: 10px; padding: 0 13px; outline: none; }
-    .verify-row button { height: 46px; border: 0; border-radius: 10px; background: #111; color: white; padding: 0 18px; font-weight: 700; cursor: pointer; }
+    .verify-row input { height: 46px; border: 1px solid #dedede; border-radius: 999px; padding: 0 15px; outline: none; font-size: 15.5px; }
+    .verify-row button { height: 46px; border: 0; border-radius: 999px; background: #111; color: white; padding: 0 18px; font-size: 15.5px; font-weight: 800; cursor: pointer; }
+    .verification-view { text-align: center; }
+    .verification-view .auth-back { display: block; text-align: left; }
+    .verification-icon { width: 52px; height: 52px; margin: 4px auto 14px; display: grid; place-items: center; border-radius: 50%; background: #f3f3f3; font-size: 23px; }
+    .verification-view h2 { margin-right: 0; }
+    .verification-view .dialog-sub { text-align: center; }
+    .verification-code { display: grid; grid-template-columns: repeat(6, 1fr); gap: 7px; margin: 18px 0 12px; }
+    .verification-code input { min-width: 0; width: 100%; height: 50px; border: 1px solid #d8d8d8; border-radius: 10px; text-align: center; font-size: 20px; font-weight: 600; outline: none; }
+    .verification-code input:focus { border-color: #111; }
+    .verification-dev-code { margin: 14px 0; padding: 10px; border-radius: 10px; background: #f5f5f5; font-size: 12px; color: #666; }
+    .verification-dev-code b { display: block; color: #111; font-size: 18px; letter-spacing: .18em; }
+    .secondary-action { width: 100%; height: 42px; margin-top: 9px; border: 1px solid #dedede; border-radius: 999px; background: #fff; font-size: 13.5px; cursor: pointer; }
+    .verification-help, .auth-message { margin: 12px 0 0; color: #777; font-size: 12.5px; line-height: 1.5; text-align: center; }
+    .verification-help button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
+    .confirmed-contact { margin-bottom: 15px; padding: 11px 13px; border: 1px solid #dedede; border-radius: 10px; display: flex; align-items: center; justify-content: space-between; font-size: 13px; }
+    .confirmed-contact span { display: block; color: #777; font-size: 11px; }
+    .confirmed-contact button { border: 0; background: transparent; text-decoration: underline; cursor: pointer; }
+    .auth-consents { display: grid; gap: 10px; margin-top: 3px; }
+    .consent-row { padding: 11px 12px; border: 1px solid #e5e5e5; border-radius: 10px; font-size: 12.5px; }
+    .consent-row label { display: flex; grid-template-columns: none; align-items: flex-start; gap: 8px; font-size: 12.5px; font-weight: 600; cursor: pointer; }
+    .consent-row input { width: 17px; height: 17px; margin: 1px 0 0; flex: 0 0 auto; }
+    .consent-row small { display: block; margin: 4px 0 0 25px; color: #777; font-size: 11.5px; font-weight: 400; }
+    .consent-links { display: flex; gap: 9px; margin: 7px 0 0 25px; }
+    .consent-links button { padding: 0; border: 0; background: transparent; color: #666; font-size: 11.5px; text-decoration: underline; cursor: pointer; }
+    .field-message { display: none; color: #c62828; font-size: 12px; font-weight: 400; }
+    .field-message.show { display: block; }
+    .success-mark { width: 58px; height: 58px; margin: 4px auto 15px; display: grid; place-items: center; border-radius: 50%; background: #111; color: #fff; font-size: 26px; }
+    #planView h2 { font-size: 24px; line-height: 1.5; font-weight: 600; }
     .plugin-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
     .plugin-filters { display: flex; gap: 8px; margin-bottom: 16px; }
     .filter-btn { border: 1px solid #e1e1e1; background: #fff; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
@@ -384,7 +421,7 @@
       .overlay { padding: 10px; }
       .dialog { max-height: calc(100dvh - 20px); border-radius: 17px; padding: 24px 18px; }
       .plugin-grid { grid-template-columns: 1fr; }
-      .social-grid { grid-template-columns: 1fr; }
+      .auth-dialog.plan-mode { width: min(420px, 100%); }
       .plan-grid { grid-template-columns: 1fr; }
       .plan-card { min-height: 0; }
     }
@@ -471,26 +508,39 @@
 
   <div class="overlay" id="aboutOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">Inchelin Guide AI</h2><p class="dialog-sub">복잡한 정보를 더 쉽게 이해하고, 더 빠르게 판단할 수 있도록.</p><div class="about-copy"><p>Inchelin Guide AI는 누구나 흩어진 정보와 데이터를 쉽게 이해하고, 필요한 다음 행동을 판단할 수 있도록 돕는 전문 AI입니다.</p><p>복잡한 자료를 이해하기 쉽게 정리하고 놓치기 쉬운 핵심 근거를 함께 보여줍니다.</p><p>질문부터 분석, 초안 작성, 데이터 연결까지 개인의 흐름에 맞춰 지속적으로 활용할 수 있는 서비스를 지향합니다.</p></div></section></div>
 
-  <div class="overlay" id="authOverlay"><section class="dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
+  <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
     <div class="auth-view" id="loginView">
       <h2 id="authTitle">로그인 또는 회원가입</h2><p class="dialog-sub">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.</p>
       <form class="auth-form" id="authForm"><label>이메일 또는 휴대전화 번호<input type="text" autocomplete="username" required /></label><label>비밀번호<input type="password" autocomplete="current-password" required /></label><button class="primary-action" type="submit">로그인</button></form>
-      <button class="auth-link" type="button" data-toast="비밀번호 찾기 안내를 준비 중입니다.">비밀번호를 잊으셨나요?</button><div class="auth-divider">또는 SNS로 로그인</div><div class="social-grid"><button disabled>카카오 · 준비 중</button><button disabled>네이버 · 준비 중</button><button disabled>Google · 준비 중</button></div>
+      <button class="auth-link" type="button" data-toast="비밀번호 찾기 안내를 준비 중입니다.">비밀번호를 잊으셨나요?</button><div class="auth-divider">또는 SNS로 로그인</div><div class="social-grid"><button disabled>카카오로 로그인 <small>준비 중</small></button><button disabled>네이버로 로그인 <small>준비 중</small></button><button disabled>Google로 로그인 <small>준비 중</small></button></div>
       <div class="auth-switch">계정이 없으신가요? <button type="button" id="openSignup">회원가입</button></div><button class="continue-button" type="button" data-close="authOverlay">가입 없이 계속하기</button>
     </div>
     <div class="auth-view" id="planView" hidden>
       <button class="auth-back" type="button" data-auth-back="login">‹ 뒤로</button><h2>어떤 플랜으로 시작할까요?</h2><p class="dialog-sub">사용량과 기능을 비교해 나에게 맞는 플랜을 선택하세요. Free로 시작하고 필요할 때 변경할 수 있습니다.</p>
       <div class="billing-toggle" id="billingToggle"><button class="active" type="button" data-billing="monthly">월간</button><button type="button" data-billing="annual">연간</button></div>
       <div class="plan-grid" id="planGrid">
-        <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-copy">결제 정보 없이 부담 없이 시작하세요.</p><ul><li>기본 AI 사용량 제공</li><li>질문과 답변 근거 확인</li><li>채팅 기록 저장</li></ul></button>
-        <button class="plan-card" type="button" data-plan="Pro"><span class="plan-check">✓</span><h3>Pro</h3><div><span class="plan-price" data-monthly="₩9,900" data-annual="₩99,000">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-copy">더 넉넉한 사용량으로 자주 확인하세요.</p><ul><li>Free의 모든 기능</li><li>더 넉넉한 AI 사용량</li><li>맞춤 자료 요청</li></ul></button>
-        <button class="plan-card" type="button" data-plan="Max"><span class="plan-check">✓</span><h3>Max</h3><div><span class="plan-price" data-monthly="₩29,000" data-annual="₩290,000">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-copy">여러 자료를 깊이 살펴볼 때 선택하세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>우선 지원</li></ul></button>
+        <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div class="plan-price-row"><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-billing">결제 정보 없이 이용</p><p class="plan-copy">보험이 궁금할 때 부담 없이 시작하세요.</p><ul><li>기본 AI 사용량 제공</li><li>보험 질문과 답변 근거 확인</li><li>채팅 기록 저장</li></ul><span class="plan-card-action">Free 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Pro"><span class="plan-check">✓</span><h3>Pro</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩9,900" data-annual="₩8,250">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩99,000 결제">매월 결제</p><p class="plan-copy">보험을 자주 확인한다면, 더 넉넉하게 이용하세요.</p><ul><li>Free의 모든 기능</li><li>Free보다 넉넉한 AI 사용량</li><li>찾는 상품이 없을 때 약관 요청</li></ul><span class="plan-card-action">Pro 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Max"><span class="plan-check">✓</span><h3>Max</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩29,000" data-annual="₩24,167">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩290,000 결제">매월 결제</p><p class="plan-copy">여러 보험을 깊이 살펴볼 때, 가장 넉넉하게 이용하세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>찾는 상품이 없을 때 약관 요청</li></ul><span class="plan-card-action">Max 선택</span></button>
       </div><p class="plan-note">모든 플랜에는 사용량 한도가 있으며, 플랜에 따라 제공량이 다릅니다.</p><button class="signup-continue" id="planContinue" type="button" disabled>플랜을 선택해 주세요</button>
     </div>
     <div class="auth-view" id="verifyView" hidden>
-      <button class="auth-back" type="button" data-auth-back="plan">‹ 요금제 선택</button><h2>이메일을 인증해 주세요</h2><p class="dialog-sub">인증을 완료하면 이름과 비밀번호를 설정할 수 있어요.</p><div class="selected-plan" id="selectedPlanLabel">Free · 무료</div>
+      <button class="auth-back" type="button" data-auth-back="plan">‹ &nbsp;요금제 선택</button><h2 id="verifyHeading">이메일을 인증해 주세요</h2><p class="dialog-sub">인증을 완료하면 이름과 비밀번호를 설정할 수 있어요.</p><div class="selected-plan"><span id="selectedPlanLabel">Free · 무료</span><button type="button" data-auth-back="plan">변경</button></div>
       <div class="signup-method" id="signupMethod"><button class="active" type="button" data-method="email">이메일로 가입</button><button type="button" data-method="phone">휴대전화로 가입</button></div>
-      <form id="verifyForm"><label id="verifyLabel" style="display:grid;gap:7px;font-size:13px;color:#555">이메일<div class="verify-row"><input id="verifyInput" type="email" placeholder="name@example.com" required /><button type="submit">이메일 인증</button></div></label></form>
+      <form class="auth-form" id="verifyForm" novalidate><label id="verifyLabel">이메일<input id="verifyInput" type="email" placeholder="you@example.com" autocomplete="email" /></label><small class="field-message" id="contactError"></small><button class="primary-action" id="verifySubmit" type="submit">이메일 인증</button></form>
+    </div>
+    <div class="auth-view verification-view" id="sentView" hidden>
+      <button class="auth-back" type="button" data-auth-back="verify">‹ &nbsp;<span id="sentBackText">이메일 주소 수정</span></button><div class="verification-icon">✉</div><h2 id="sentHeading">이메일을 확인해 주세요</h2><p class="dialog-sub"><b id="sentContact"></b> <span id="sentDelivery">주소로 인증번호를 보냈어요.</span><br />6자리 번호를 확인해 주세요.</p><p class="verification-dev-code"><span>인증번호</span><b id="demoCode">123456</b><small>다음 단계에서 이 번호를 입력해 주세요.</small></p><button class="primary-action" id="openCode" type="button" style="width:100%">인증번호 입력하기</button><button class="secondary-action" id="resendFromSent" type="button">인증번호 재발송</button><p class="verification-help">메시지가 오지 않나요? <button type="button" data-toast="입력한 주소와 스팸함 또는 차단된 문자함을 확인해 주세요.">입력 정보를 확인해 주세요</button></p>
+    </div>
+    <div class="auth-view verification-view" id="codeView" hidden>
+      <button class="auth-back" type="button" data-auth-back="verify">‹ &nbsp;<span id="codeBackText">이메일 주소 수정</span></button><div class="verification-icon">♢</div><h2>인증번호를 입력해 주세요</h2><p class="dialog-sub"><b id="codeContact"></b> <span id="codeDelivery">주소로 인증 메일을 보냈어요.</span><br />6자리 인증번호를 입력해 주세요.</p><p class="verification-help" id="codeTimer">남은 시간 10:00</p><form id="codeForm"><div class="verification-code" id="verificationCode"><input inputmode="numeric" maxlength="1" aria-label="인증번호 1번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 2번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 3번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 4번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 5번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 6번째 자리" /></div><small class="field-message" id="codeError"></small><button class="primary-action" type="submit" style="width:100%">인증 확인</button></form><button class="secondary-action" id="resendFromCode" type="button">인증번호 재발송</button>
+    </div>
+    <div class="auth-view" id="accountView" hidden>
+      <button class="auth-back" type="button" data-auth-back="verify">‹ &nbsp;가입 정보 수정</button><h2>가입 정보를 입력해 주세요</h2><p class="dialog-sub">인증을 마쳤어요. 이름과 로그인에 사용할 비밀번호를 설정해 주세요.</p><div class="selected-plan"><span id="accountPlanLabel">Free · 무료</span><button type="button" data-auth-back="plan">변경</button></div><div class="confirmed-contact"><div><span id="confirmedKind">이메일 인증 완료</span><b id="confirmedContact"></b></div><button type="button" data-auth-back="verify">변경</button></div>
+      <form class="auth-form" id="accountForm" novalidate><label>이름<input id="signupName" type="text" placeholder="홍길동" autocomplete="name" maxlength="80" /></label><small class="field-message" id="nameError"></small><label>비밀번호<input id="signupPassword" type="password" placeholder="영문·숫자 포함 8자 이상" autocomplete="new-password" maxlength="128" /></label><small class="field-message" id="passwordError"></small><label>비밀번호 확인<input id="signupPasswordConfirm" type="password" placeholder="비밀번호를 다시 입력하세요" autocomplete="new-password" maxlength="128" /></label><small class="field-message" id="passwordConfirmError"></small><div class="auth-consents"><div class="consent-row"><label><input id="termsConsent" type="checkbox" /><span>[필수] 이용약관 및 개인정보 처리방침 동의</span></label><div class="consent-links"><button type="button" data-toast="이용약관 전문은 서비스 준비 단계에서 연결됩니다.">이용약관 보기</button><button type="button" data-toast="개인정보 처리방침 전문은 서비스 준비 단계에서 연결됩니다.">개인정보 처리방침 보기</button></div></div><div class="consent-row" id="marketingRow"><label><input id="marketingConsent" type="checkbox" /><span>[선택] 마케팅 정보 수신 동의</span></label><small>서비스 소식과 콘텐츠를 이메일로 받아볼 수 있습니다.</small><div class="consent-links"><button type="button" data-toast="마케팅 수신 동의 내용은 서비스 준비 단계에서 연결됩니다.">마케팅 수신 동의 내용 보기</button></div></div></div><small class="field-message" id="termsError"></small><button class="primary-action" type="submit">가입 완료</button></form>
+    </div>
+    <div class="auth-view verification-view" id="successView" hidden>
+      <div class="success-mark">✓</div><h2>회원가입이 완료됐어요</h2><p class="dialog-sub">이제 선택한 플랜으로 시작할 수 있어요.<br />다음에도 <b id="successContact"></b> 계정으로 로그인해 이어서 이용하세요.</p><div class="selected-plan"><span id="successPlanLabel">Free · 무료</span></div><button class="primary-action" id="startAfterSignup" type="button" style="width:100%">채팅 시작하기</button><button class="secondary-action" type="button" data-auth-back="login">로그인 화면으로</button>
     </div>
   </section></div>
 
@@ -553,6 +603,10 @@
     let selectedPlan = '';
     let billingCycle = 'monthly';
     let signupMethod = 'email';
+    let signupContact = '';
+    let verificationCode = '123456';
+    let verificationSeconds = 600;
+    let verificationTimer;
 
     $('#welcomeTitle').textContent = CONTENT.title;
     $('#welcomeInput').placeholder = CONTENT.placeholder;
@@ -569,10 +623,12 @@
     function openOverlay(id) { moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); document.getElementById(id).classList.add('open'); }
     function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
     function showAuthView(view) {
-      $('#loginView').hidden = view !== 'login';
-      $('#planView').hidden = view !== 'plan';
-      $('#verifyView').hidden = view !== 'verify';
-      $('#authDialog').classList.remove('wide');
+      ['login', 'plan', 'verify', 'sent', 'code', 'account', 'success'].forEach(name => {
+        document.getElementById(`${name}View`).hidden = name !== view;
+      });
+      $('#authDialog').classList.toggle('plan-mode', view === 'plan');
+      $('#authDialog').scrollTop = 0;
+      if (view !== 'code') clearInterval(verificationTimer);
     }
     function openAuth(view = 'login') {
       openOverlay('authOverlay');
@@ -774,20 +830,27 @@
       billingCycle = button.dataset.billing;
       $$('#billingToggle button').forEach(b => b.classList.toggle('active', b === button));
       $$('.plan-price[data-monthly]').forEach(price => price.textContent = price.dataset[billingCycle]);
-      $$('.plan-unit').forEach((unit, index) => { if (index > 0) unit.textContent = billingCycle === 'monthly' ? '/월' : '/년'; });
+      $$('.plan-billing[data-monthly]').forEach(note => note.textContent = note.dataset[billingCycle]);
     });
     $('#planGrid').addEventListener('click', event => {
       const card = event.target.closest('[data-plan]');
       if (!card) return;
       selectedPlan = card.dataset.plan;
       $$('.plan-card').forEach(item => item.classList.toggle('selected', item === card));
+      $$('.plan-card-action').forEach(action => action.textContent = `${action.closest('.plan-card').dataset.plan} 선택`);
+      card.querySelector('.plan-card-action').textContent = '선택됨';
       $('#planContinue').disabled = false;
       $('#planContinue').textContent = `${selectedPlan} 플랜으로 계속`;
     });
+    function planSummary() {
+      if (selectedPlan === 'Free') return 'Free · 무료';
+      return `${selectedPlan} · ${billingCycle === 'monthly' ? '월간' : '연간'}`;
+    }
     $('#planContinue').addEventListener('click', () => {
       if (!selectedPlan) return;
-      const price = selectedPlan === 'Free' ? '무료' : billingCycle === 'monthly' ? '월간 결제' : '연간 결제';
-      $('#selectedPlanLabel').textContent = `${selectedPlan} · ${price}`;
+      $('#selectedPlanLabel').textContent = planSummary();
+      $('#accountPlanLabel').textContent = planSummary();
+      $('#successPlanLabel').textContent = planSummary();
       showAuthView('verify');
     });
     $('#signupMethod').addEventListener('click', event => {
@@ -795,12 +858,108 @@
       if (!button) return;
       signupMethod = button.dataset.method;
       $$('#signupMethod button').forEach(b => b.classList.toggle('active', b === button));
+      $('#verifyHeading').textContent = signupMethod === 'email' ? '이메일을 인증해 주세요' : '휴대전화 번호를 인증해 주세요';
       $('#verifyLabel').childNodes[0].nodeValue = signupMethod === 'email' ? '이메일' : '휴대전화 번호';
       $('#verifyInput').type = signupMethod === 'email' ? 'email' : 'tel';
-      $('#verifyInput').placeholder = signupMethod === 'email' ? 'name@example.com' : '010-0000-0000';
-      $('#verifyForm button').textContent = signupMethod === 'email' ? '이메일 인증' : '인증번호 받기';
+      $('#verifyInput').placeholder = signupMethod === 'email' ? 'you@example.com' : '010-1234-5678';
+      $('#verifyInput').value = '';
+      $('#verifySubmit').textContent = signupMethod === 'email' ? '이메일 인증' : '휴대전화 인증';
+      $('#marketingRow').hidden = signupMethod === 'phone';
+      $('#contactError').classList.remove('show');
     });
-    $('#verifyForm').addEventListener('submit', event => { event.preventDefault(); showToast(`${signupMethod === 'email' ? '이메일' : '휴대전화'} 인증 요청이 준비되었습니다.`); });
+    function setFieldError(id, text = '') {
+      const field = document.getElementById(id);
+      field.textContent = text ? `ⓘ ${text}` : '';
+      field.classList.toggle('show', Boolean(text));
+    }
+    function normalizePhone(value) {
+      const digits = value.replace(/\D/g, '').slice(0, 11);
+      if (digits.length <= 3) return digits;
+      if (digits.length <= 7) return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+      return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+    }
+    $('#verifyInput').addEventListener('input', event => {
+      if (signupMethod === 'phone') event.target.value = normalizePhone(event.target.value);
+      setFieldError('contactError');
+    });
+    $('#verifyForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const value = $('#verifyInput').value.trim();
+      const valid = signupMethod === 'email' ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value) : /^010-\d{4}-\d{4}$/.test(value);
+      if (!valid) { setFieldError('contactError', signupMethod === 'email' ? '올바른 이메일 주소를 입력해 주세요.' : '휴대전화 번호를 010-1234-5678 형식으로 입력해 주세요.'); return; }
+      signupContact = value;
+      verificationCode = String(Math.floor(100000 + Math.random() * 900000));
+      $('#demoCode').textContent = verificationCode;
+      $('#sentContact').textContent = signupContact;
+      $('#codeContact').textContent = signupContact;
+      $('#sentHeading').textContent = signupMethod === 'email' ? '이메일을 확인해 주세요' : '휴대전화를 확인해 주세요';
+      $('#sentDelivery').textContent = signupMethod === 'email' ? '주소로 인증번호를 보냈어요.' : '번호로 인증 문자를 보냈어요.';
+      $('#sentBackText').textContent = signupMethod === 'email' ? '이메일 주소 수정' : '휴대전화 번호 수정';
+      $('#codeBackText').textContent = $('#sentBackText').textContent;
+      $('#codeDelivery').textContent = signupMethod === 'email' ? '주소로 인증 메일을 보냈어요.' : '번호로 인증 문자를 보냈어요.';
+      showAuthView('sent');
+    });
+    function resetCodeInputs() {
+      $$('#verificationCode input').forEach(input => input.value = '');
+      setFieldError('codeError');
+    }
+    function startVerificationTimer() {
+      clearInterval(verificationTimer);
+      verificationSeconds = 600;
+      const render = () => { $('#codeTimer').textContent = `남은 시간 ${Math.floor(verificationSeconds / 60)}:${String(verificationSeconds % 60).padStart(2, '0')}`; };
+      render();
+      verificationTimer = setInterval(() => { verificationSeconds = Math.max(0, verificationSeconds - 1); render(); if (!verificationSeconds) clearInterval(verificationTimer); }, 1000);
+    }
+    $('#openCode').addEventListener('click', () => { resetCodeInputs(); showAuthView('code'); startVerificationTimer(); $('#verificationCode input').focus(); });
+    function resendCode() {
+      verificationCode = String(Math.floor(100000 + Math.random() * 900000));
+      $('#demoCode').textContent = verificationCode;
+      resetCodeInputs();
+      startVerificationTimer();
+      showToast('새 인증번호를 발송했습니다.');
+    }
+    $('#resendFromSent').addEventListener('click', resendCode);
+    $('#resendFromCode').addEventListener('click', resendCode);
+    $$('#verificationCode input').forEach((input, index, inputs) => {
+      input.addEventListener('input', event => {
+        event.target.value = event.target.value.replace(/\D/g, '').slice(-1);
+        if (event.target.value && inputs[index + 1]) inputs[index + 1].focus();
+        setFieldError('codeError');
+      });
+      input.addEventListener('keydown', event => { if (event.key === 'Backspace' && !input.value && inputs[index - 1]) inputs[index - 1].focus(); });
+      input.addEventListener('paste', event => {
+        event.preventDefault();
+        const digits = event.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        digits.split('').forEach((digit, i) => { if (inputs[i]) inputs[i].value = digit; });
+        if (digits.length) inputs[Math.min(digits.length, 6) - 1].focus();
+      });
+    });
+    $('#codeForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const entered = $$('#verificationCode input').map(input => input.value).join('');
+      if (verificationSeconds <= 0) { setFieldError('codeError', '인증 시간이 만료됐어요. 인증번호를 다시 요청해 주세요.'); return; }
+      if (entered.length !== 6) { setFieldError('codeError', '6자리 인증번호를 모두 입력해 주세요.'); return; }
+      if (entered !== verificationCode) { setFieldError('codeError', '인증번호가 일치하지 않습니다.'); return; }
+      clearInterval(verificationTimer);
+      $('#confirmedKind').textContent = signupMethod === 'email' ? '이메일 인증 완료' : '휴대전화 인증 완료';
+      $('#confirmedContact').textContent = signupContact;
+      showAuthView('account');
+    });
+    $('#accountForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const name = $('#signupName').value.trim();
+      const password = $('#signupPassword').value;
+      const confirmation = $('#signupPasswordConfirm').value;
+      const passwordValid = password.length >= 8 && /[A-Za-z]/.test(password) && /\d/.test(password);
+      setFieldError('nameError', name ? '' : '이름을 입력해 주세요.');
+      setFieldError('passwordError', passwordValid ? '' : '영문과 숫자를 포함해 8자 이상 입력해 주세요.');
+      setFieldError('passwordConfirmError', confirmation === password && confirmation ? '' : '비밀번호가 일치하지 않습니다.');
+      setFieldError('termsError', $('#termsConsent').checked ? '' : '필수 약관에 동의해 주세요.');
+      if (!name || !passwordValid || confirmation !== password || !$('#termsConsent').checked) return;
+      $('#successContact').textContent = signupContact;
+      showAuthView('success');
+    });
+    $('#startAfterSignup').addEventListener('click', () => { closeOverlay('authOverlay'); showWelcome(); showToast('회원가입이 완료되었습니다.'); });
     $$('[data-close]').forEach(button => button.addEventListener('click', () => closeOverlay(button.dataset.close)));
     $$('.overlay').forEach(overlay => overlay.addEventListener('click', event => { if (event.target === overlay) closeOverlay(overlay.id); }));
     $$('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
