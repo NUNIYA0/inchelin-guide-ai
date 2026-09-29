@@ -23,7 +23,7 @@ async function walk(directory) {
 }
 
 await rm(outputRoot, { recursive: true, force: true });
-await mkdir(join(outputRoot, "server"), { recursive: true });
+await mkdir(join(outputRoot, "dist", "server"), { recursive: true });
 await mkdir(join(outputRoot, ".openai"), { recursive: true });
 
 const html = await readFile(join(root, "dist", "index.html"), "utf8");
@@ -42,6 +42,6 @@ const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
   .replace("__ASSETS__", JSON.stringify(assets));
 
-await writeFile(join(outputRoot, "server", "index.js"), worker);
+await writeFile(join(outputRoot, "dist", "server", "index.js"), worker);
 await writeFile(join(outputRoot, ".openai", "hosting.json"), await readFile(join(root, ".openai", "hosting.json")));
 console.log(`Built Worker with ${Object.keys(assets).length} embedded assets.`);
