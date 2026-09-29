@@ -81,6 +81,8 @@
     .icon-btn:active { transform: scale(.96); }
     .icon-btn.active { background: #ededed; }
     .icon-btn svg { width: 19px; height: 19px; stroke: #6e6e6e; }
+    .nav-icon { width: 20px; height: 20px; display: block; object-fit: contain; flex: 0 0 auto; }
+    .icon-btn .nav-icon { width: 21px; height: 21px; }
     .sidebar {
       position: fixed;
       z-index: 40;
@@ -441,9 +443,9 @@
     <nav class="rail" aria-label="주 메뉴">
       <button class="brand" id="sidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><img class="brand-logo" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI" /></button>
       <div class="rail-nav">
-        <button class="icon-btn" id="aboutRail" aria-label="Inchelin Guide AI 소개" title="Inchelin Guide AI 소개"><svg viewBox="0 0 24 24" fill="none"><path d="M8 3h8l5 9-5 9H8l-5-9z" stroke-width="1.7"/></svg></button>
-        <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><svg viewBox="0 0 24 24" fill="none"><path d="M20 11.5a8 8 0 0 1-8.4 8L5 21l1.6-4.4A8 8 0 1 1 20 11.5Z" stroke-width="1.7"/></svg></button>
-        <button class="icon-btn" id="guideRail" aria-label="사용 설명서" title="사용 설명서"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5A3.5 3.5 0 0 1 7.5 2H11v17H7.5A3.5 3.5 0 0 0 4 22Zm16 0A3.5 3.5 0 0 0 16.5 2H13v17h3.5A3.5 3.5 0 0 1 20 22Z" stroke-width="1.7"/></svg></button>
+        <button class="icon-btn" id="aboutRail" aria-label="Inchelin Guide AI 소개" title="Inchelin Guide AI 소개"><img class="nav-icon" src="assets/intro-icon.png" alt="" /></button>
+        <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /></button>
+        <button class="icon-btn" id="guideRail" aria-label="사용 설명서" title="사용 설명서"><img class="nav-icon" src="assets/guide-icon.png" alt="" /></button>
       </div>
       <div class="rail-bottom">
         <button class="icon-btn auth-trigger" aria-label="로그인" title="로그인"><svg viewBox="0 0 24 24" fill="none"><path d="M14 8V5H4v14h10v-3M10 12h10m0 0-3-3m3 3-3 3" stroke-width="1.7"/></svg></button>
@@ -453,9 +455,9 @@
 
     <aside class="sidebar" id="sidebar" aria-hidden="true">
       <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-logo.png" alt="" />Inchelin Guide AI</span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.6"/><path d="M15 4v16" stroke-width="1.6"/></svg></button></div>
-      <button class="new-chat" id="aboutSide"><span>◇</span><span>Inchelin Guide AI 소개</span></button>
-      <button class="new-chat" id="newChatSide"><span>◯</span><span>새 채팅</span></button>
-      <button class="new-chat" id="guideSide"><span>▣</span><span>사용 설명서</span></button>
+      <button class="new-chat" id="aboutSide"><img class="nav-icon" src="assets/intro-icon.png" alt="" /><span>Inchelin Guide AI 소개</span></button>
+      <button class="new-chat" id="newChatSide"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /><span>새 채팅</span></button>
+      <button class="new-chat" id="guideSide"><img class="nav-icon" src="assets/guide-icon.png" alt="" /><span>사용 설명서</span></button>
       <div class="history-label">최근 대화</div>
       <div class="history-list" id="historyList"></div>
       <div class="sidebar-foot">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.<button class="sidebar-login auth-trigger">로그인 · 회원가입</button></div>
