@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://inchelin.example/schemas/ai-place-profile.schema.json",
+  "title": "Inchelin AI Place Profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["place_id", "identity_key", "inchelin_core", "business_status", "facts", "retrieved_at"],
+  "properties": {
+    "place_id": { "type": "string", "format": "uuid" },
+    "identity_key": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "inchelin_core": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "address"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "address": { "type": "string", "minLength": 1 }
+      }
+    },
+    "business_status": {
+      "type": "string",
+      "enum": ["active", "temporarily_closed", "permanently_closed", "unknown"]
+    },
+    "facts": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/resolvedFact" },
+      "properties": {
+        "opening_hours": { "$ref": "#/$defs/resolvedFact" },
+        "representative_menu": { "$ref": "#/$defs/resolvedFact" },
+        "menu_price": { "$ref": "#/$defs/resolvedFact" },
+        "parking": { "$ref": "#/$defs/resolvedFact" },
+        "phone": { "$ref": "#/$defs/resolvedFact" },
+        "official_links": { "$ref": "#/$defs/resolvedFact" },
+        "reservation": { "$ref": "#/$defs/resolvedFact" }
+      }
+    },
+    "retrieved_at": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "resolvedFact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["value", "resolution_status", "checked_at", "sources"],
+      "properties": {
+        "value": {},
+        "resolution_status": {
+          "type": "string",
+          "enum": ["confirmed", "needs_review", "conflict", "missing"]
+        },
+        "checked_at": { "type": "string", "format": "date-time" },
+        "expires_at": { "type": ["string", "null"], "format": "date-time" },
+        "confidence": { "type": ["number", "null"], "minimum": 0, "maximum": 1 },
+        "sources": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/sourceEvidence" }
+        }
+      }
+    },
+    "sourceEvidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source_id", "origin", "kind", "source_rank", "retrieved_at"],
+      "properties": {
+        "source_id": { "type": "string" },
+        "origin": { "type": "string", "enum": ["inchelin_db", "web"] },
+        "kind": {
+          "type": "string",
+          "enum": ["inchelin_db", "official_website", "official_social", "map_service", "reservation_platform", "delivery_platform", "review", "blog"]
+        },
+        "source_rank": { "type": "integer", "minimum": 0, "maximum": 4 },
+        "url": { "type": ["string", "null"], "format": "uri" },
+        "published_at": { "type": ["string", "null"], "format": "date-time" },
+        "retrieved_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}
