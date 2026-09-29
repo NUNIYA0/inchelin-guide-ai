@@ -9,9 +9,13 @@ const SYSTEM_PROMPT = `너는 Inchelin Guide AI야. 사용자가 자연스러운
 
 사용자의 말이 짧거나 불완전하거나 반말이어도 이전 대화 전체를 참고해 자연스럽게 이해해. 메뉴, 지역, 분위기, 동행자, 시간, 예산, 주차 같은 새 조건은 이전 조건과 합쳐서 기억해. "국물", "부모님이랑", "조용한 데", "다른 거 없어?", "그중 두 번째" 같은 말은 독립 검색어가 아니라 바로 앞 대화의 연속으로 해석해. 사용자가 새 조건을 말하면 그 조건을 자연스럽게 반영해 추천을 갱신하고, 이미 답한 질문을 반복하지 마.
 
+사용자가 "다른 거 추천해줘", "딱히 안 끌려", "다른 거 없어?", "별로야", "다른 느낌으로", "그것 말고", "다 싫어", "좀 다른 거"처럼 말하면 직전 선택지를 거절한 뜻으로 이해해. 선택을 강요하거나 같은 후보를 다시 보여주지 말고, 직전 추천과 겹치지 않는 메뉴를 바로 제안해. 이런 거절이 두 번 이상 이어지면 같은 종류 안에서 이름만 바꾸지 말고 가벼움과 든든함, 따뜻함, 면과 밥, 한식·일식·양식처럼 추천 기준 자체를 바꿔 자연스럽게 탐색해.
+
 사용자가 가볍게 말하면 답변도 가볍고 친근하게 해. "배고파"에는 먼저 공감하고 자연스럽게 다음 말을 이어갈 수 있게 답하고, "매운 거 먹고 싶어"에는 떡볶이, 짬뽕, 닭도리탕처럼 구체적인 예를 먼저 보여줘. 보고서, 업무 분석, 체크리스트, 메뉴판, 검색 필터 같은 딱딱한 형식은 사용하지 마. 사용자가 목록을 요청하지 않았다면 소제목이나 불릿 목록을 만들지 말고, 2~4개의 짧고 자연스러운 문장 안에서 후보와 이유를 함께 말해. "추천 4가지", "선택지는 다음과 같아요", "상황을 모르면" 같은 안내 문구로 시작하지 마. 한국어 중심의 편안한 대화체로 지나치게 장황하지 않게 답하고, 사용자의 말투와 흐름에 맞춰. 고유명사가 아닌데 중국어나 일본어 문자를 섞지 마.
 
 좋은 응답 흐름의 예: 사용자가 "지금 가볍게 먹기 좋은 메뉴 있을까?"라고 하면 "가볍게 먹고 싶다면 포케, 샌드위치, 메밀소바 정도가 좋아요. 따뜻한 게 당기면 쌀국수도 괜찮고요. 지금 밥이랑 면 중에는 어떤 쪽이 더 끌려요?"처럼 먼저 추천하고 자연스럽게 질문 하나만 이어가. 사용자가 "매운 거 먹고 싶어"라고 하면 "매운 거 좋죠. 떡볶이처럼 가볍게 갈 수도 있고, 짬뽕이나 닭도리탕처럼 든든하게 갈 수도 있어요. 오늘은 어느 쪽이 더 당겨요?"처럼 답해.
+
+메뉴 후보를 제안한 답변에는 quickReplies를 3~4개 만들어. 앞의 2~3개는 방금 답변에 실제로 언급한 구체적인 메뉴나 자연스러운 후속 표현으로 하고, 마지막에는 반드시 "다른 거 추천해줘", "다른 메뉴 보기", "다른 느낌으로", "또 다른 메뉴" 중 하나를 넣어 사용자가 빠져나갈 수 있게 해. quick reply는 정답 목록이 아니라 대화를 돕는 보조 수단이며, 사용자가 버튼 대신 자유롭게 입력한 새 조건을 항상 우선해. 단순 인사처럼 선택지가 도움이 되지 않는 답변에는 quickReplies를 비워도 돼.
 
 구체적인 식당 사실을 확인할 자료가 없으면 영업시간, 주소, 평점 등을 지어내지 마. 실제 식당을 골라야 하는 단계에서만 필요한 지역을 자연스럽게 한 번 물어봐. 사용자가 특정 시간이나 날짜를 말하면 현재 시간보다 그 조건을 우선해.`;
 
@@ -40,6 +44,25 @@ function extractOutputText(response) {
     .map(part => part.text)
     .join("")
     .trim();
+}
+
+function sanitizeKoreanText(value) {
+  return String(value || "")
+    .replace(/[\u3400-\u4dbf\u4e00-\u9fff\u3040-\u30ff]/g, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
+function normalizeQuickReplies(value) {
+  if (!Array.isArray(value)) return [];
+  const replies = [...new Set(value.map(item => typeof item === "string" ? sanitizeKoreanText(item) : "").filter(Boolean))].slice(0, 4);
+  if (!replies.length) return [];
+  const hasEscape = replies.some(item => /(다른|또 다른|별로|안 끌)/.test(item));
+  if (!hasEscape) {
+    if (replies.length >= 4) replies[3] = "다른 거 추천해줘";
+    else replies.push("다른 거 추천해줘");
+  }
+  return replies.slice(0, 4);
 }
 
 async function handleChat(request, env) {
@@ -91,7 +114,28 @@ async function handleChat(request, env) {
       instructions: `${SYSTEM_PROMPT}\n\n${timeContext}`,
       input: messages,
       reasoning: { effort: "minimal" },
-      text: { verbosity: "low" },
+      text: {
+        verbosity: "low",
+        format: {
+          type: "json_schema",
+          name: "inchelin_chat_response",
+          strict: true,
+          schema: {
+            type: "object",
+            properties: {
+              content: { type: "string" },
+              quickReplies: {
+                type: "array",
+                items: { type: "string" },
+                minItems: 0,
+                maxItems: 4,
+              },
+            },
+            required: ["content", "quickReplies"],
+            additionalProperties: false,
+          },
+        },
+      },
       max_output_tokens: 500,
       store: false,
     }),
@@ -102,9 +146,16 @@ async function handleChat(request, env) {
     return json({ error: "답변을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." }, 502);
   }
 
-  const content = extractOutputText(await response.json());
+  const rawContent = extractOutputText(await response.json());
+  let result;
+  try {
+    result = JSON.parse(rawContent);
+  } catch {
+    return json({ error: "답변 형식을 확인하지 못했어요. 다시 시도해 주세요." }, 502);
+  }
+  const content = typeof result?.content === "string" ? sanitizeKoreanText(result.content) : "";
   if (!content) return json({ error: "답변을 생성하지 못했어요. 다시 시도해 주세요." }, 502);
-  return json({ content });
+  return json({ content, quickReplies: normalizeQuickReplies(result.quickReplies) });
 }
 
 export default {

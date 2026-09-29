@@ -249,6 +249,11 @@
     .message.user { margin-left: auto; border-radius: 18px 18px 4px 18px; background: #f1f1f1; padding: 11px 15px; }
     .message.ai { color: #303030; }
     .message.ai::before { content: ""; width: 30px; height: 30px; display: block; border-radius: 50%; background: url("assets/inchelin-guide-logo.png") center / contain no-repeat; margin-bottom: 8px; }
+    .message-copy { white-space: pre-wrap; }
+    .quick-replies { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; }
+    .quick-reply { min-height: 36px; padding: 7px 12px; border: 1px solid #dedede; border-radius: 999px; background: #fff; color: #555; font-size: 13px; line-height: 1.35; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+    .quick-reply:hover { border-color: #bcbcbc; background: #f7f7f7; color: #222; }
+    .quick-reply:disabled { opacity: .48; cursor: default; }
     .message.status { color: #555; display: flex; align-items: center; gap: 10px; }
     .message.error { color: #555; }
     .retry-button { display: block; margin-top: 10px; padding: 7px 11px; border: 1px solid #d8d8d8; border-radius: 9px; background: #fff; color: #333; font: inherit; font-size: 13px; cursor: pointer; }
@@ -807,7 +812,10 @@
       const role = message?.role || (message?.type === 'ai' ? 'assistant' : message?.type);
       const content = String(message?.content ?? message?.text ?? '').trim();
       if (!['user', 'assistant'].includes(role) || !content) return null;
-      return { role, content };
+      const quickReplies = role === 'assistant' && Array.isArray(message?.quickReplies)
+        ? [...new Set(message.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
+        : [];
+      return { role, content, quickReplies };
     }
     function readStoredConversations() {
       try {
@@ -852,9 +860,13 @@
         signal
       });
       if (!response.ok) throw new Error(`AI request failed: ${response.status}`);
-      const answer = extractAssistantText(await response.json());
-      if (!answer) throw new Error('AI response did not include assistant content.');
-      return answer;
+      const data = await response.json();
+      const content = extractAssistantText(data);
+      if (!content) throw new Error('AI response did not include assistant content.');
+      const quickReplies = Array.isArray(data?.quickReplies)
+        ? [...new Set(data.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
+        : [];
+      return { content, quickReplies };
     }
     setInterval(() => refreshTimeSuggestions(), 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeSuggestions(); });
@@ -929,13 +941,30 @@
     function renderMessage(message, extra = '', follow = false) {
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
-      item.textContent = message.content;
+      const copy = document.createElement('div');
+      copy.className = 'message-copy';
+      copy.textContent = message.content;
+      item.appendChild(copy);
+      if (message.role === 'assistant' && message.quickReplies?.length) {
+        const replies = document.createElement('div');
+        replies.className = 'quick-replies';
+        replies.setAttribute('aria-label', '빠른 답변');
+        message.quickReplies.forEach(reply => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'quick-reply';
+          button.textContent = reply;
+          button.addEventListener('click', () => ask(reply));
+          replies.appendChild(button);
+        });
+        item.appendChild(replies);
+      }
       messagesEl.appendChild(item);
       if (follow) requestAnimationFrame(() => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' }));
       return item;
     }
-    function appendMessage(role, content, { save = true } = {}) {
-      const message = normalizeMessage({ role, content });
+    function appendMessage(role, content, { save = true, quickReplies = [] } = {}) {
+      const message = normalizeMessage({ role, content, quickReplies });
       if (!message) return null;
       const shouldFollow = isNearConversationBottom();
       chatMessages = [...chatMessages, message];
@@ -1083,7 +1112,7 @@
         const answer = await requestAssistant(request, controller.signal);
         if (controller.signal.aborted) return;
         status.remove();
-        appendMessage('assistant', answer);
+        appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies });
       } catch (error) {
         status.remove();
         if (error?.name !== 'AbortError') showRequestError(request);
