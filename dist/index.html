@@ -249,8 +249,10 @@
     .message.user { margin-left: auto; border-radius: 18px 18px 4px 18px; background: #f1f1f1; padding: 11px 15px; }
     .message.ai { color: #303030; }
     .message.ai::before { content: ""; width: 30px; height: 30px; display: block; border-radius: 50%; background: url("assets/inchelin-guide-logo.png") center / contain no-repeat; margin-bottom: 8px; }
-    .message-copy { white-space: pre-wrap; }
-    .quick-replies { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 7px; }
+    .message-copy { display: flex; flex-direction: column; gap: 10px; white-space: normal; }
+    .message-copy p { margin: 0; font-weight: 400; }
+    .message-copy strong { color: #202020; font-weight: 600; }
+    .quick-replies { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
     .quick-reply { min-height: 36px; padding: 7px 12px; border: 1px solid #dedede; border-radius: 999px; background: #fff; color: #555; font-size: 13px; line-height: 1.35; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
     .quick-reply:hover { border-color: #bcbcbc; background: #f7f7f7; color: #222; }
     .quick-reply:disabled { opacity: .48; cursor: default; }
@@ -938,12 +940,36 @@
     function isNearConversationBottom() {
       return messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 120;
     }
+    function appendLimitedMarkdown(parent, text) {
+      const blocks = String(text).split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
+      const appendLine = (target, line) => {
+        const pattern = /\*\*([^*\n]+)\*\*/g;
+        let cursor = 0;
+        let match;
+        while ((match = pattern.exec(line))) {
+          if (match.index > cursor) target.appendChild(document.createTextNode(line.slice(cursor, match.index)));
+          const strong = document.createElement('strong');
+          strong.textContent = match[1];
+          target.appendChild(strong);
+          cursor = match.index + match[0].length;
+        }
+        if (cursor < line.length) target.appendChild(document.createTextNode(line.slice(cursor)));
+      };
+      (blocks.length ? blocks : ['']).forEach(block => {
+        const paragraph = document.createElement('p');
+        block.split('\n').forEach((line, index) => {
+          if (index) paragraph.appendChild(document.createElement('br'));
+          appendLine(paragraph, line);
+        });
+        parent.appendChild(paragraph);
+      });
+    }
     function renderMessage(message, extra = '', follow = false) {
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
       const copy = document.createElement('div');
       copy.className = 'message-copy';
-      copy.textContent = message.content;
+      appendLimitedMarkdown(copy, message.content);
       item.appendChild(copy);
       if (message.role === 'assistant' && message.quickReplies?.length) {
         const replies = document.createElement('div');
