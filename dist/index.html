@@ -663,7 +663,7 @@
   <div class="toast" id="toast" role="status"></div>
 
   <script>
-  (($, $$) => {
+  (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
     const CONTENT = {
       title: '맛있는 한 끼, 같이 찾아볼까요?',
@@ -989,7 +989,7 @@
     function closeHistoryMenu() {
       historyActionMenu.classList.remove('open');
       historyActionMenu.setAttribute('aria-hidden', 'true');
-      $$('[data-history-menu]').forEach(button => button.setAttribute('aria-expanded', 'false'));
+      qsa('[data-history-menu]').forEach(button => button.setAttribute('aria-expanded', 'false'));
       historyMenuId = null;
     }
     function openHistoryMenu(id, button) {
@@ -1000,7 +1000,7 @@
       historyMenuId = id;
       historyActionMenu.classList.add('open');
       historyActionMenu.setAttribute('aria-hidden', 'false');
-      $$('[data-history-menu]').forEach(item => item.setAttribute('aria-expanded', String(item === button)));
+      qsa('[data-history-menu]').forEach(item => item.setAttribute('aria-expanded', String(item === button)));
       const rect = button.getBoundingClientRect();
       const width = historyActionMenu.offsetWidth;
       const height = historyActionMenu.offsetHeight;
@@ -1159,18 +1159,18 @@
     ['newChatRail', 'newChatSide', 'topNewChat'].forEach(id => document.getElementById(id).addEventListener('click', newChat));
     ['aboutRail', 'aboutSide'].forEach(id => document.getElementById(id).addEventListener('click', () => { if (window.innerWidth <= 768) setSidebar(false); openOverlay('aboutOverlay'); }));
     ['guideRail', 'guideSide'].forEach(id => document.getElementById(id).addEventListener('click', showGuide));
-    $$('.auth-trigger').forEach(button => button.addEventListener('click', () => openAuth('login')));
-    $$('.signup-trigger').forEach(button => button.addEventListener('click', () => openAuth('plan')));
+    qsa('.auth-trigger').forEach(button => button.addEventListener('click', () => openAuth('login')));
+    qsa('.signup-trigger').forEach(button => button.addEventListener('click', () => openAuth('plan')));
     $('#startButton').addEventListener('click', () => openAuth('login'));
     $('#mobileStartButton').addEventListener('click', () => openAuth('login'));
-    $$('.more-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const open = moreMenu.classList.toggle('open'); $$('.more-trigger').forEach(item => item.setAttribute('aria-expanded', String(open))); }));
+    qsa('.more-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const open = moreMenu.classList.toggle('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', String(open))); }));
     $('#releaseButton').addEventListener('click', () => openOverlay('releaseOverlay'));
-    $$('.task-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const rect = button.getBoundingClientRect(); taskMenu.style.left = `${Math.max(10, rect.left)}px`; taskMenu.style.top = `${Math.max(10, rect.top - 102)}px`; const open = taskMenu.classList.toggle('open'); $$('.task-trigger').forEach(b => b.setAttribute('aria-expanded', String(open && b === button))); }));
+    qsa('.task-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const rect = button.getBoundingClientRect(); taskMenu.style.left = `${Math.max(10, rect.left)}px`; taskMenu.style.top = `${Math.max(10, rect.top - 102)}px`; const open = taskMenu.classList.toggle('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', String(open && b === button))); }));
     $('#photoButton').addEventListener('click', () => { taskMenu.classList.remove('open'); $('#fileInput').click(); });
     $('#fileInput').addEventListener('change', event => { const file = event.target.files[0]; if (file) { const input = chatView.classList.contains('active') ? $('#chatInput') : $('#welcomeInput'); input.value = `[첨부: ${file.name}] ` + input.value; resizeInput(input); showToast('사진이 질문에 첨부되었습니다.'); } });
     $('#pluginButton').addEventListener('click', () => { renderPlugins(); openOverlay('pluginOverlay'); });
     $('#pluginSearch').addEventListener('input', renderPlugins);
-    $('#pluginFilters').addEventListener('click', event => { const button = event.target.closest('[data-filter]'); if (!button) return; activeFilter = button.dataset.filter; $$('.filter-btn').forEach(b => b.classList.toggle('active', b === button)); renderPlugins(); });
+    $('#pluginFilters').addEventListener('click', event => { const button = event.target.closest('[data-filter]'); if (!button) return; activeFilter = button.dataset.filter; qsa('.filter-btn').forEach(b => b.classList.toggle('active', b === button)); renderPlugins(); });
     $('#pluginGrid').addEventListener('click', event => {
       const pin = event.target.closest('[data-pin]');
       if (pin) { event.stopPropagation(); const id = Number(pin.dataset.pin); pinned = pinned.includes(id) ? pinned.filter(x => x !== id) : [...pinned, id]; localStorage.setItem('insight-ai-pins', JSON.stringify(pinned)); renderPlugins(); return; }
@@ -1185,21 +1185,21 @@
     $('#guideList').addEventListener('click', event => { const button = event.target.closest('button'); if (button) button.parentElement.classList.toggle('open'); });
     $('#authForm').addEventListener('submit', event => { event.preventDefault(); closeOverlay('authOverlay'); showToast('데모 계정으로 로그인되었습니다.'); });
     $('#openSignup').addEventListener('click', () => showAuthView('plan'));
-    $$('[data-auth-back]').forEach(button => button.addEventListener('click', () => showAuthView(button.dataset.authBack)));
+    qsa('[data-auth-back]').forEach(button => button.addEventListener('click', () => showAuthView(button.dataset.authBack)));
     $('#billingToggle').addEventListener('click', event => {
       const button = event.target.closest('[data-billing]');
       if (!button) return;
       billingCycle = button.dataset.billing;
-      $$('#billingToggle button').forEach(b => b.classList.toggle('active', b === button));
-      $$('.plan-price[data-monthly]').forEach(price => price.textContent = price.dataset[billingCycle]);
-      $$('.plan-billing[data-monthly]').forEach(note => note.textContent = note.dataset[billingCycle]);
+      qsa('#billingToggle button').forEach(b => b.classList.toggle('active', b === button));
+      qsa('.plan-price[data-monthly]').forEach(price => price.textContent = price.dataset[billingCycle]);
+      qsa('.plan-billing[data-monthly]').forEach(note => note.textContent = note.dataset[billingCycle]);
     });
     $('#planGrid').addEventListener('click', event => {
       const card = event.target.closest('[data-plan]');
       if (!card) return;
       selectedPlan = card.dataset.plan;
-      $$('.plan-card').forEach(item => item.classList.toggle('selected', item === card));
-      $$('.plan-card-action').forEach(action => action.textContent = `${action.closest('.plan-card').dataset.plan} 선택`);
+      qsa('.plan-card').forEach(item => item.classList.toggle('selected', item === card));
+      qsa('.plan-card-action').forEach(action => action.textContent = `${action.closest('.plan-card').dataset.plan} 선택`);
       card.querySelector('.plan-card-action').textContent = '선택됨';
       $('#planContinue').disabled = false;
       $('#planContinue').textContent = `${selectedPlan} 플랜으로 계속`;
@@ -1219,7 +1219,7 @@
       const button = event.target.closest('[data-method]');
       if (!button) return;
       signupMethod = button.dataset.method;
-      $$('#signupMethod button').forEach(b => b.classList.toggle('active', b === button));
+      qsa('#signupMethod button').forEach(b => b.classList.toggle('active', b === button));
       $('#verifyHeading').textContent = signupMethod === 'email' ? '이메일을 인증해 주세요' : '휴대전화 번호를 인증해 주세요';
       $('#verifyLabel').childNodes[0].nodeValue = signupMethod === 'email' ? '이메일' : '휴대전화 번호';
       $('#verifyInput').type = signupMethod === 'email' ? 'email' : 'tel';
@@ -1272,7 +1272,7 @@
       showAuthView('sent');
     });
     function resetCodeInputs() {
-      $$('#verificationCode input').forEach(input => input.value = '');
+      qsa('#verificationCode input').forEach(input => input.value = '');
       setFieldError('codeError');
     }
     function startVerificationTimer() {
@@ -1311,7 +1311,7 @@
     }
     $('#resendFromSent').addEventListener('click', resendCode);
     $('#resendFromCode').addEventListener('click', resendCode);
-    $$('#verificationCode input').forEach((input, index, inputs) => {
+    qsa('#verificationCode input').forEach((input, index, inputs) => {
       input.addEventListener('input', event => {
         const digits = event.target.value.replace(/\D/g, '');
         if (digits.length > 1) {
@@ -1337,7 +1337,7 @@
     });
     $('#codeForm').addEventListener('submit', event => {
       event.preventDefault();
-      const entered = $$('#verificationCode input').map(input => input.value).join('');
+      const entered = qsa('#verificationCode input').map(input => input.value).join('');
       if (verificationSeconds <= 0) { setFieldError('codeError', '인증 시간이 만료됐어요. 인증번호를 다시 요청해 주세요.'); return; }
       if (entered.length !== 6) { setFieldError('codeError', '6자리 인증번호를 모두 입력해 주세요.'); return; }
       if (entered !== verificationCode) {
@@ -1363,7 +1363,7 @@
     }
     $('#signupPassword').addEventListener('input', validatePasswordFields);
     $('#signupPasswordConfirm').addEventListener('input', validatePasswordFields);
-    $$('[data-legal]').forEach(button => button.addEventListener('click', () => {
+    qsa('[data-legal]').forEach(button => button.addEventListener('click', () => {
       const document = LEGAL_CONTENT[button.dataset.legal];
       $('#legalTitle').textContent = document.title;
       $('#legalCopy').innerHTML = document.html;
@@ -1385,11 +1385,11 @@
       showAuthView('success');
     });
     $('#startAfterSignup').addEventListener('click', () => { closeOverlay('authOverlay'); showWelcome(); showToast('회원가입이 완료되었습니다.'); });
-    $$('[data-close]').forEach(button => button.addEventListener('click', () => closeOverlay(button.dataset.close)));
-    $$('.overlay').forEach(overlay => overlay.addEventListener('click', event => { if (event.target === overlay) closeOverlay(overlay.id); }));
-    $$('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
-    document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); $$('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); $$('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') { $$('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
+    qsa('[data-close]').forEach(button => button.addEventListener('click', () => closeOverlay(button.dataset.close)));
+    qsa('.overlay').forEach(overlay => overlay.addEventListener('click', event => { if (event.target === overlay) closeOverlay(overlay.id); }));
+    qsa('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
+    document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
     window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
     renderHistory();
     renderPlugins();
