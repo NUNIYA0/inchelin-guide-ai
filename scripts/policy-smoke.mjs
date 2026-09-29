@@ -112,7 +112,7 @@ const baseEnv = {
   const result = await runCase({
     message: "맛집 추천해줘",
     env: { OPENAI_API_KEY: "test-key" },
-    expectedStatus: 503,
+    expectedStatus: 200,
   });
   assert.match(result.body.content, /등록 매장 데이터를 연결 중/);
   assert.equal(result.calls.length, 0);

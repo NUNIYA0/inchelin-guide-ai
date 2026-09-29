@@ -356,11 +356,11 @@ async function handleChat(request, env) {
       lookup = await searchInchelinDatabase(env, latestUserMessage, messages);
     } catch (error) {
       console.error("Inchelin DB request failed", error instanceof Error ? error.message : "unknown error");
-      return json(dataConnectionUnavailableResponse(), 503);
+      return json(dataConnectionUnavailableResponse());
     }
 
     if (!lookup.configured) {
-      if (venueIntent) return json(dataConnectionUnavailableResponse(), 503);
+      if (venueIntent) return json(dataConnectionUnavailableResponse());
     } else if (!lookup.places.length) {
       if (venueIntent) return json(unregisteredVenueResponse());
     } else if (lookup.ambiguous) {
