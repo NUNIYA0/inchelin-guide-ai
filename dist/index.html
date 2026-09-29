@@ -663,7 +663,7 @@
   <div class="toast" id="toast" role="status"></div>
 
   <script>
-  (() => {
+  (($, $$) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
     const CONTENT = {
       title: '맛있는 한 끼, 같이 찾아볼까요?',
@@ -722,8 +722,6 @@
       ['요금제·사용량', '현재 데모에는 결제나 사용량 제한이 연결되어 있지 않습니다.']
     ];
 
-    const $ = selector => document.querySelector(selector);
-    const $$ = selector => [...document.querySelectorAll(selector)];
     const welcome = $('#welcome');
     const chatView = $('#chatView');
     const guidePanel = $('#guidePanel');
@@ -1395,7 +1393,10 @@
     window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
     renderHistory();
     renderPlugins();
-  })();
+  })(
+    selector => document.querySelector(selector),
+    selector => [...document.querySelectorAll(selector)]
+  );
   </script>
 </body>
 </html>
