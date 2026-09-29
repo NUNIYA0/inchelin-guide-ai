@@ -283,22 +283,22 @@
     .eyebrow { margin-bottom: 8px; font-size: 11px; letter-spacing: .14em; font-weight: 800; color: #888; }
     .dialog h2 { margin: 0 42px 8px 0; font-size: 21px; line-height: 1.45; letter-spacing: -.025em; font-weight: 600; }
     .dialog-sub { margin: 0 0 18px; color: #666; font-size: 13.5px; line-height: 1.55; }
-    .about-dialog { padding: 32px 36px 36px; text-align: left; }
-    .about-shell { width: 100%; max-width: 480px; text-align: left; }
-    .about-dialog .eyebrow { margin-bottom: 4px; color: #858585; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
-    .about-dialog h2 { margin: 0 42px 24px 0; color: #151515; font-size: 26px; line-height: 1.35; font-weight: 700; letter-spacing: -.035em; }
-    .about-copy { color: #303030; font-size: 16px; line-height: 1.75; letter-spacing: -.015em; text-align: left; }
+    .about-dialog { width: min(560px, calc(100vw - 32px)); max-width: 560px; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: clamp(20px, 5vw, 36px); text-align: left; }
+    .about-shell { width: 100%; max-width: 480px; text-align: left; word-break: keep-all; overflow-wrap: break-word; }
+    .about-dialog .eyebrow { margin-bottom: 4px; color: #858585; font-size: clamp(11px, 3vw, 13px); font-weight: 700; letter-spacing: .12em; }
+    .about-dialog h2 { margin: 0 42px clamp(20px, 4vw, 24px) 0; color: #151515; font-size: clamp(22px, 5.5vw, 28px); line-height: 1.35; font-weight: 700; letter-spacing: -.035em; }
+    .about-copy { display: flex; flex-direction: column; gap: clamp(20px, 4vw, 30px); color: #303030; font-size: clamp(14px, 3.8vw, 16px); line-height: 1.75; letter-spacing: -.015em; text-align: left; word-break: keep-all; overflow-wrap: break-word; }
     .about-copy p { margin: 0; }
-    .about-line { display: block; }
-    .about-intro { font-size: 16px; line-height: 1.7; font-weight: 400; }
+    .about-intro { font-size: clamp(14px, 3.8vw, 16px); line-height: 1.7; font-weight: 400; }
+    .about-intro p + p { margin-top: clamp(10px, 2.5vw, 14px); }
     .about-intro strong { color: #111; font-size: inherit; line-height: inherit; font-weight: 600; }
-    .about-story { margin-top: 30px; padding: 21px 22px 22px; border-left: 3px solid #424242; border-radius: 14px; background: rgba(0,0,0,.035); }
-    .about-story h3 { margin: 0 0 12px; color: #222; font-size: 15.5px; line-height: 1.5; font-weight: 700; letter-spacing: -.02em; }
-    .about-story p { color: #4a4a4a; font-size: 15px; line-height: 1.75; }
-    .about-story p + p { margin-top: 14px; }
-    .about-vision { margin-top: 30px !important; padding: 18px 20px 20px; border-radius: 14px; background: rgba(0,0,0,.025); color: #333; }
+    .about-story { height: auto; min-height: 0; padding: clamp(18px, 4.5vw, 22px); border-left: 3px solid #424242; border-radius: 14px; background: rgba(0,0,0,.035); }
+    .about-story h3 { margin: 0 0 12px; color: #222; font-size: clamp(17px, 4.3vw, 18px); line-height: 1.45; font-weight: 600; letter-spacing: -.02em; }
+    .about-story p { color: #4a4a4a; font-size: clamp(14px, 3.8vw, 16px); line-height: 1.75; font-weight: 400; }
+    .about-story p + p { margin-top: clamp(16px, 3vw, 20px); }
+    .about-vision { height: auto; min-height: 0; padding: clamp(17px, 4vw, 20px); border-radius: 14px; background: rgba(0,0,0,.025); color: #333; font-size: clamp(15px, 4vw, 17px); line-height: 1.65; font-weight: 400; }
     .about-vision span, .about-vision strong { display: block; }
-    .about-vision strong { margin-top: 3px; color: #111; font-size: 18px; line-height: 1.55; font-weight: 700; }
+    .about-vision strong { margin-top: 3px; color: #111; font-size: inherit; line-height: inherit; font-weight: 600; }
     .auth-form { display: grid; gap: 12px; }
     .auth-form label { display: grid; gap: 6px; font-size: 14.5px; line-height: 1.5; color: #333; font-weight: 700; }
     .auth-form input, .search-input { width: 100%; height: 46px; border: 1px solid #dedede; border-radius: 999px; padding: 0 15px; outline: none; font-size: 15.5px; font-weight: 400; }
@@ -447,12 +447,7 @@
       .message { max-width: 90%; }
       .overlay { padding: 10px; }
       .dialog { max-height: calc(100dvh - 20px); border-radius: 17px; padding: 24px 18px; }
-      .about-dialog { padding: 28px 22px 30px; }
-      .about-dialog h2 { margin-bottom: 22px; font-size: 24px; }
-      .about-copy { font-size: 15.5px; }
-      .about-intro { font-size: 16px; }
-      .about-story { margin-top: 28px; padding: 19px 18px 20px; }
-      .about-vision { margin-top: 28px !important; padding: 17px 18px 19px; }
+      .about-dialog { width: calc(100vw - 24px); padding-top: max(20px, env(safe-area-inset-top)); padding-right: clamp(20px, 5vw, 28px); padding-bottom: max(20px, env(safe-area-inset-bottom)); padding-left: clamp(20px, 5vw, 28px); }
       .plugin-grid { grid-template-columns: 1fr; }
       .auth-dialog.plan-mode { width: min(420px, 100%); }
       .plan-grid { grid-template-columns: 1fr; }
@@ -539,7 +534,7 @@
     </main>
   </div>
 
-  <div class="overlay" id="aboutOverlay"><section class="dialog about-dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="about-shell"><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">인슐랭가이드 AI 소개</h2><div class="about-copy"><p class="about-intro"><span class="about-line"><strong>인슐랭 가이드</strong>는</span><span class="about-line">보험(Insurance)과 미슐랭 가이드(Michelin Guide)의 합성어로,</span><span class="about-line"><strong>보험인과 고객이 함께 만드는 맛집 앱(App)</strong>입니다.</span></p><section class="about-story" aria-labelledby="aboutStoryTitle"><h3 id="aboutStoryTitle">우리가 인슐랭 가이드를 만든 이유</h3><p>맛있는 한 끼에서 느끼는 작은 기쁨을<br />전국의 보험인과 고객님들과 함께 나누고 싶었습니다.</p><p>그래서 전국 방방곡곡의 맛집을 소개하고<br />더 즐거운 일상을 연결하는 인슐랭 가이드를 시작했습니다.</p></section><p class="about-vision"><span>진짜 맛있는 한 끼를 찾을 수 있는</span><strong>‘맛집 앱의 보험’이 되겠습니다.</strong></p></div></div></section></div>
+  <div class="overlay" id="aboutOverlay"><section class="dialog about-dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="about-shell"><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">인슐랭가이드 AI 소개</h2><div class="about-copy"><div class="about-intro"><p><strong>인슐랭 가이드</strong>는 보험(Insurance)과 미슐랭 가이드(Michelin Guide)를 더한 이름입니다.</p><p>보험인과 고객이 함께 <strong>좋은 맛집을 발견하고 공유하는 맛집 앱</strong>입니다.</p></div><section class="about-story" aria-labelledby="aboutStoryTitle"><h3 id="aboutStoryTitle">우리가 인슐랭 가이드를 만든 이유</h3><p>맛있는 한 끼는 평범한 하루를 조금 더 즐겁게 만들어줍니다.</p><p>전국의 보험인과 고객이 좋았던 맛집을 함께 공유하고, 누구나 좋은 한 끼를 쉽게 만날 수 있도록 인슐랭 가이드를 시작했습니다.</p></section><p class="about-vision"><span>맛집을 고를 때 믿고 찾을 수 있는</span><strong>‘맛집 앱의 보험’이 되겠습니다.</strong></p></div></div></section></div>
 
   <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
     <div class="auth-view" id="loginView">
