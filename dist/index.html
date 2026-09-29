@@ -7,6 +7,15 @@
   <title>Inchelin Guide AI</title>
   <link rel="icon" type="image/png" href="assets/inchelin-guide-logo.png" />
   <style>
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-thin.ttf") format("truetype"); font-weight: 100; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-extra-light.ttf") format("truetype"); font-weight: 200; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-light.ttf") format("truetype"); font-weight: 300; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-semi-bold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-extra-bold.ttf") format("truetype"); font-weight: 800; font-style: normal; font-display: swap; }
+    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-black.ttf") format("truetype"); font-weight: 900; font-style: normal; font-display: swap; }
     :root {
       color-scheme: light;
       --ink: #090909;
@@ -25,7 +34,7 @@
       overflow: hidden;
       color: var(--ink);
       background: #fff;
-      font-family: Pretendard, "Noto Sans KR", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-family: "AtoZ", Pretendard, "Noto Sans KR", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
     button, textarea { font: inherit; }
@@ -44,8 +53,8 @@
       padding: 18px 0 14px;
     }
     .brand {
-      width: 50px;
-      height: 50px;
+      width: 42px;
+      height: 42px;
       border: 0;
       background: transparent;
       display: grid;
@@ -53,7 +62,7 @@
       cursor: pointer;
       margin-bottom: 8px;
     }
-    .brand-logo { width: 44px; height: 44px; object-fit: contain; display: block; }
+    .brand-logo { width: 34px; height: 34px; object-fit: contain; display: block; }
     .rail-nav { display: flex; flex-direction: column; gap: 9px; }
     .rail-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
     .icon-btn {
@@ -88,7 +97,7 @@
     .sidebar.open { transform: translateX(0); }
     .sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
     .sidebar-title { display: flex; align-items: center; gap: 9px; font-size: 19px; font-weight: 800; letter-spacing: -.04em; }
-    .sidebar-title img { width: 42px; height: 42px; object-fit: contain; flex: 0 0 auto; }
+    .sidebar-title img { width: 32px; height: 32px; object-fit: contain; flex: 0 0 auto; }
     .new-chat {
       width: 100%;
       border: 1px solid #dedede;
@@ -286,24 +295,25 @@
     .billing-toggle, .signup-method { width: fit-content; margin: 0 auto 20px; padding: 4px; display: flex; gap: 4px; border-radius: 11px; background: #f1f1f1; }
     .billing-toggle button, .signup-method button { min-width: 76px; height: 34px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
     .billing-toggle button.active, .signup-method button.active { background: white; box-shadow: 0 1px 5px rgba(0,0,0,.1); font-weight: 700; }
-    .plan-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
-    .plan-card { position: relative; min-height: 260px; padding: 20px 17px; border: 1px solid #e1e1e1; border-radius: 16px; background: white; text-align: left; cursor: pointer; }
+    .plan-grid { display: grid; grid-template-columns: 1fr; gap: 9px; }
+    .plan-card { position: relative; min-height: 0; padding: 16px 52px 16px 17px; border: 1px solid #e1e1e1; border-radius: 14px; background: white; text-align: left; cursor: pointer; }
     .plan-card:hover { border-color: #aaa; }
-    .plan-card.selected { border: 2px solid #111; padding: 19px 16px; }
-    .plan-card h3 { margin: 0 0 14px; font-size: 21px; }
-    .plan-price { font-size: 22px; font-weight: 800; }
+    .plan-card.selected { border: 2px solid #111; padding: 15px 51px 15px 16px; }
+    .plan-card h3 { display: inline-block; min-width: 56px; margin: 0 8px 7px 0; font-size: 19px; }
+    .plan-price { font-size: 19px; font-weight: 800; }
     .plan-unit { color: #777; font-size: 12px; }
-    .plan-copy { min-height: 44px; margin: 8px 0 14px; color: #666; font-size: 13px; line-height: 1.45; }
-    .plan-card ul { margin: 0; padding-left: 18px; color: #555; font-size: 13px; line-height: 1.8; }
-    .plan-check { position: absolute; top: 16px; right: 16px; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid #bbb; border-radius: 50%; color: transparent; font-size: 12px; }
+    .plan-copy { min-height: 0; margin: 0 0 8px; color: #666; font-size: 13px; line-height: 1.45; }
+    .plan-card ul { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0; padding: 0; list-style: none; color: #555; font-size: 12px; line-height: 1.55; }
+    .plan-card li::before { content: "✓"; margin-right: 5px; color: #111; font-weight: 800; }
+    .plan-check { position: absolute; top: 50%; right: 18px; width: 22px; height: 22px; transform: translateY(-50%); display: grid; place-items: center; border: 1px solid #bbb; border-radius: 50%; color: transparent; font-size: 12px; }
     .plan-card.selected .plan-check { background: #111; color: white; border-color: #111; }
     .plan-note { margin: 14px 0; color: #888; text-align: center; font-size: 12px; }
     .signup-continue { width: 100%; height: 46px; border: 0; border-radius: 10px; background: #111; color: white; font-weight: 700; cursor: pointer; }
     .signup-continue:disabled { background: #d7d7d7; color: #8b8b8b; cursor: default; }
     .selected-plan { display: inline-flex; gap: 8px; align-items: center; margin: 0 0 20px; padding: 8px 11px; border-radius: 9px; background: #f3f3f3; font-size: 13px; }
-    .verify-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .verify-row { display: grid; grid-template-columns: 1fr; gap: 10px; }
     .verify-row input { height: 46px; border: 1px solid #dedede; border-radius: 10px; padding: 0 13px; outline: none; }
-    .verify-row button { border: 0; border-radius: 10px; background: #111; color: white; padding: 0 18px; font-weight: 700; cursor: pointer; }
+    .verify-row button { height: 46px; border: 0; border-radius: 10px; background: #111; color: white; padding: 0 18px; font-weight: 700; cursor: pointer; }
     .plugin-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
     .plugin-filters { display: flex; gap: 8px; margin-bottom: 16px; }
     .filter-btn { border: 1px solid #e1e1e1; background: #fff; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
@@ -562,7 +572,7 @@
       $('#loginView').hidden = view !== 'login';
       $('#planView').hidden = view !== 'plan';
       $('#verifyView').hidden = view !== 'verify';
-      $('#authDialog').classList.toggle('wide', view === 'plan');
+      $('#authDialog').classList.remove('wide');
     }
     function openAuth(view = 'login') {
       openOverlay('authOverlay');
