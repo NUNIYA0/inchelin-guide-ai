@@ -275,10 +275,35 @@
     .auth-form input:focus, .search-input:focus { border-color: #888; }
     .primary-action { height: 46px; border: 0; border-radius: 10px; background: #000; color: #fff; font-weight: 700; cursor: pointer; }
     .auth-link { border: 0; background: transparent; cursor: pointer; color: #555; text-decoration: underline; }
+    .auth-switch { margin-top: 18px; text-align: center; color: #666; font-size: 13px; }
+    .auth-switch button { border: 0; background: transparent; font-weight: 700; text-decoration: underline; cursor: pointer; }
     .auth-divider { margin: 20px 0 12px; text-align: center; font-size: 12px; color: #aaa; }
     .social-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
     .social-grid button { height: 42px; border: 1px solid #e5e5e5; border-radius: 10px; background: #fafafa; color: #aaa; }
     .continue-button { width: 100%; margin-top: 18px; height: 42px; border: 1px solid #dedede; border-radius: 10px; background: #fff; cursor: pointer; }
+    .auth-view[hidden] { display: none; }
+    .auth-back { margin: 0 0 12px; padding: 0; border: 0; background: transparent; color: #555; cursor: pointer; }
+    .billing-toggle, .signup-method { width: fit-content; margin: 0 auto 20px; padding: 4px; display: flex; gap: 4px; border-radius: 11px; background: #f1f1f1; }
+    .billing-toggle button, .signup-method button { min-width: 76px; height: 34px; border: 0; border-radius: 8px; background: transparent; cursor: pointer; }
+    .billing-toggle button.active, .signup-method button.active { background: white; box-shadow: 0 1px 5px rgba(0,0,0,.1); font-weight: 700; }
+    .plan-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 10px; }
+    .plan-card { position: relative; min-height: 260px; padding: 20px 17px; border: 1px solid #e1e1e1; border-radius: 16px; background: white; text-align: left; cursor: pointer; }
+    .plan-card:hover { border-color: #aaa; }
+    .plan-card.selected { border: 2px solid #111; padding: 19px 16px; }
+    .plan-card h3 { margin: 0 0 14px; font-size: 21px; }
+    .plan-price { font-size: 22px; font-weight: 800; }
+    .plan-unit { color: #777; font-size: 12px; }
+    .plan-copy { min-height: 44px; margin: 8px 0 14px; color: #666; font-size: 13px; line-height: 1.45; }
+    .plan-card ul { margin: 0; padding-left: 18px; color: #555; font-size: 13px; line-height: 1.8; }
+    .plan-check { position: absolute; top: 16px; right: 16px; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid #bbb; border-radius: 50%; color: transparent; font-size: 12px; }
+    .plan-card.selected .plan-check { background: #111; color: white; border-color: #111; }
+    .plan-note { margin: 14px 0; color: #888; text-align: center; font-size: 12px; }
+    .signup-continue { width: 100%; height: 46px; border: 0; border-radius: 10px; background: #111; color: white; font-weight: 700; cursor: pointer; }
+    .signup-continue:disabled { background: #d7d7d7; color: #8b8b8b; cursor: default; }
+    .selected-plan { display: inline-flex; gap: 8px; align-items: center; margin: 0 0 20px; padding: 8px 11px; border-radius: 9px; background: #f3f3f3; font-size: 13px; }
+    .verify-row { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+    .verify-row input { height: 46px; border: 1px solid #dedede; border-radius: 10px; padding: 0 13px; outline: none; }
+    .verify-row button { border: 0; border-radius: 10px; background: #111; color: white; padding: 0 18px; font-weight: 700; cursor: pointer; }
     .plugin-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
     .plugin-filters { display: flex; gap: 8px; margin-bottom: 16px; }
     .filter-btn { border: 1px solid #e1e1e1; background: #fff; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
@@ -350,6 +375,8 @@
       .dialog { max-height: calc(100dvh - 20px); border-radius: 17px; padding: 24px 18px; }
       .plugin-grid { grid-template-columns: 1fr; }
       .social-grid { grid-template-columns: 1fr; }
+      .plan-grid { grid-template-columns: 1fr; }
+      .plan-card { min-height: 0; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
   </style>
@@ -365,12 +392,12 @@
       </div>
       <div class="rail-bottom">
         <button class="icon-btn auth-trigger" aria-label="로그인" title="로그인"><svg viewBox="0 0 24 24" fill="none"><path d="M14 8V5H4v14h10v-3M10 12h10m0 0-3-3m3 3-3 3" stroke-width="1.7"/></svg></button>
-        <button class="icon-btn auth-trigger" aria-label="회원가입" title="회원가입"><svg viewBox="0 0 24 24" fill="none"><path d="M15 20a6 6 0 0 0-12 0m6-9a4 4 0 1 0 0-8m10 5v6m-3-3h6" stroke-width="1.7"/></svg></button>
+        <button class="icon-btn signup-trigger" aria-label="회원가입" title="회원가입"><svg viewBox="0 0 24 24" fill="none"><path d="M15 20a6 6 0 0 0-12 0m6-9a4 4 0 1 0 0-8m10 5v6m-3-3h6" stroke-width="1.7"/></svg></button>
       </div>
     </nav>
 
     <aside class="sidebar" id="sidebar" aria-hidden="true">
-      <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-logo.png" alt="" />Inchelin Guide AI</span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기">◧</button></div>
+      <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-logo.png" alt="" />Inchelin Guide AI</span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.6"/><path d="M15 4v16" stroke-width="1.6"/></svg></button></div>
       <button class="new-chat" id="aboutSide"><span>◇</span><span>Inchelin Guide AI 소개</span></button>
       <button class="new-chat" id="newChatSide"><span>◯</span><span>새 채팅</span></button>
       <button class="new-chat" id="guideSide"><span>▣</span><span>사용 설명서</span></button>
@@ -434,7 +461,28 @@
 
   <div class="overlay" id="aboutOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">Inchelin Guide AI</h2><p class="dialog-sub">복잡한 정보를 더 쉽게 이해하고, 더 빠르게 판단할 수 있도록.</p><div class="about-copy"><p>Inchelin Guide AI는 누구나 흩어진 정보와 데이터를 쉽게 이해하고, 필요한 다음 행동을 판단할 수 있도록 돕는 전문 AI입니다.</p><p>복잡한 자료를 이해하기 쉽게 정리하고 놓치기 쉬운 핵심 근거를 함께 보여줍니다.</p><p>질문부터 분석, 초안 작성, 데이터 연결까지 개인의 흐름에 맞춰 지속적으로 활용할 수 있는 서비스를 지향합니다.</p></div></section></div>
 
-  <div class="overlay" id="authOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button><h2 id="authTitle">로그인 또는 회원가입</h2><p class="dialog-sub">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요.</p><form class="auth-form" id="authForm"><label>이메일 또는 휴대전화 번호<input type="text" autocomplete="username" required /></label><label>비밀번호<input type="password" autocomplete="current-password" required /></label><button class="primary-action" type="submit">로그인</button></form><button class="auth-link" type="button" data-toast="비밀번호 찾기 안내를 준비 중입니다.">비밀번호를 잊으셨나요?</button><div class="auth-divider">또는 SNS로 로그인</div><div class="social-grid"><button disabled>카카오 · 준비 중</button><button disabled>네이버 · 준비 중</button><button disabled>Google · 준비 중</button></div><button class="continue-button" type="button" data-close="authOverlay">가입 없이 계속하기</button></section></div>
+  <div class="overlay" id="authOverlay"><section class="dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
+    <div class="auth-view" id="loginView">
+      <h2 id="authTitle">로그인 또는 회원가입</h2><p class="dialog-sub">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.</p>
+      <form class="auth-form" id="authForm"><label>이메일 또는 휴대전화 번호<input type="text" autocomplete="username" required /></label><label>비밀번호<input type="password" autocomplete="current-password" required /></label><button class="primary-action" type="submit">로그인</button></form>
+      <button class="auth-link" type="button" data-toast="비밀번호 찾기 안내를 준비 중입니다.">비밀번호를 잊으셨나요?</button><div class="auth-divider">또는 SNS로 로그인</div><div class="social-grid"><button disabled>카카오 · 준비 중</button><button disabled>네이버 · 준비 중</button><button disabled>Google · 준비 중</button></div>
+      <div class="auth-switch">계정이 없으신가요? <button type="button" id="openSignup">회원가입</button></div><button class="continue-button" type="button" data-close="authOverlay">가입 없이 계속하기</button>
+    </div>
+    <div class="auth-view" id="planView" hidden>
+      <button class="auth-back" type="button" data-auth-back="login">‹ 뒤로</button><h2>어떤 플랜으로 시작할까요?</h2><p class="dialog-sub">사용량과 기능을 비교해 나에게 맞는 플랜을 선택하세요. Free로 시작하고 필요할 때 변경할 수 있습니다.</p>
+      <div class="billing-toggle" id="billingToggle"><button class="active" type="button" data-billing="monthly">월간</button><button type="button" data-billing="annual">연간</button></div>
+      <div class="plan-grid" id="planGrid">
+        <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-copy">결제 정보 없이 부담 없이 시작하세요.</p><ul><li>기본 AI 사용량 제공</li><li>질문과 답변 근거 확인</li><li>채팅 기록 저장</li></ul></button>
+        <button class="plan-card" type="button" data-plan="Pro"><span class="plan-check">✓</span><h3>Pro</h3><div><span class="plan-price" data-monthly="₩9,900" data-annual="₩99,000">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-copy">더 넉넉한 사용량으로 자주 확인하세요.</p><ul><li>Free의 모든 기능</li><li>더 넉넉한 AI 사용량</li><li>맞춤 자료 요청</li></ul></button>
+        <button class="plan-card" type="button" data-plan="Max"><span class="plan-check">✓</span><h3>Max</h3><div><span class="plan-price" data-monthly="₩29,000" data-annual="₩290,000">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-copy">여러 자료를 깊이 살펴볼 때 선택하세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>우선 지원</li></ul></button>
+      </div><p class="plan-note">모든 플랜에는 사용량 한도가 있으며, 플랜에 따라 제공량이 다릅니다.</p><button class="signup-continue" id="planContinue" type="button" disabled>플랜을 선택해 주세요</button>
+    </div>
+    <div class="auth-view" id="verifyView" hidden>
+      <button class="auth-back" type="button" data-auth-back="plan">‹ 요금제 선택</button><h2>이메일을 인증해 주세요</h2><p class="dialog-sub">인증을 완료하면 이름과 비밀번호를 설정할 수 있어요.</p><div class="selected-plan" id="selectedPlanLabel">Free · 무료</div>
+      <div class="signup-method" id="signupMethod"><button class="active" type="button" data-method="email">이메일로 가입</button><button type="button" data-method="phone">휴대전화로 가입</button></div>
+      <form id="verifyForm"><label id="verifyLabel" style="display:grid;gap:7px;font-size:13px;color:#555">이메일<div class="verify-row"><input id="verifyInput" type="email" placeholder="name@example.com" required /><button type="submit">이메일 인증</button></div></label></form>
+    </div>
+  </section></div>
 
   <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">모든 유형</button><button class="filter-btn" data-filter="work">업무 기능</button><button class="filter-btn" data-filter="data">데이터 연결</button></div><div class="plugin-grid" id="pluginGrid"></div></section></div>
 
@@ -492,6 +540,9 @@
     let histories = JSON.parse(localStorage.getItem('insight-ai-history') || '[]');
     let pinned = JSON.parse(localStorage.getItem('insight-ai-pins') || '[]');
     let activeFilter = 'all';
+    let selectedPlan = '';
+    let billingCycle = 'monthly';
+    let signupMethod = 'email';
 
     $('#welcomeTitle').textContent = CONTENT.title;
     $('#welcomeInput').placeholder = CONTENT.placeholder;
@@ -507,6 +558,16 @@
     }
     function openOverlay(id) { moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); document.getElementById(id).classList.add('open'); }
     function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+    function showAuthView(view) {
+      $('#loginView').hidden = view !== 'login';
+      $('#planView').hidden = view !== 'plan';
+      $('#verifyView').hidden = view !== 'verify';
+      $('#authDialog').classList.toggle('wide', view === 'plan');
+    }
+    function openAuth(view = 'login') {
+      openOverlay('authOverlay');
+      showAuthView(view);
+    }
     function resizeInput(el) {
       el.style.height = 'auto';
       el.style.height = `${Math.min(el.scrollHeight, 135)}px`;
@@ -518,8 +579,13 @@
       sidebar.setAttribute('aria-hidden', String(!open));
       $('#sidebarToggle').setAttribute('aria-expanded', String(open));
       $('#sidebarToggle').setAttribute('aria-label', open ? '사이드바 접기' : '사이드바 펼치기');
-      if (window.innerWidth > 820) main.classList.toggle('shift', open);
-      else scrim.classList.toggle('show', open);
+      if (window.innerWidth > 820) {
+        main.classList.toggle('shift', open);
+        scrim.classList.remove('show');
+      } else {
+        main.classList.remove('shift');
+        scrim.classList.toggle('show', open);
+      }
     }
     function showWelcome() {
       welcome.style.display = '';
@@ -533,7 +599,7 @@
       showWelcome();
       $('#welcomeInput').value = '';
       resizeInput($('#welcomeInput'));
-      setSidebar(false);
+      if (window.innerWidth <= 820) setSidebar(false);
       $('#welcomeInput').focus();
     }
     function addMessage(type, text, extra = '') {
@@ -569,7 +635,7 @@
       welcome.style.display = 'none';
       guidePanel.classList.remove('active');
       chatView.classList.add('active');
-      setSidebar(false);
+      if (window.innerWidth <= 820) setSidebar(false);
     }
     function manageHistory(id) {
       const item = histories.find(h => h.id === id);
@@ -642,7 +708,7 @@
       welcome.style.display = 'none';
       chatView.classList.remove('active');
       guidePanel.classList.add('active');
-      setSidebar(false);
+      if (window.innerWidth <= 820) setSidebar(false);
     }
     function renderPlugins() {
       const term = $('#pluginSearch').value.trim().toLowerCase();
@@ -666,8 +732,9 @@
     ['newChatRail', 'newChatSide', 'topNewChat'].forEach(id => document.getElementById(id).addEventListener('click', newChat));
     ['aboutRail', 'aboutSide'].forEach(id => document.getElementById(id).addEventListener('click', () => openOverlay('aboutOverlay')));
     ['guideRail', 'guideSide'].forEach(id => document.getElementById(id).addEventListener('click', showGuide));
-    $$('.auth-trigger').forEach(button => button.addEventListener('click', () => openOverlay('authOverlay')));
-    $('#startButton').addEventListener('click', () => openOverlay('authOverlay'));
+    $$('.auth-trigger').forEach(button => button.addEventListener('click', () => openAuth('login')));
+    $$('.signup-trigger').forEach(button => button.addEventListener('click', () => openAuth('plan')));
+    $('#startButton').addEventListener('click', () => openAuth('login'));
     $('#moreButton').addEventListener('click', event => { event.stopPropagation(); const open = moreMenu.classList.toggle('open'); event.currentTarget.setAttribute('aria-expanded', String(open)); });
     $('#releaseButton').addEventListener('click', () => openOverlay('releaseOverlay'));
     $$('.task-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const rect = button.getBoundingClientRect(); taskMenu.style.left = `${Math.max(10, rect.left)}px`; taskMenu.style.top = `${Math.max(10, rect.top - 102)}px`; const open = taskMenu.classList.toggle('open'); $$('.task-trigger').forEach(b => b.setAttribute('aria-expanded', String(open && b === button))); }));
@@ -689,12 +756,47 @@
     });
     $('#guideList').addEventListener('click', event => { const button = event.target.closest('button'); if (button) button.parentElement.classList.toggle('open'); });
     $('#authForm').addEventListener('submit', event => { event.preventDefault(); closeOverlay('authOverlay'); showToast('데모 계정으로 로그인되었습니다.'); });
+    $('#openSignup').addEventListener('click', () => showAuthView('plan'));
+    $$('[data-auth-back]').forEach(button => button.addEventListener('click', () => showAuthView(button.dataset.authBack)));
+    $('#billingToggle').addEventListener('click', event => {
+      const button = event.target.closest('[data-billing]');
+      if (!button) return;
+      billingCycle = button.dataset.billing;
+      $$('#billingToggle button').forEach(b => b.classList.toggle('active', b === button));
+      $$('.plan-price[data-monthly]').forEach(price => price.textContent = price.dataset[billingCycle]);
+      $$('.plan-unit').forEach((unit, index) => { if (index > 0) unit.textContent = billingCycle === 'monthly' ? '/월' : '/년'; });
+    });
+    $('#planGrid').addEventListener('click', event => {
+      const card = event.target.closest('[data-plan]');
+      if (!card) return;
+      selectedPlan = card.dataset.plan;
+      $$('.plan-card').forEach(item => item.classList.toggle('selected', item === card));
+      $('#planContinue').disabled = false;
+      $('#planContinue').textContent = `${selectedPlan} 플랜으로 계속`;
+    });
+    $('#planContinue').addEventListener('click', () => {
+      if (!selectedPlan) return;
+      const price = selectedPlan === 'Free' ? '무료' : billingCycle === 'monthly' ? '월간 결제' : '연간 결제';
+      $('#selectedPlanLabel').textContent = `${selectedPlan} · ${price}`;
+      showAuthView('verify');
+    });
+    $('#signupMethod').addEventListener('click', event => {
+      const button = event.target.closest('[data-method]');
+      if (!button) return;
+      signupMethod = button.dataset.method;
+      $$('#signupMethod button').forEach(b => b.classList.toggle('active', b === button));
+      $('#verifyLabel').childNodes[0].nodeValue = signupMethod === 'email' ? '이메일' : '휴대전화 번호';
+      $('#verifyInput').type = signupMethod === 'email' ? 'email' : 'tel';
+      $('#verifyInput').placeholder = signupMethod === 'email' ? 'name@example.com' : '010-0000-0000';
+      $('#verifyForm button').textContent = signupMethod === 'email' ? '이메일 인증' : '인증번호 받기';
+    });
+    $('#verifyForm').addEventListener('submit', event => { event.preventDefault(); showToast(`${signupMethod === 'email' ? '이메일' : '휴대전화'} 인증 요청이 준비되었습니다.`); });
     $$('[data-close]').forEach(button => button.addEventListener('click', () => closeOverlay(button.dataset.close)));
     $$('.overlay').forEach(overlay => overlay.addEventListener('click', event => { if (event.target === overlay) closeOverlay(overlay.id); }));
     $$('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
     document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && event.target !== $('#moreButton')) moreMenu.classList.remove('open'); if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); $$('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { $$('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); } });
-    window.addEventListener('resize', () => { if (window.innerWidth <= 820) main.classList.remove('shift'); else if (sidebar.classList.contains('open')) main.classList.add('shift'); });
+    window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
     renderHistory();
     renderPlugins();
   </script>
