@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="Inchelin Guide AI와 대화하는 지능형 채팅 인터페이스" />
+  <meta name="description" content="인슐랭가이드에 등록된 맛집을 자연어로 탐색하고 추천받는 대화형 AI" />
   <title>Inchelin Guide AI</title>
   <link rel="icon" type="image/png" sizes="203x203" href="assets/favicon-inchelin-v2.png?v=2" />
   <link rel="shortcut icon" type="image/png" href="assets/favicon-inchelin-v2.png?v=2" />
@@ -252,6 +252,22 @@
     .message-copy { display: flex; flex-direction: column; gap: 10px; white-space: normal; }
     .message-copy p { margin: 0; font-weight: 400; }
     .message-copy strong { color: #202020; font-weight: 600; }
+    .restaurant-list { margin-top: 16px; display: grid; gap: 12px; }
+    .restaurant-card { overflow: hidden; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
+    .restaurant-image { display: block; width: 100%; aspect-ratio: 16 / 8; object-fit: cover; background: #f3f3f3; }
+    .restaurant-card-body { padding: 15px 16px 16px; }
+    .restaurant-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+    .restaurant-card h3 { margin: 0; color: #202020; font-size: 16px; font-weight: 600; line-height: 1.4; }
+    .restaurant-status { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: #f2f2f2; color: #666; font-size: 11px; line-height: 1.3; }
+    .restaurant-status.active { background: #eef7f0; color: #27723b; }
+    .restaurant-status.temporarily_closed { background: #fff5e8; color: #9a5c0c; }
+    .restaurant-address { margin: 6px 0 0; color: #777; font-size: 13px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
+    .restaurant-details { margin: 13px 0 0; display: grid; gap: 7px; }
+    .restaurant-detail { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; color: #444; font-size: 13px; line-height: 1.5; }
+    .restaurant-detail dt { color: #8a8a8a; }
+    .restaurant-detail dd { margin: 0; overflow-wrap: anywhere; }
+    .restaurant-map-link { display: inline-flex; min-height: 38px; margin-top: 14px; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; color: #333; font-size: 13px; font-weight: 500; text-decoration: none; }
+    .restaurant-map-link:hover { background: #f7f7f7; }
     .quick-replies { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
     .quick-reply { min-height: 36px; padding: 7px 12px; border: 1px solid #dedede; border-radius: 999px; background: #fff; color: #555; font-size: 13px; line-height: 1.35; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
     .quick-reply:hover { border-color: #bcbcbc; background: #f7f7f7; color: #222; }
@@ -510,6 +526,8 @@
       .main.chat-mode .workspace { padding: 0 16px; overflow: hidden; }
       .messages { min-height: 0; padding: 18px 2px 20px; }
       .message { max-width: 90%; font-size: clamp(14px, 3.8vw, 15px); }
+      .restaurant-card-body { padding: 14px; }
+      .restaurant-detail { grid-template-columns: 60px minmax(0, 1fr); }
       .chat-composer { position: sticky; z-index: 2; bottom: 0; margin: 0; min-height: 88px; border-radius: 22px; background: #fff; }
       .disclaimer { flex: 0 0 auto; background: #fff; padding: 7px 0 max(8px, env(safe-area-inset-bottom)); }
     }
@@ -663,7 +681,7 @@
     </div>
   </section></div>
 
-  <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">모든 유형</button><button class="filter-btn" data-filter="work">업무 기능</button><button class="filter-btn" data-filter="data">데이터 연결</button></div><div class="plugin-grid" id="pluginGrid"></div></section></div>
+  <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">맛집 탐색에 필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">모든 유형</button><button class="filter-btn" data-filter="guide">탐색 기능</button><button class="filter-btn" data-filter="data">데이터 연결</button></div><div class="plugin-grid" id="pluginGrid"></div></section></div>
 
   <div class="overlay" id="releaseOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="releaseTitle"><button class="dialog-close" data-close="releaseOverlay" aria-label="닫기">×</button><div class="eyebrow">RELEASE NOTES</div><h2 id="releaseTitle">Inchelin Guide AI 업데이트</h2><p class="dialog-sub">서비스에 반영된 기능과 개선 내용을 확인하세요.</p><article class="release-card"><div class="release-meta"><span>v1.1.0</span><span>2026.09.29</span><span class="badge">최신</span></div><h3>채팅 경험과 도구 연결 개선</h3><ul><li>추천 질문을 입력창에 미리 채워 수정할 수 있습니다.</li><li>대화 저장·이름 변경·삭제를 지원합니다.</li><li>사진 업로드와 플러그인 선택 흐름을 추가했습니다.</li></ul></article><article class="release-card"><div class="release-meta"><span>v1.0.0</span><span>2026.09.28</span></div><h3>Inchelin Guide AI 기본 화면</h3></article></section></div>
 
@@ -675,17 +693,17 @@
     const CONTENT = {
       title: '맛있는 한 끼, 같이 찾아볼까요?',
       placeholder: '먹고 싶은 메뉴나 분위기를 편하게 말해보세요',
-      answer: '말씀하신 조건에 맞춰 메뉴의 분위기와 식사 무게감, 이용하기 좋은 시간대를 함께 고려해 추천해 드릴게요. 위치와 인원, 예산을 알려주시면 더 구체적으로 좁혀볼 수 있어요.'
+      answer: '말씀하신 내용과 이전 대화를 함께 살펴보고, 인슐랭가이드에 등록된 맛집 안에서 자연스럽게 찾아드릴게요.'
     };
     const TIME_SUGGESTIONS = {
       morning: [
-        '오늘 아침 뭐 먹으면 좋을까?',
+        '오늘 아침 뭐 드시고 싶으세요?',
         '가볍게 먹기 좋은 메뉴 추천해줘',
         '든든한 아침 식사 추천해줘',
         '아침에 가기 좋은 식당 찾아줘'
       ],
       lunch: [
-        '오늘 점심 뭐 먹으면 좋을까?',
+        '오늘 점심 뭐 드시고 싶으세요?',
         '부담 없이 먹기 좋은 메뉴 추천해줘',
         '동료들과 가기 좋은 점심 맛집 찾아줘',
         '빠르게 먹기 좋은 식당 추천해줘'
@@ -693,11 +711,11 @@
       afternoon: [
         '지금 가볍게 먹기 좋은 메뉴 있을까?',
         '간단하게 먹기 좋은 곳 추천해줘',
-        '커피랑 같이 즐기기 좋은 디저트 추천해줘',
+        '커피랑 같이 먹기 좋은 디저트 추천해줘',
         '조용하게 쉬기 좋은 곳 찾아줘'
       ],
       evening: [
-        '오늘 저녁 뭐 먹을까?',
+        '오늘 저녁 뭐 드시고 싶으세요?',
         '분위기 좋은 저녁 맛집 추천해줘',
         '가족이랑 가기 좋은 식당 찾아줘',
         '든든하게 먹기 좋은 메뉴 추천해줘'
@@ -706,25 +724,23 @@
         '지금 먹기 좋은 야식 추천해줘',
         '늦게까지 하는 식당 찾아줘',
         '가볍게 먹을 수 있는 메뉴 추천해줘',
-        '지금 주문하거나 먹기 좋은 메뉴 알려줘'
+        '지금 먹기 좋은 메뉴 알려줘'
       ]
     };
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
-      ['문서 요약', '긴 문서의 핵심과 확인 사항 정리', 'work', '요'],
-      ['회의 준비', '안건과 결정이 필요한 질문 추천', 'work', '회'],
-      ['고객 의견 분석', '반복 이슈와 감정 패턴 확인', 'work', '고'],
-      ['보고서 작성', '근거 중심의 보고서 초안 작성', 'work', '보'],
-      ['프로젝트 점검', '일정·위험·다음 행동 한눈에 보기', 'work', '프'],
-      ['클라우드 문서 연결', '업무 문서와 폴더를 불러옵니다', 'data', 'D'],
-      ['CRM 데이터 연결', '고객 활동과 파이프라인을 불러옵니다', 'data', 'C'],
-      ['분석 데이터 연결', '지표와 대시보드 데이터를 불러옵니다', 'data', 'A']
+      ['메뉴 탐색', '먹고 싶은 메뉴를 자연스럽게 좁혀봅니다', 'guide', '메'],
+      ['상황별 추천', '동행자와 식사 상황에 맞춰 찾아봅니다', 'guide', '상'],
+      ['지역별 찾기', '원하는 지역의 등록 맛집을 탐색합니다', 'guide', '지'],
+      ['등록 맛집 비교', '확인 가능한 매장 정보를 함께 비교합니다', 'guide', '비'],
+      ['인슐랭가이드 등록 정보', '등록된 맛집 데이터를 기준으로 검색합니다', 'data', 'I'],
+      ['최신 매장 정보', '등록 매장의 확인된 최신 정보를 보강합니다', 'data', '최']
     ].map((p, i) => ({ id: i + 1, name: p[0], desc: p[1], type: p[2], icon: p[3] }));
     const GUIDES = [
       ['처음 이용하기', '추천 질문을 선택하면 일반 질문과 같은 방식으로 바로 대화를 시작합니다. 직접 입력한 질문도 전송 버튼으로 이어서 물어볼 수 있습니다.'],
       ['회원가입', '시작하기 또는 로그인 버튼을 눌러 계정 화면을 열 수 있습니다. 현재 데모에서는 가입 없이 계속하기도 가능합니다.'],
       ['채팅 기록', '완료된 대화는 이 브라우저에 자동 저장됩니다. 사이드바에서 다시 열거나 이름을 바꾸고 삭제할 수 있습니다.'],
-      ['플러그인', '입력창의 + 버튼에서 플러그인을 열고 필요한 업무 기능을 선택하거나 고정할 수 있습니다.'],
+      ['플러그인', '입력창의 + 버튼에서 맛집 탐색 기능을 선택하거나 자주 쓰는 기능을 고정할 수 있습니다.'],
       ['정보 연결', '상단 더 보기 메뉴의 데이터 연결에서 연결 흐름을 시작할 수 있습니다.'],
       ['요금제·사용량', '현재 데모에는 결제나 사용량 제한이 연결되어 있지 않습니다.']
     ];
@@ -817,7 +833,42 @@
       const quickReplies = role === 'assistant' && Array.isArray(message?.quickReplies)
         ? [...new Set(message.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
         : [];
-      return { role, content, quickReplies };
+      const restaurants = role === 'assistant' && Array.isArray(message?.restaurants)
+        ? message.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 4)
+        : [];
+      return { role, content, quickReplies, restaurants };
+    }
+    function safeHttpUrl(value, naverOnly = false) {
+      try {
+        const url = new URL(String(value || ''));
+        if (!['https:', 'http:'].includes(url.protocol)) return '';
+        if (naverOnly && !(url.hostname === 'naver.me' || url.hostname === 'map.naver.com' || url.hostname === 'place.naver.com' || url.hostname.endsWith('.naver.com'))) return '';
+        return url.href;
+      } catch (_) {
+        return '';
+      }
+    }
+    function normalizeRestaurant(restaurant) {
+      if (!restaurant || restaurant.isRegisteredInInchelin !== true) return null;
+      const id = String(restaurant.id || '').trim();
+      const name = String(restaurant.name || '').trim();
+      const address = String(restaurant.address || '').trim();
+      if (!id || !name || !address) return null;
+      return {
+        id,
+        name,
+        address,
+        phone: String(restaurant.phone || '').trim(),
+        recommender: String(restaurant.recommender || '').trim(),
+        imageUrl: safeHttpUrl(restaurant.imageUrl),
+        businessStatus: String(restaurant.businessStatus || 'unknown').trim(),
+        openingHours: String(restaurant.openingHours || '').trim(),
+        representativeMenus: Array.isArray(restaurant.representativeMenus) ? restaurant.representativeMenus.map(item => String(item).trim()).filter(Boolean).slice(0, 8) : [],
+        menuPrice: restaurant.menuPrice ?? null,
+        parking: restaurant.parking ?? null,
+        naverPlaceUrl: safeHttpUrl(restaurant.naverPlaceUrl, true),
+        isRegisteredInInchelin: true
+      };
     }
     function readStoredConversations() {
       try {
@@ -850,7 +901,9 @@
       };
     }
     function extractAssistantText(data) {
-      const content = data?.message?.content ?? data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.response ?? data?.content;
+      const content = typeof data?.message === 'string'
+        ? data.message
+        : data?.message?.content ?? data?.choices?.[0]?.message?.content ?? data?.output_text ?? data?.response ?? data?.content;
       if (Array.isArray(content)) return content.map(item => item?.text || item?.content || '').join('').trim();
       return typeof content === 'string' ? content.trim() : '';
     }
@@ -865,10 +918,12 @@
       const data = await response.json();
       const content = extractAssistantText(data);
       if (!content) throw new Error('AI response did not include assistant content.');
-      const quickReplies = Array.isArray(data?.quickReplies)
-        ? [...new Set(data.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
+      const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : data?.quickReplies;
+      const quickReplies = Array.isArray(suggestions)
+        ? [...new Set(suggestions.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
         : [];
-      return { content, quickReplies };
+      const restaurants = Array.isArray(data?.restaurants) ? data.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 4) : [];
+      return { content, quickReplies, restaurants };
     }
     setInterval(() => refreshTimeSuggestions(), 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeSuggestions(); });
@@ -964,6 +1019,82 @@
         parent.appendChild(paragraph);
       });
     }
+    function restaurantValue(value) {
+      if (value === null || value === undefined || value === '') return '';
+      if (typeof value === 'boolean') return value ? '가능' : '불가';
+      if (Array.isArray(value)) return value.map(restaurantValue).filter(Boolean).join(', ');
+      if (typeof value === 'object') return Object.entries(value).map(([key, item]) => `${key} ${restaurantValue(item)}`).join(' · ');
+      return String(value).trim();
+    }
+    function restaurantStatusLabel(status) {
+      return ({ active: '영업 확인', temporarily_closed: '임시 휴업', unknown: '상태 확인 필요' })[status] || '상태 확인 필요';
+    }
+    function appendRestaurantDetail(list, label, value) {
+      const text = restaurantValue(value);
+      if (!text) return;
+      const row = document.createElement('div');
+      row.className = 'restaurant-detail';
+      const term = document.createElement('dt');
+      term.textContent = label;
+      const description = document.createElement('dd');
+      description.textContent = text;
+      row.append(term, description);
+      list.appendChild(row);
+    }
+    function renderRestaurantCards(restaurants) {
+      const list = document.createElement('div');
+      list.className = 'restaurant-list';
+      list.setAttribute('aria-label', '인슐랭가이드 등록 맛집');
+      restaurants.forEach(restaurant => {
+        const card = document.createElement('article');
+        card.className = 'restaurant-card';
+        if (restaurant.imageUrl) {
+          const image = document.createElement('img');
+          image.className = 'restaurant-image';
+          image.src = restaurant.imageUrl;
+          image.alt = `${restaurant.name} 대표 이미지`;
+          image.loading = 'lazy';
+          image.referrerPolicy = 'no-referrer';
+          image.addEventListener('error', () => image.remove(), { once: true });
+          card.appendChild(image);
+        }
+        const body = document.createElement('div');
+        body.className = 'restaurant-card-body';
+        const head = document.createElement('div');
+        head.className = 'restaurant-card-head';
+        const title = document.createElement('h3');
+        title.textContent = restaurant.name;
+        const status = document.createElement('span');
+        status.className = `restaurant-status ${restaurant.businessStatus}`;
+        status.textContent = restaurantStatusLabel(restaurant.businessStatus);
+        head.append(title, status);
+        const address = document.createElement('p');
+        address.className = 'restaurant-address';
+        address.textContent = restaurant.address;
+        const details = document.createElement('dl');
+        details.className = 'restaurant-details';
+        appendRestaurantDetail(details, '대표 메뉴', restaurant.representativeMenus);
+        appendRestaurantDetail(details, '메뉴 가격', restaurant.menuPrice);
+        appendRestaurantDetail(details, '영업시간', restaurant.openingHours);
+        appendRestaurantDetail(details, '전화번호', restaurant.phone);
+        appendRestaurantDetail(details, '주차', restaurant.parking);
+        appendRestaurantDetail(details, '추천인', restaurant.recommender);
+        body.append(head, address);
+        if (details.children.length) body.appendChild(details);
+        if (restaurant.naverPlaceUrl) {
+          const link = document.createElement('a');
+          link.className = 'restaurant-map-link';
+          link.href = restaurant.naverPlaceUrl;
+          link.target = '_blank';
+          link.rel = 'noopener noreferrer';
+          link.textContent = '네이버지도에서 보기';
+          body.appendChild(link);
+        }
+        card.appendChild(body);
+        list.appendChild(card);
+      });
+      return list;
+    }
     function renderMessage(message, extra = '', follow = false) {
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
@@ -971,6 +1102,9 @@
       copy.className = 'message-copy';
       appendLimitedMarkdown(copy, message.content);
       item.appendChild(copy);
+      if (message.role === 'assistant' && message.restaurants?.length) {
+        item.appendChild(renderRestaurantCards(message.restaurants));
+      }
       if (message.role === 'assistant' && message.quickReplies?.length) {
         const replies = document.createElement('div');
         replies.className = 'quick-replies';
@@ -989,8 +1123,8 @@
       if (follow) requestAnimationFrame(() => messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' }));
       return item;
     }
-    function appendMessage(role, content, { save = true, quickReplies = [] } = {}) {
-      const message = normalizeMessage({ role, content, quickReplies });
+    function appendMessage(role, content, { save = true, quickReplies = [], restaurants = [] } = {}) {
+      const message = normalizeMessage({ role, content, quickReplies, restaurants });
       if (!message) return null;
       const shouldFollow = isNearConversationBottom();
       chatMessages = [...chatMessages, message];
@@ -1138,7 +1272,7 @@
         const answer = await requestAssistant(request, controller.signal);
         if (controller.signal.aborted) return;
         status.remove();
-        appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies });
+        appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants });
       } catch (error) {
         status.remove();
         if (error?.name !== 'AbortError') showRequestError(request);

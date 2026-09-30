@@ -18,7 +18,7 @@ async function runCase({ message, env, dbResponse, enrichmentResponse, expectedS
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
     if (href.includes("api.openai.com")) {
-      return Response.json({ output_text: JSON.stringify({ content: "등록 매장 근거 답변", quickReplies: [] }) });
+      return Response.json({ output_text: JSON.stringify({ message: "등록 매장 근거 답변", suggestions: [], selectedRestaurantIds: ["ig-1"] }) });
     }
     throw new Error(`Unexpected URL: ${href}`);
   };
@@ -43,7 +43,7 @@ const baseEnv = {
     env: baseEnv,
     dbResponse: { places: [] },
   });
-  assert.match(result.body.content, /등록되지 않은/);
+  assert.match(result.body.message, /등록되지 않은/);
   assert.equal(result.calls.filter(call => call.href.includes("enrich.example")).length, 0);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
@@ -53,12 +53,12 @@ const baseEnv = {
     message: "등록식당 영업시간 알려줘",
     env: { ...baseEnv, INCHELIN_ENRICHMENT_API_URL: "https://enrich.example" },
     dbResponse: {
-      places: [{ id: "ig-1", name: "등록식당", address: "서울시 중구 1", business_status: "active" }],
+      places: [{ id: "ig-1", name: "등록식당", address: "강원도 춘천시 중앙로 1", business_status: "active" }],
     },
     enrichmentResponse: {
       identity_confirmed: true,
       matched_name: "등록식당",
-      matched_address: "서울시 중구 1",
+      matched_address: "강원특별자치도 춘천시 중앙로 1",
       facts: {
         opening_hours: {
           value: "11:00-21:00",
@@ -74,6 +74,8 @@ const baseEnv = {
   assert.ok(openaiCall);
   assert.match(openaiCall.body.instructions, /inchelin_registered_only/);
   assert.match(openaiCall.body.instructions, /11:00-21:00/);
+  assert.equal(result.body.restaurants[0].id, "ig-1");
+  assert.equal(result.body.restaurants[0].isRegisteredInInchelin, true);
 }
 
 {
@@ -84,7 +86,7 @@ const baseEnv = {
       places: [{ id: "ig-2", name: "폐업식당", address: "서울시 중구 2", business_status: "permanently_closed" }],
     },
   });
-  assert.match(result.body.content, /폐업/);
+  assert.match(result.body.message, /폐업/);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -104,7 +106,7 @@ const baseEnv = {
       },
     },
   });
-  assert.match(result.body.content, /주차 정보는 현재/);
+  assert.match(result.body.message, /주차 정보는 현재/);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -114,7 +116,7 @@ const baseEnv = {
     env: { OPENAI_API_KEY: "test-key" },
     expectedStatus: 200,
   });
-  assert.match(result.body.content, /등록 매장 데이터를 연결 중/);
+  assert.match(result.body.message, /등록 매장 데이터를 연결 중/);
   assert.equal(result.calls.length, 0);
 }
 
