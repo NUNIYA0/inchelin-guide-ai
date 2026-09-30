@@ -840,10 +840,10 @@
       const content = String(message?.content ?? message?.text ?? '').trim();
       if (!['user', 'assistant'].includes(role) || !content) return null;
       const quickReplies = role === 'assistant' && Array.isArray(message?.quickReplies)
-        ? [...new Set(message.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
+        ? [...new Set(message.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 6)
         : [];
       const restaurants = role === 'assistant' && Array.isArray(message?.restaurants)
-        ? message.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 4)
+        ? message.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3)
         : [];
       return { role, content, quickReplies, restaurants };
     }
@@ -898,6 +898,12 @@
       const state = getLocalTimeState();
       const latestQuestion = [...nextMessages].reverse().find(message => message.role === 'user')?.content || '';
       const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
+      const latestRestaurantMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.restaurants?.length);
+      const recentRestaurants = (latestRestaurantMessage?.restaurants || []).slice(0, 3).map(restaurant => ({
+        id: restaurant.id,
+        name: restaurant.name,
+        address: restaurant.address
+      }));
       return {
         conversationId: currentId,
         messages: nextMessages,
@@ -909,7 +915,9 @@
           instruction: userSpecifiedTime
             ? '사용자가 직접 지정한 시간이나 날짜 조건을 현재 시간보다 우선해서 답변하세요.'
             : '사용자의 현재 로컬 시간대를 고려해 식사 상황에 맞는 답변을 하세요.',
-          currentLocationName
+          currentLocationName,
+          hasRestaurantResults: recentRestaurants.length > 0,
+          recentRestaurants
         }
       };
     }
@@ -933,9 +941,9 @@
       if (!content) throw new Error('AI response did not include assistant content.');
       const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : data?.quickReplies;
       const quickReplies = Array.isArray(suggestions)
-        ? [...new Set(suggestions.map(item => String(item).trim()).filter(Boolean))].slice(0, 4)
+        ? [...new Set(suggestions.map(item => String(item).trim()).filter(Boolean))].slice(0, 6)
         : [];
-      const restaurants = Array.isArray(data?.restaurants) ? data.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 4) : [];
+      const restaurants = Array.isArray(data?.restaurants) ? data.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3) : [];
       return { content, quickReplies, restaurants };
     }
     setInterval(() => refreshTimeSuggestions(), 60000);
@@ -1382,7 +1390,8 @@
     function routeQuestion(question) {
       const value = String(question || '').trim();
       if (!value) return;
-      if (value === '직접 입력') {
+      if (value === '지역 바꾸기' || value === '다른 지역' || value === '지역 변경') currentLocationName = '';
+      if (value === '직접 입력' || value === '지역 직접 입력') {
         focusManualLocationInput();
         return;
       }

@@ -9,7 +9,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, env, context, dbResponse, enrichmentResponse, naverResponse, aiResponse, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, aiResponse, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -26,7 +26,7 @@ async function runCase({ message, env, context, dbResponse, enrichmentResponse, 
     throw new Error(`Unexpected URL: ${href}`);
   };
   try {
-    const response = await worker.fetch(request(message, [], context), env, {});
+    const response = await worker.fetch(request(message, history, context), env, {});
     assert.equal(response.status, expectedStatus);
     return { body: await response.json(), calls };
   } finally {
@@ -152,7 +152,8 @@ const baseEnv = {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "inchelin" },
     expectedStatus: 200,
   });
-  assert.match(result.body.message, /등록 매장 데이터를 연결 중/);
+  assert.match(result.body.message, /어느 지역/);
+  assert.deepEqual(result.body.suggestions, ["현재 위치 근처", "지역 직접 입력"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -196,6 +197,10 @@ const baseEnv = {
 {
   const result = await runCase({
     message: "현재 위치 근처",
+    history: [
+      { role: "user", content: "든든한 한 끼 원해요" },
+      { role: "assistant", content: "좋아요. 어느 지역에서 찾고 계세요?" },
+    ],
     context: { currentLocationName: "서울특별시 강남구 역삼동" },
     env: {
       OPENAI_API_KEY: "test-key",
@@ -233,7 +238,65 @@ const baseEnv = {
 
 {
   const result = await runCase({
-    message: "점심 뭐 먹지?",
+    message: "강남",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /오늘 뭐 드시고 싶으세요/);
+  assert.deepEqual(result.body.suggestions, ["한식", "중식", "일식", "양식", "가볍게", "직접 입력"]);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "강남",
+    history: [
+      { role: "user", content: "든든한 한 끼 원해요" },
+      { role: "assistant", content: "좋아요. 어느 지역에서 찾고 계세요?" },
+    ],
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_CLIENT_ID: "naver-id",
+      NAVER_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "강남국밥",
+        roadAddress: "서울특별시 강남구 강남대로 1",
+        link: "https://map.naver.com/p/entry/place/111",
+        mapx: "127111",
+        mapy: "37111",
+      }],
+    },
+  });
+  assert.equal(result.body.restaurants[0].name, "강남국밥");
+  assert.deepEqual(result.body.suggestions.slice(0, 2), ["다른 맛집", "지역 바꾸기"]);
+}
+
+{
+  const recentRestaurants = [
+    { id: "naver:이전식당:127100:37100", name: "이전식당", address: "서울 강남구 1" },
+    { id: "naver:두번째식당:127200:37200", name: "두번째식당", address: "서울 강남구 2" },
+  ];
+  const result = await runCase({
+    message: "두 번째가 좋아",
+    history: [
+      { role: "user", content: "강남에서 냉면 먹고 싶어" },
+      { role: "assistant", content: "강남에서 냉면 맛집을 찾아봤어요." },
+    ],
+    context: { hasRestaurantResults: true, recentRestaurants },
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  const openaiCall = result.calls.find(call => call.href.includes("api.openai.com"));
+  assert.ok(openaiCall);
+  assert.match(openaiCall.body.instructions, /"position":2/);
+  assert.match(openaiCall.body.instructions, /두번째식당/);
+  assert.equal(result.calls.filter(call => call.href.includes("openapi.naver.com")).length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "안녕",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     aiResponse: {
       message: "점심 메뉴 같이 골라볼까요? 가볍게, 든든하게, 매콤하게 중에서 어떤 느낌이 좋으세요?",
