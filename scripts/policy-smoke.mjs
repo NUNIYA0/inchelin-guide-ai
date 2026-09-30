@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
 import worker from "../build/dist/server/index.js";
 
-function request(message, history = []) {
+function request(message, history = [], context = {}) {
   return new Request("https://example.test/api/chat", {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ messages: [...history, { role: "user", content: message }] }),
+    body: JSON.stringify({ messages: [...history, { role: "user", content: message }], context }),
   });
 }
 
-async function runCase({ message, env, dbResponse, enrichmentResponse, naverResponse, expectedStatus = 200 }) {
+async function runCase({ message, env, context, dbResponse, enrichmentResponse, naverResponse, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -26,9 +26,41 @@ async function runCase({ message, env, dbResponse, enrichmentResponse, naverResp
     throw new Error(`Unexpected URL: ${href}`);
   };
   try {
-    const response = await worker.fetch(request(message), env, {});
+    const response = await worker.fetch(request(message, [], context), env, {});
     assert.equal(response.status, expectedStatus);
     return { body: await response.json(), calls };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+{
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.match(String(url), /coords=127%2C37\.5/);
+    return Response.json({
+      results: [{
+        name: "admcode",
+        region: {
+          area1: { name: "서울특별시" },
+          area2: { name: "강남구" },
+          area3: { name: "역삼동" },
+          area4: { name: "" },
+        },
+      }],
+    });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://example.test/api/reverse-geocode", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ latitude: 37.5, longitude: 127.0 }),
+    }), {
+      NAVER_MAPS_API_KEY_ID: "maps-id",
+      NAVER_MAPS_API_KEY: "maps-key",
+    }, {});
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), { locationName: "서울특별시 강남구 역삼동" });
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -158,6 +190,44 @@ const baseEnv = {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.match(result.body.message, /네이버 맛집 검색 연결/);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "현재 위치 근처",
+    context: { currentLocationName: "서울특별시 강남구 역삼동" },
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_CLIENT_ID: "naver-id",
+      NAVER_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "역삼식당",
+        roadAddress: "서울특별시 강남구 역삼로 1",
+        telephone: "02-0000-0000",
+        category: "한식",
+        link: "https://map.naver.com/p/entry/place/999",
+        mapx: "1270000000",
+        mapy: "375000000",
+      }],
+    },
+  });
+  const naverCall = result.calls.find(call => call.href.includes("openapi.naver.com"));
+  assert.ok(naverCall);
+  assert.match(new URL(naverCall.href).searchParams.get("query"), /서울특별시 강남구 역삼동/);
+  assert.equal(result.body.restaurants[0].name, "역삼식당");
+}
+
+{
+  const result = await runCase({
+    message: "현재 위치 근처",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /임의로 추정하지 않아요/);
+  assert.ok(result.body.suggestions.includes("현재 위치 근처"));
   assert.equal(result.calls.length, 0);
 }
 

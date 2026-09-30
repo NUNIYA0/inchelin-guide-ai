@@ -781,7 +781,10 @@
     let activeSuggestions = [];
     let lastAIRequest = null;
     let historyMenuId = null;
+    let currentLocationName = '';
+    let locationRequestInFlight = false;
     const AI_API_ENDPOINT = '/api/chat';
+    const REVERSE_GEOCODE_ENDPOINT = '/api/reverse-geocode';
 
     const LEGAL_CONTENT = {
       terms: { title: '이용약관', html: '<h3>제1조 목적</h3><p>본 약관은 Inchelin Guide AI 서비스 이용에 필요한 기본 사항과 이용자와 서비스 간의 권리·의무를 정합니다.</p><h3>서비스 이용</h3><p>이용자는 정확한 가입 정보를 제공하고 계정 정보를 안전하게 관리해야 합니다. 서비스는 안정적인 운영을 위해 기능을 개선하거나 일부 내용을 변경할 수 있습니다.</p><h3>이용 시 유의사항</h3><p>AI가 제공하는 내용은 이해를 돕기 위한 참고 정보이며, 중요한 판단 전에는 관련 원문과 전문가의 확인이 필요합니다.</p>' },
@@ -820,7 +823,10 @@
       const nextKey = `${state.timeZone}:${state.period}`;
       if (!force && nextKey === activeSuggestionKey) return;
       activeSuggestionKey = nextKey;
-      activeSuggestions = TIME_SUGGESTIONS[state.period].map(text => ({ label: text, prompt: text }));
+      activeSuggestions = [
+        ...TIME_SUGGESTIONS[state.period].map(text => ({ label: text, prompt: text })),
+        { label: '현재 위치 근처 맛집 찾기', prompt: '현재 위치 근처', locationAction: true }
+      ];
       const container = $('#suggestions');
       container.dataset.period = state.period;
       container.dataset.timezone = state.timeZone;
@@ -902,7 +908,8 @@
           userSpecifiedTime,
           instruction: userSpecifiedTime
             ? '사용자가 직접 지정한 시간이나 날짜 조건을 현재 시간보다 우선해서 답변하세요.'
-            : '사용자의 현재 로컬 시간대를 고려해 식사 상황에 맞는 답변을 하세요.'
+            : '사용자의 현재 로컬 시간대를 고려해 식사 상황에 맞는 답변을 하세요.',
+          currentLocationName
         }
       };
     }
@@ -991,6 +998,7 @@
       stopGeneration(false);
       currentId = null;
       chatMessages = [];
+      currentLocationName = '';
       messagesEl.innerHTML = '';
       showWelcome();
       $('#welcomeInput').value = '';
@@ -1121,7 +1129,7 @@
           button.type = 'button';
           button.className = 'quick-reply';
           button.textContent = reply;
-          button.addEventListener('click', () => ask(reply));
+          button.addEventListener('click', () => routeQuestion(reply));
           replies.appendChild(button);
         });
         item.appendChild(replies);
@@ -1153,6 +1161,7 @@
         id: currentId,
         title: existing?.title || firstQuestion.slice(0, 26),
         messages: chatMessages,
+        locationName: currentLocationName,
         createdAt: existing?.createdAt || Date.now(),
         updatedAt: Date.now()
       };
@@ -1171,6 +1180,7 @@
       if (!history) return;
       stopGeneration(false);
       currentId = id;
+      currentLocationName = String(history.locationName || '');
       chatMessages = history.messages.map(normalizeMessage).filter(Boolean);
       renderConversation();
       welcome.style.display = 'none';
@@ -1290,14 +1300,102 @@
         if (generating) setGenerating(false);
       }
     }
-    function ask(question) {
-      const value = question.trim();
-      if (!value || generating) return;
+    function isCurrentLocationIntent(value) {
+      return /^(?:현재\s*위치|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾아줘|추천해줘|검색해줘))?)?$/.test(String(value || '').trim());
+    }
+    function showChatView() {
       if (!currentId) currentId = `chat-${Date.now()}`;
       welcome.style.display = 'none';
       guidePanel.classList.remove('active');
       chatView.classList.add('active');
       main.classList.add('chat-mode');
+    }
+    function focusManualLocationInput() {
+      showChatView();
+      const input = $('#chatInput');
+      input.placeholder = '찾고 싶은 지역을 입력하세요';
+      input.focus();
+    }
+    function locationPermissionWasDenied() {
+      try { return sessionStorage.getItem('inchelin-location-denied') === 'true'; } catch (_) { return false; }
+    }
+    function rememberLocationPermissionDenied() {
+      try { sessionStorage.setItem('inchelin-location-denied', 'true'); } catch (_) {}
+    }
+    function appendLocationFallback() {
+      appendMessage('assistant', '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요?', {
+        quickReplies: ['서울', '강남', '직접 입력']
+      });
+    }
+    function geolocationPosition() {
+      return new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: false,
+          timeout: 10000,
+          maximumAge: 300000
+        });
+      });
+    }
+    async function requestCurrentLocation() {
+      if (generating || locationRequestInFlight) return;
+      showChatView();
+      appendMessage('user', '현재 위치 근처');
+      if (!window.isSecureContext || !navigator.geolocation || locationPermissionWasDenied()) {
+        appendLocationFallback();
+        return;
+      }
+
+      locationRequestInFlight = true;
+      const status = document.createElement('div');
+      status.className = 'message status location-status';
+      status.innerHTML = '<span class="thinking-dots"><i></i><i></i><i></i></span><span>현재 위치를 확인하고 있어요</span>';
+      messagesEl.appendChild(status);
+      messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
+      try {
+        const position = await geolocationPosition();
+        status.querySelector('span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
+        const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          })
+        });
+        if (!response.ok) throw new Error(`Reverse geocoding failed: ${response.status}`);
+        const data = await response.json();
+        const locationName = String(data?.locationName || '').trim();
+        if (!locationName) throw new Error('Reverse geocoding did not return a location name.');
+        currentLocationName = locationName;
+        saveConversation();
+        status.remove();
+        lastAIRequest = buildAIRequest(chatMessages);
+        generateAnswer(lastAIRequest);
+      } catch (error) {
+        status.remove();
+        if (error?.code === 1) rememberLocationPermissionDenied();
+        appendLocationFallback();
+      } finally {
+        locationRequestInFlight = false;
+      }
+    }
+    function routeQuestion(question) {
+      const value = String(question || '').trim();
+      if (!value) return;
+      if (value === '직접 입력') {
+        focusManualLocationInput();
+        return;
+      }
+      if (isCurrentLocationIntent(value)) {
+        requestCurrentLocation();
+        return;
+      }
+      ask(value);
+    }
+    function ask(question) {
+      const value = question.trim();
+      if (!value || generating) return;
+      showChatView();
       appendMessage('user', value);
       $('#welcomeInput').value = '';
       $('#chatInput').value = '';
@@ -1332,9 +1430,9 @@
         }
       });
     });
-    $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); ask($('#welcomeInput').value); });
-    $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else ask($('#chatInput').value); });
-    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const item = activeSuggestions[Number(button.dataset.index)]; if (!item) return; ask(item.prompt); });
+    $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); routeQuestion($('#welcomeInput').value); });
+    $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else routeQuestion($('#chatInput').value); });
+    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const item = activeSuggestions[Number(button.dataset.index)]; if (!item) return; routeQuestion(item.prompt); });
     $('#historyList').addEventListener('click', event => {
       const open = event.target.closest('[data-open-history]');
       const menu = event.target.closest('[data-history-menu]');

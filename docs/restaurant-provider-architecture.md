@@ -16,7 +16,7 @@
 두 공급자는 다음 메서드를 제공한다.
 
 ```text
-searchRestaurants({ query, messages })
+searchRestaurants({ query, messages, locationName })
 getRestaurantDetail(place)
 ```
 
@@ -34,6 +34,18 @@ getRestaurantDetail(place)
 - `NAVER_LOCAL_SEARCH_API_URL` — 선택값. 기본값은 기존 지역 검색 API URL이며 API HUB 이관 시 새 엔드포인트로 교체한다.
 
 최근 사용자 대화 최대 6개를 하나의 검색 문맥으로 만들어 단답형 후속 입력도 이전 조건과 함께 검색한다. API에서 실제로 받은 상호명, 주소, 전화번호와 네이버 URL만 카드에 사용한다. 이미지, 영업시간, 메뉴, 가격 등 응답에 없는 값은 숨긴다.
+
+## 현재 위치 검색
+
+브라우저는 사용자가 `현재 위치 근처`를 직접 선택하거나 입력해 전송했을 때만 `navigator.geolocation.getCurrentPosition()`을 호출한다. 좌표는 대화 기록이나 브라우저 저장소에 보관하지 않고 `/api/reverse-geocode` 요청에만 사용한다. Worker가 네이버 지도 Reverse Geocoding API로 지역명을 확인한 뒤, 지역명만 현재 대화의 검색 문맥에 저장한다.
+
+추가 런타임 값:
+
+- `NAVER_MAPS_API_KEY_ID`
+- `NAVER_MAPS_API_KEY`
+- `NAVER_REVERSE_GEOCODE_API_URL` — 선택값. 기본값은 네이버 지도 Reverse Geocoding URL이다.
+
+권한 거부는 세션 동안 기억해 같은 세션에서 권한 요청을 반복하지 않는다. 실패 시 좌표나 추정 위치를 사용하지 않고 서울, 강남, 직접 입력 선택지를 제공한다.
 
 네이버 모드에서는 다음 표현을 사용하지 않는다.
 
