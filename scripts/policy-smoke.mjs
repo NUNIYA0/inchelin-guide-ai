@@ -9,7 +9,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, env, context, dbResponse, enrichmentResponse, naverResponse, expectedStatus = 200 }) {
+async function runCase({ message, env, context, dbResponse, enrichmentResponse, naverResponse, aiResponse, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -21,7 +21,7 @@ async function runCase({ message, env, context, dbResponse, enrichmentResponse, 
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
       const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
-      return Response.json({ output_text: JSON.stringify({ message: "검색 결과를 확인했어요.", suggestions: [], selectedRestaurantIds: selectedId ? [selectedId] : [] }) });
+      return Response.json({ output_text: JSON.stringify(aiResponse || { message: "검색 결과를 확인했어요.", suggestions: [], selectedRestaurantIds: selectedId ? [selectedId] : [] }) });
     }
     throw new Error(`Unexpected URL: ${href}`);
   };
@@ -229,6 +229,20 @@ const baseEnv = {
   assert.match(result.body.message, /임의로 추정하지 않아요/);
   assert.ok(result.body.suggestions.includes("현재 위치 근처"));
   assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "점심 뭐 먹지?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: {
+      message: "점심 메뉴 같이 골라볼까요? 가볍게, 든든하게, 매콤하게 중에서 어떤 느낌이 좋으세요?",
+      suggestions: ["가볍게", "든든하게", "매콤하게", "다른 거 추천해줘"],
+      selectedRestaurantIds: [],
+    },
+  });
+  assert.equal(result.body.message, "점심 메뉴 같이 골라볼까요?");
+  assert.deepEqual(result.body.suggestions, ["가볍게", "든든하게", "매콤하게", "다른 메뉴"]);
 }
 
 console.log("Inchelin data policy smoke tests passed.");
