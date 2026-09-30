@@ -32,6 +32,11 @@ getRestaurantDetail(place)
 - `NAVER_CLIENT_ID`
 - `NAVER_CLIENT_SECRET`
 - `NAVER_LOCAL_SEARCH_API_URL` — 선택값. 기본값은 기존 지역 검색 API URL이며 API HUB 이관 시 새 엔드포인트로 교체한다.
+- `PROVIDER_DEBUG_LOGS=true` — 개발 환경에서 데이터 소스, provider, 검색 query, API 상태, 결과 수, 오류 원인을 서버 로그에 기록한다. 인증정보는 기록하지 않는다.
+
+자연어 대화에서 최근 지역과 음식 카테고리/메뉴를 분리해 `지역 + 음식 의도` 형태의 검색어를 만든다. 예를 들어 `강남에서 한식 먹고 싶어`는 `강남 한식`, 현재 위치가 `서울특별시 강남구 역삼동`이고 사용자가 국밥을 원하면 `역삼동 국밥`으로 요청한다.
+
+네이버 지역 검색 결과는 공통 restaurant 객체로 정규화한다. 지역 검색 API가 제공하지 않는 이미지, 영업 상태, 영업시간, 대표 메뉴는 `null` 또는 빈 배열로 유지하고 임의로 생성하지 않는다. `mapx`, `mapy`는 네이버의 WGS84 정수 좌표 형식만 숫자 경도·위도로 변환한다.
 
 최근 사용자 대화 최대 6개를 하나의 검색 문맥으로 만들어 단답형 후속 입력도 이전 조건과 함께 검색한다. API에서 실제로 받은 상호명, 주소, 전화번호와 네이버 URL만 카드에 사용한다. 이미지, 영업시간, 메뉴, 가격 등 응답에 없는 값은 숨긴다.
 
@@ -43,7 +48,12 @@ getRestaurantDetail(place)
 
 - `NAVER_MAPS_API_KEY_ID`
 - `NAVER_MAPS_API_KEY`
+- `NAVER_GEOCODE_API_URL` — 선택값. 기본값은 네이버 지도 Geocoding URL이다.
 - `NAVER_REVERSE_GEOCODE_API_URL` — 선택값. 기본값은 네이버 지도 Reverse Geocoding URL이다.
+
+서버의 `/api/geocode`는 주소를 좌표로, `/api/reverse-geocode`는 좌표를 주소/지역명으로 변환한다. 지역 검색 API는 좌표 반경 검색으로 취급하지 않는다. 현재 위치는 역지오코딩으로 얻은 동네명을 지역 검색 query에 사용하며, 거리순 기능이 필요하면 추후 사용자 좌표와 결과 좌표 사이의 거리를 별도로 계산한다.
+
+검색 상태는 `missing_credentials`, `authentication_failed`, `api_request_failed`, `no_results`, 정상 결과로 분리해 응답한다.
 
 권한 거부는 세션 동안 기억해 같은 세션에서 권한 요청을 반복하지 않는다. 실패 시 좌표나 추정 위치를 사용하지 않고 서울, 강남, 직접 입력 선택지를 제공한다.
 

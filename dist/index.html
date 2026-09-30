@@ -262,6 +262,7 @@
     .restaurant-status { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: #f2f2f2; color: #666; font-size: 11px; line-height: 1.3; }
     .restaurant-status.active { background: #eef7f0; color: #27723b; }
     .restaurant-status.temporarily_closed { background: #fff5e8; color: #9a5c0c; }
+    .restaurant-category { margin: 5px 0 0; color: #8a8a8a; font-size: 12px; line-height: 1.45; }
     .restaurant-address { margin: 6px 0 0; color: #777; font-size: 13px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; }
     .restaurant-details { margin: 13px 0 0; display: grid; gap: 7px; }
     .restaurant-detail { display: grid; grid-template-columns: 68px minmax(0, 1fr); gap: 8px; color: #444; font-size: 13px; line-height: 1.5; }
@@ -873,8 +874,13 @@
       return {
         id,
         name,
+        category: String(restaurant.category || '').trim(),
         address,
-        phone: String(restaurant.phone || '').trim(),
+        roadAddress: String(restaurant.roadAddress || '').trim(),
+        phone: String(restaurant.phone || restaurant.telephone || '').trim(),
+        telephone: String(restaurant.telephone || restaurant.phone || '').trim(),
+        longitude: Number.isFinite(Number(restaurant.longitude)) ? Number(restaurant.longitude) : null,
+        latitude: Number.isFinite(Number(restaurant.latitude)) ? Number(restaurant.latitude) : null,
         recommender: String(restaurant.recommender || '').trim(),
         imageUrl: safeHttpUrl(restaurant.imageUrl),
         businessStatus: String(restaurant.businessStatus || 'unknown').trim(),
@@ -882,7 +888,8 @@
         representativeMenus: Array.isArray(restaurant.representativeMenus) ? restaurant.representativeMenus.map(item => String(item).trim()).filter(Boolean).slice(0, 8) : [],
         menuPrice: restaurant.menuPrice ?? null,
         parking: restaurant.parking ?? null,
-        naverPlaceUrl: safeHttpUrl(restaurant.naverPlaceUrl, true),
+        naverPlaceUrl: safeHttpUrl(restaurant.naverPlaceUrl || restaurant.naverLink, true),
+        naverLink: safeHttpUrl(restaurant.naverLink || restaurant.naverPlaceUrl, true),
         isRegisteredInInchelin: dataSource === 'inchelin',
         dataSource
       };
@@ -1098,7 +1105,10 @@
         if (restaurant.businessStatus && restaurant.businessStatus !== 'unknown') head.appendChild(status);
         const address = document.createElement('p');
         address.className = 'restaurant-address';
-        address.textContent = restaurant.address;
+        address.textContent = restaurant.roadAddress || restaurant.address;
+        const category = document.createElement('p');
+        category.className = 'restaurant-category';
+        category.textContent = restaurant.category;
         const details = document.createElement('dl');
         details.className = 'restaurant-details';
         appendRestaurantDetail(details, '대표 메뉴', restaurant.representativeMenus);
@@ -1107,12 +1117,14 @@
         appendRestaurantDetail(details, '전화번호', restaurant.phone);
         appendRestaurantDetail(details, '주차', restaurant.parking);
         appendRestaurantDetail(details, '추천인', restaurant.recommender);
-        body.append(head, address);
+        body.appendChild(head);
+        if (restaurant.category) body.appendChild(category);
+        body.appendChild(address);
         if (details.children.length) body.appendChild(details);
-        if (restaurant.naverPlaceUrl) {
+        if (restaurant.naverPlaceUrl || restaurant.naverLink) {
           const link = document.createElement('a');
           link.className = 'restaurant-map-link';
-          link.href = restaurant.naverPlaceUrl;
+          link.href = restaurant.naverPlaceUrl || restaurant.naverLink;
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
           link.textContent = '네이버지도에서 보기';
@@ -1376,13 +1388,13 @@
 
       locationRequestInFlight = true;
       const status = document.createElement('div');
-      status.className = 'message status location-status';
-      status.innerHTML = '<span class="thinking-dots"><i></i><i></i><i></i></span><span>현재 위치를 확인하고 있어요</span>';
+      status.className = 'message ai status location-status';
+      status.innerHTML = '<img class="ai-avatar" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI"><div class="ai-bubble"><span class="thinking-dots"><i></i><i></i><i></i></span><span>현재 위치를 확인하고 있어요</span></div>';
       messagesEl.appendChild(status);
       messagesEl.scrollTo({ top: messagesEl.scrollHeight, behavior: 'smooth' });
       try {
         const position = await geolocationPosition();
-        status.querySelector('span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
+        status.querySelector('.ai-bubble > span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
         const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

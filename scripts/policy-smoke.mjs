@@ -9,7 +9,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, aiResponse, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, aiResponse, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -17,7 +17,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     calls.push({ href, body: options.body ? JSON.parse(options.body) : null });
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
-    if (href.includes("openapi.naver.com")) return Response.json(naverResponse);
+    if (href.includes("openapi.naver.com")) return Response.json(naverResponse, { status: naverStatus });
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
       const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
@@ -29,6 +29,38 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     const response = await worker.fetch(request(message, history, context), env, {});
     assert.equal(response.status, expectedStatus);
     return { body: await response.json(), calls };
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+{
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.match(String(url), /map-geocode\/v2\/geocode\?query=/);
+    return Response.json({
+      status: "OK",
+      addresses: [{
+        roadAddress: "서울특별시 강남구 테헤란로 1",
+        jibunAddress: "서울특별시 강남구 역삼동 1",
+        x: "127.0276",
+        y: "37.4979",
+      }],
+    });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://example.test/api/geocode", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ address: "서울특별시 강남구 테헤란로 1" }),
+    }), {
+      NAVER_MAPS_API_KEY_ID: "maps-id",
+      NAVER_MAPS_API_KEY: "maps-key",
+    }, {});
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.longitude, 127.0276);
+    assert.equal(body.latitude, 37.4979);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -183,6 +215,10 @@ const baseEnv = {
   assert.equal(result.body.restaurants[0].dataSource, "naver");
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
   assert.equal(result.body.restaurants[0].recommender, "");
+  assert.equal(result.body.restaurants[0].category, "한식>냉면");
+  assert.equal(result.body.restaurants[0].longitude, 127);
+  assert.equal(result.body.restaurants[0].latitude, 37.5);
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
 }
 
 {
@@ -190,8 +226,56 @@ const baseEnv = {
     message: "강남 물냉면 맛집 찾아줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.match(result.body.message, /네이버 맛집 검색 연결/);
+  assert.match(result.body.message, /인증정보가 아직 설정되지 않았어요/);
+  assert.equal(result.body.meta.restaurantSearchStatus, "missing_credentials");
   assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "강남 물냉면 맛집 찾아줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_CLIENT_ID: "wrong-id",
+      NAVER_CLIENT_SECRET: "wrong-secret",
+    },
+    naverResponse: { errorMessage: "Authentication failed" },
+    naverStatus: 401,
+  });
+  assert.match(result.body.message, /인증에 실패/);
+  assert.equal(result.body.meta.restaurantSearchStatus, "authentication_failed");
+}
+
+{
+  const result = await runCase({
+    message: "강남 한식 맛집 찾아줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_CLIENT_ID: "naver-id",
+      NAVER_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: { errorMessage: "Temporary upstream error" },
+    naverStatus: 500,
+  });
+  assert.match(result.body.message, /요청에 실패/);
+  assert.equal(result.body.meta.restaurantSearchStatus, "api_request_failed");
+}
+
+{
+  const result = await runCase({
+    message: "강남 한식 맛집 찾아줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_CLIENT_ID: "naver-id",
+      NAVER_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: { items: [] },
+  });
+  assert.match(result.body.message, /찾지 못했어요/);
+  assert.equal(result.body.meta.restaurantSearchStatus, "no_results");
 }
 
 {
@@ -222,7 +306,7 @@ const baseEnv = {
   });
   const naverCall = result.calls.find(call => call.href.includes("openapi.naver.com"));
   assert.ok(naverCall);
-  assert.match(new URL(naverCall.href).searchParams.get("query"), /서울특별시 강남구 역삼동/);
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "역삼동 든든한 식사");
   assert.equal(result.body.restaurants[0].name, "역삼식당");
 }
 

@@ -120,12 +120,13 @@ function compactMessageForQuickReplies(value, replies) {
   return units.slice(0, 2).join("\n\n");
 }
 
-function chatResponse(message, suggestions = [], restaurants = []) {
+function chatResponse(message, suggestions = [], restaurants = [], meta = null) {
   const normalizedSuggestions = normalizeQuickReplies(suggestions);
   return {
     message: compactMessageForQuickReplies(message, normalizedSuggestions),
     suggestions: normalizedSuggestions,
     restaurants: Array.isArray(restaurants) ? restaurants : [],
+    ...(meta && typeof meta === "object" ? { meta } : {}),
   };
 }
 
@@ -150,7 +151,7 @@ function asksForVenueSearch(text) {
 }
 
 const LOCATION_TOKEN_SOURCE = "서울|부산|대구|인천|광주|대전|울산|세종|제주|강남|강북|홍대|성수|잠실|판교|분당|일산|수원|용산|여의도|을지로|종로|[가-힣]{2,}(?:시|군|구|동|읍|면|역)";
-const LOCATION_PATTERN = new RegExp(LOCATION_TOKEN_SOURCE);
+const LOCATION_FALSE_POSITIVE_PATTERN = /^(?:냉면|물냉면|비빔냉면|회냉면|라면|짜장면|우동면)$/;
 const CURRENT_LOCATION_PATTERN = /(?:현재\s*위치|내\s*(?:위치|주변))(?:\s*근처)?/;
 const MEAL_INTENT_PATTERN = /먹|식사|한\s*끼|배고|맛집|식당|카페|한식|중식|일식|양식|분식|면|밥|고기|국물|냉면|국밥|찌개|돈까스|매운|매콤|가볍|든든|부모님|가족|데이트|회식|모임|친구|동료/;
 const RESULT_REFINEMENT_PATTERN = /다른\s*(?:곳|데|맛집)|비슷한\s*(?:곳|데)|별로|안\s*끌|국물|부모님|가족|데이트|한식|중식|일식|양식|면|밥|고기|가볍|든든|매운|매콤|조용|분위기|주차|예약|저렴|비싸|가격|예산/;
@@ -160,16 +161,23 @@ function userMessagesOnly(messages) {
   return messages.filter(message => message.role === "user").map(message => message.content);
 }
 
-function explicitLocationFromMessages(messages) {
+function locationMatches(text) {
   const matcher = new RegExp(LOCATION_TOKEN_SOURCE, "g");
-  const matches = userMessagesOnly(messages).flatMap(text => [...text.matchAll(matcher)].map(match => match[0]));
+  return [...String(text || "").matchAll(matcher)]
+    .map(match => match[0])
+    .filter(value => !LOCATION_FALSE_POSITIVE_PATTERN.test(value));
+}
+
+function explicitLocationFromMessages(messages) {
+  const matches = userMessagesOnly(messages)
+    .flatMap(text => locationMatches(text));
   return matches.at(-1) || "";
 }
 
 function isLocationOnlyMessage(text) {
-  if (!LOCATION_PATTERN.test(text)) return false;
-  const withoutLocation = text
-    .replace(new RegExp(LOCATION_TOKEN_SOURCE, "g"), " ")
+  const matches = locationMatches(text);
+  if (!matches.length) return false;
+  const withoutLocation = matches.reduce((value, location) => value.replace(location, " "), text)
     .replace(/(?:에서|근처|주변|쪽으로|쪽|으로|로|요|이요|예요|입니다)/g, " ")
     .replace(/[^가-힣0-9]/g, "")
     .trim();
@@ -186,7 +194,7 @@ function conversationSignals(messages, currentLocationName, hasRestaurantResults
     latest,
     locationName,
     hasLocation: Boolean(locationName),
-    latestHasLocation: LOCATION_PATTERN.test(latest),
+    latestHasLocation: locationMatches(latest).length > 0,
     latestIsLocationOnly: isLocationOnlyMessage(latest),
     hasMealIntent: MEAL_INTENT_PATTERN.test(userMessages.join(" ")),
     hadMealIntent: MEAL_INTENT_PATTERN.test(earlier),
@@ -211,9 +219,9 @@ function mealDirectionNeededResponse(locationName) {
 
 function shouldSearchRestaurants(text, messages, requestedField) {
   if (Boolean(requestedField) || asksForVenueSearch(text) || /(?:어때|알려줘|정보\s*(좀|알려)|괜찮아)/.test(text)) return true;
-  if (LOCATION_PATTERN.test(text)) return true;
+  if (locationMatches(text).length) return true;
   const userConversation = messages.filter(message => message.role === "user").slice(-6).map(message => message.content).join(" ");
-  return LOCATION_PATTERN.test(userConversation) && /한식|중식|일식|양식|면|밥|고기|국물|냉면|카페|디저트|메뉴|먹|가벼|든든|다른/.test(text);
+  return locationMatches(userConversation).length > 0 && /한식|중식|일식|양식|면|밥|고기|국물|냉면|카페|디저트|메뉴|먹|가벼|든든|다른/.test(text);
 }
 
 function needsBrowserLocationResponse() {
@@ -223,16 +231,39 @@ function needsBrowserLocationResponse() {
   );
 }
 
-function dataConnectionUnavailableResponse(source = "inchelin") {
+function providerConfigurationMissingResponse(source = "inchelin") {
   if (source === "naver") {
     return chatResponse(
-      "현재 네이버 맛집 검색 연결을 준비하고 있어 실제 식당을 바로 확인할 수 없어요.\n\n연결 전에는 임의의 매장을 만들지 않을게요. 지금 드시고 싶은 메뉴는 함께 골라드릴 수 있어요.",
-      ["메뉴 추천받기", "오늘 뭐 먹지", "다른 조건으로 볼게"]
+      "네이버 맛집 검색 인증정보가 아직 설정되지 않았어요.\n\n설정이 완료되면 실제 검색 결과만 보여드릴게요.",
+      ["메뉴 추천받기", "다른 조건으로 볼게"],
+      [],
+      { restaurantSearchStatus: "missing_credentials", provider: "naver" }
     );
   }
   return chatResponse(
     "현재 인슐랭가이드 등록 매장 데이터를 연결 중이라 실제 맛집을 확인할 수 없어요.\n\n연결 전에는 임의의 매장을 추천하지 않을게요. 대신 지금 드시고 싶은 메뉴는 함께 골라드릴 수 있어요.",
-    ["메뉴 추천받기", "오늘 뭐 먹지", "다른 조건으로 볼게"]
+    ["메뉴 추천받기", "오늘 뭐 먹지", "다른 조건으로 볼게"],
+    [],
+    { restaurantSearchStatus: "missing_configuration", provider: "inchelin" }
+  );
+}
+
+function providerRequestFailedResponse(source = "inchelin", reason = "api_request_failed") {
+  if (source === "naver" && reason === "authentication_failed") {
+    return chatResponse(
+      "네이버 맛집 검색 인증에 실패했어요.\n\n관리자 설정을 확인한 뒤 다시 시도해 주세요.",
+      ["다시 시도", "다른 조건으로 볼게"],
+      [],
+      { restaurantSearchStatus: "authentication_failed", provider: "naver" }
+    );
+  }
+  return chatResponse(
+    source === "naver"
+      ? "네이버 맛집 검색 요청에 실패했어요.\n\n잠시 후 다시 시도해 주세요."
+      : "맛집 데이터 요청에 실패했어요.\n\n잠시 후 다시 시도해 주세요.",
+    ["다시 시도", "다른 조건으로 볼게"],
+    [],
+    { restaurantSearchStatus: "api_request_failed", provider: source }
   );
 }
 
@@ -259,7 +290,9 @@ function unavailableFactResponse(field, source = "inchelin") {
 function noSearchResultsResponse() {
   return chatResponse(
     "조건에 맞는 곳을 바로 찾지 못했어요.\n\n지역을 조금 넓히거나 메뉴 조건을 바꿔서 다시 찾아볼까요?",
-    ["주변 지역까지 보기", "조건 바꿔보기"]
+    ["주변 지역까지 보기", "조건 바꿔보기"],
+    [],
+    { restaurantSearchStatus: "no_results" }
   );
 }
 
@@ -337,6 +370,37 @@ function trustedEndpoint(value) {
   }
 }
 
+class UpstreamHttpError extends Error {
+  constructor(status, service) {
+    super(`${service || "upstream"}_${status}`);
+    this.name = "UpstreamHttpError";
+    this.status = status;
+    this.service = service || "upstream";
+  }
+}
+
+class RestaurantProviderError extends Error {
+  constructor(code, status = 0) {
+    super(code);
+    this.name = "RestaurantProviderError";
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function providerDebugLog(env, event, details = {}) {
+  if (String(env.PROVIDER_DEBUG_LOGS || "").toLowerCase() !== "true") return;
+  console.info("[restaurant-provider]", JSON.stringify({
+    DATA_SOURCE: env.RESTAURANT_DATA_SOURCE || "naver",
+    provider: details.provider || env.RESTAURANT_DATA_SOURCE || "naver",
+    event,
+    query: safeText(details.query, 300),
+    api_status: Number(details.apiStatus || 0) || null,
+    result_count: Number.isFinite(details.resultCount) ? details.resultCount : null,
+    error_reason: safeText(details.errorReason, 120) || null,
+  }));
+}
+
 async function postJsonWithTimeout(url, token, body, timeoutMs = 6500) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -349,7 +413,7 @@ async function postJsonWithTimeout(url, token, body, timeoutMs = 6500) {
       body: JSON.stringify(body),
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error(`upstream_${response.status}`);
+    if (!response.ok) throw new UpstreamHttpError(response.status, "post_json");
     return await response.json();
   } finally {
     clearTimeout(timeout);
@@ -365,7 +429,7 @@ async function getJsonWithTimeout(url, headers = {}, timeoutMs = 6500) {
       headers: { accept: "application/json", ...headers },
       signal: controller.signal,
     });
-    if (!response.ok) throw new Error(`upstream_${response.status}`);
+    if (!response.ok) throw new UpstreamHttpError(response.status, "get_json");
     return await response.json();
   } finally {
     clearTimeout(timeout);
@@ -384,6 +448,21 @@ function locationNameFromReverseGeocode(data) {
   return [...new Set(names)].join(" ").slice(0, 240);
 }
 
+function naverMapsConfiguration(env) {
+  return {
+    apiKeyId: safeText(env.NAVER_MAPS_API_KEY_ID, 300),
+    apiKey: safeText(env.NAVER_MAPS_API_KEY, 300),
+  };
+}
+
+function naverMapsHeaders(env) {
+  const { apiKeyId, apiKey } = naverMapsConfiguration(env);
+  return {
+    "x-ncp-apigw-api-key-id": apiKeyId,
+    "x-ncp-apigw-api-key": apiKey,
+  };
+}
+
 async function handleReverseGeocode(request, env) {
   let payload;
   try {
@@ -400,10 +479,9 @@ async function handleReverseGeocode(request, env) {
   }
 
   const endpoint = trustedEndpoint(env.NAVER_REVERSE_GEOCODE_API_URL || "https://maps.apigw.ntruss.com/map-reversegeocode/v2/gc");
-  const apiKeyId = safeText(env.NAVER_MAPS_API_KEY_ID, 300);
-  const apiKey = safeText(env.NAVER_MAPS_API_KEY, 300);
+  const { apiKeyId, apiKey } = naverMapsConfiguration(env);
   if (!endpoint || !apiKeyId || !apiKey) {
-    return json({ error: "현재 위치 주소 변환 연결을 준비하고 있어요." }, 503);
+    return json({ error: "현재 위치 주소 변환 인증정보가 설정되지 않았어요.", code: "missing_credentials" }, 503);
   }
 
   try {
@@ -412,16 +490,62 @@ async function handleReverseGeocode(request, env) {
     url.searchParams.set("sourcecrs", "epsg:4326");
     url.searchParams.set("orders", "admcode,legalcode,addr,roadaddr");
     url.searchParams.set("output", "json");
-    const data = await getJsonWithTimeout(url.toString(), {
-      "x-ncp-apigw-api-key-id": apiKeyId,
-      "x-ncp-apigw-api-key": apiKey,
-    });
+    const data = await getJsonWithTimeout(url.toString(), naverMapsHeaders(env));
     const locationName = locationNameFromReverseGeocode(data);
-    if (!locationName) return json({ error: "현재 위치의 지역명을 확인하지 못했어요." }, 404);
+    if (!locationName) return json({ error: "현재 위치의 지역명을 확인하지 못했어요.", code: "no_results" }, 404);
     return json({ locationName });
   } catch (error) {
     console.error("Reverse geocoding failed", error instanceof Error ? error.message : "unknown error");
-    return json({ error: "현재 위치의 지역명을 확인하지 못했어요." }, 502);
+    const authenticationFailed = error instanceof UpstreamHttpError && [401, 403].includes(error.status);
+    return json({
+      error: authenticationFailed ? "현재 위치 주소 변환 인증에 실패했어요." : "현재 위치의 지역명을 확인하지 못했어요.",
+      code: authenticationFailed ? "authentication_failed" : "api_request_failed",
+    }, 502);
+  }
+}
+
+async function handleGeocode(request, env) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ error: "주소 요청 형식이 올바르지 않습니다.", code: "invalid_request" }, 400);
+  }
+
+  const address = safeText(payload?.address, 300);
+  if (!address) return json({ error: "변환할 주소를 입력해 주세요.", code: "invalid_address" }, 400);
+
+  const endpoint = trustedEndpoint(env.NAVER_GEOCODE_API_URL || "https://maps.apigw.ntruss.com/map-geocode/v2/geocode");
+  const { apiKeyId, apiKey } = naverMapsConfiguration(env);
+  if (!endpoint || !apiKeyId || !apiKey) {
+    return json({ error: "주소 좌표 변환 인증정보가 설정되지 않았어요.", code: "missing_credentials" }, 503);
+  }
+
+  try {
+    const url = new URL(endpoint);
+    url.searchParams.set("query", address);
+    url.searchParams.set("count", "1");
+    const data = await getJsonWithTimeout(url.toString(), naverMapsHeaders(env));
+    const first = Array.isArray(data?.addresses) ? data.addresses[0] : null;
+    const longitude = Number(first?.x);
+    const latitude = Number(first?.y);
+    if (!first || !Number.isFinite(longitude) || !Number.isFinite(latitude)) {
+      return json({ error: "주소에 해당하는 좌표를 찾지 못했어요.", code: "no_results" }, 404);
+    }
+    return json({
+      address: safeText(first.roadAddress || first.jibunAddress || address, 300),
+      roadAddress: safeText(first.roadAddress, 300) || null,
+      jibunAddress: safeText(first.jibunAddress, 300) || null,
+      longitude,
+      latitude,
+    });
+  } catch (error) {
+    console.error("Geocoding failed", error instanceof Error ? error.message : "unknown error");
+    const authenticationFailed = error instanceof UpstreamHttpError && [401, 403].includes(error.status);
+    return json({
+      error: authenticationFailed ? "주소 좌표 변환 인증에 실패했어요." : "주소를 좌표로 변환하지 못했어요.",
+      code: authenticationFailed ? "authentication_failed" : "api_request_failed",
+    }, 502);
   }
 }
 
@@ -435,24 +559,60 @@ function stripSearchMarkup(value) {
     .trim();
 }
 
-function buildRestaurantSearchQuery(messages, locationName = "") {
-  const parts = messages
+const FOOD_SEARCH_PATTERN = /국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고기|국물/;
+
+function mostSpecificSearchLocation(value) {
+  const parts = safeText(value, 240).split(/\s+/).filter(Boolean);
+  if (!parts.length) return "";
+  return parts.findLast(part => /(?:동|읍|면|역)$/.test(part))
+    || parts.findLast(part => /(?:구|군|시)$/.test(part))
+    || parts.at(-1);
+}
+
+function extractRestaurantSearchIntent(messages) {
+  const userTexts = messages
     .filter(message => message.role === "user")
     .slice(-8)
     .map(message => safeText(message.content, 160))
-    .filter(Boolean);
-  const explicitLocation = explicitLocationFromMessages(messages);
-  const verifiedLocation = safeText(explicitLocation || locationName, 240);
-  const intentParts = parts
-    .map(part => part
-      .replace(new RegExp(LOCATION_TOKEN_SOURCE, "g"), " ")
-      .replace(CURRENT_LOCATION_PATTERN, " ")
-      .replace(/지역\s*바꾸기|다른\s*지역|다른\s*(?:곳|데|맛집)|별로야?/g, " ")
-      .replace(/\s+/g, " ")
-      .trim())
     .filter(Boolean)
-    .slice(-5);
-  return safeText(`${verifiedLocation} ${intentParts.join(" ")} 맛집`, 500);
+    .reverse();
+  let primary = "";
+  let modifier = "";
+  for (const text of userTexts) {
+    if (!primary) primary = text.match(FOOD_SEARCH_PATTERN)?.[0] || "";
+    if (!modifier) {
+      if (/가볍/.test(text)) modifier = "가벼운 식사";
+      else if (/든든/.test(text)) modifier = "든든한 식사";
+      else if (/매운|매콤/.test(text)) modifier = "매운 음식";
+      else if (/부모님|가족/.test(text)) modifier = "가족 식사";
+      else if (/데이트/.test(text)) modifier = "데이트 맛집";
+      else if (/조용/.test(text)) modifier = "조용한 식당";
+      else if (/저렴|비싸|가격|예산/.test(text)) modifier = "가성비 맛집";
+    }
+    if (primary && modifier) break;
+  }
+  return [...new Set([primary, modifier].filter(Boolean))].join(" ") || "맛집";
+}
+
+function buildRestaurantSearchQuery(messages, locationName = "") {
+  const explicitLocation = explicitLocationFromMessages(messages);
+  const verifiedLocation = mostSpecificSearchLocation(explicitLocation || locationName);
+  const intent = extractRestaurantSearchIntent(messages);
+  return safeText(`${verifiedLocation} ${intent}`.replace(/\s+/g, " ").trim(), 200);
+}
+
+function naverWgs84Coordinate(value, type) {
+  const raw = Number(value);
+  if (!Number.isFinite(raw)) return null;
+  const coordinate = Math.abs(raw) > 1000 ? raw / 10000000 : raw;
+  if (type === "longitude" && (coordinate < -180 || coordinate > 180)) return null;
+  if (type === "latitude" && (coordinate < -90 || coordinate > 90)) return null;
+  return coordinate;
+}
+
+function naverMapSearchUrl(name, address) {
+  const query = safeText(`${name} ${address}`, 400);
+  return query ? `https://map.naver.com/p/search/${encodeURIComponent(query)}` : "";
 }
 
 function sanitizeNaverPlace(item) {
@@ -462,8 +622,11 @@ function sanitizeNaverPlace(item) {
   const mapX = safeText(String(item?.mapx || ""), 40);
   const mapY = safeText(String(item?.mapy || ""), 40);
   const id = `naver:${normalizeIdentityText(name).slice(0, 48)}:${mapX}:${mapY}`.slice(0, 120);
-  const link = safeRestaurantUrl(item?.link, "naver");
+  const rawLink = safeUrl(item?.link);
+  const naverLink = safeRestaurantUrl(rawLink, "naver") || naverMapSearchUrl(name, address);
   const phone = safeText(item?.telephone, 80);
+  const longitude = naverWgs84Coordinate(mapX, "longitude");
+  const latitude = naverWgs84Coordinate(mapY, "latitude");
   return {
     id,
     name,
@@ -472,13 +635,24 @@ function sanitizeNaverPlace(item) {
     business_status: "unknown",
     provider: "naver",
     registered_data: {
-      category: stripSearchMarkup(item?.category),
-      phone,
-      naver_place_url: link,
+      category: stripSearchMarkup(item?.category) || null,
+      address: safeText(item?.address, 300) || null,
+      roadAddress: safeText(item?.roadAddress, 300) || null,
+      telephone: phone || null,
+      phone: phone || null,
+      longitude,
+      latitude,
+      naverLink: naverLink || null,
+      naver_place_url: naverLink || null,
+      officialLink: rawLink || null,
+      imageUrl: null,
+      businessStatus: null,
+      openingHours: null,
+      representativeMenus: [],
     },
     facts: {
-      ...(phone ? { phone: { value: phone, origin: "naver", checked_at: new Date().toISOString(), source_url: link, resolution_status: "confirmed" } } : {}),
-      ...(link ? { naver_place_url: { value: link, origin: "naver", checked_at: new Date().toISOString(), source_url: link, resolution_status: "confirmed" } } : {}),
+      ...(phone ? { phone: { value: phone, origin: "naver", checked_at: new Date().toISOString(), source_url: naverLink, resolution_status: "confirmed" } } : {}),
+      ...(naverLink ? { naver_place_url: { value: naverLink, origin: "naver", checked_at: new Date().toISOString(), source_url: naverLink, resolution_status: "confirmed" } } : {}),
     },
   };
 }
@@ -493,21 +667,47 @@ class NaverRestaurantProvider {
     const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://openapi.naver.com/v1/search/local.json");
     const clientId = safeText(this.env.NAVER_CLIENT_ID, 300);
     const clientSecret = safeText(this.env.NAVER_CLIENT_SECRET, 300);
-    if (!endpoint || !clientId || !clientSecret) return { configured: false, places: [], ambiguous: false };
+    const query = buildRestaurantSearchQuery(messages, locationName);
+    if (!endpoint || !clientId || !clientSecret) {
+      providerDebugLog(this.env, "search_skipped", {
+        provider: this.source,
+        query,
+        errorReason: "missing_credentials",
+        resultCount: 0,
+      });
+      return { configured: false, places: [], ambiguous: false, query, errorCode: "missing_credentials" };
+    }
     const url = new URL(endpoint);
-    url.searchParams.set("query", buildRestaurantSearchQuery(messages, locationName));
+    url.searchParams.set("query", query);
     url.searchParams.set("display", "5");
     url.searchParams.set("start", "1");
     url.searchParams.set("sort", "random");
-    const data = await getJsonWithTimeout(url.toString(), {
-      "X-Naver-Client-Id": clientId,
-      "X-Naver-Client-Secret": clientSecret,
-    });
-    return {
-      configured: true,
-      places: (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean).slice(0, 5),
-      ambiguous: false,
-    };
+    providerDebugLog(this.env, "search_started", { provider: this.source, query });
+    try {
+      const data = await getJsonWithTimeout(url.toString(), {
+        "X-Naver-Client-Id": clientId,
+        "X-Naver-Client-Secret": clientSecret,
+      });
+      const places = (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean).slice(0, 5);
+      providerDebugLog(this.env, "search_completed", {
+        provider: this.source,
+        query,
+        apiStatus: 200,
+        resultCount: places.length,
+      });
+      return { configured: true, places, ambiguous: false, query, apiStatus: 200 };
+    } catch (error) {
+      const status = error instanceof UpstreamHttpError ? error.status : 0;
+      const code = [401, 403].includes(status) ? "authentication_failed" : "api_request_failed";
+      providerDebugLog(this.env, "search_failed", {
+        provider: this.source,
+        query,
+        apiStatus: status,
+        errorReason: code,
+        resultCount: 0,
+      });
+      throw new RestaurantProviderError(code, status);
+    }
   }
 
   async getRestaurantDetail(place) {
@@ -683,16 +883,22 @@ function restaurantCard(place, source) {
   return {
     id: place.id,
     name: currentName || place.name,
+    category: safeText(registered.category, 160) || null,
     address: currentAddress || place.address,
+    roadAddress: safeText(registered.roadAddress || registered.road_address, 300) || null,
     phone: safeText(firstPresent(factValue(place, "phone"), registered.phone), 80),
+    telephone: safeText(firstPresent(factValue(place, "phone"), registered.telephone, registered.phone), 80) || null,
+    longitude: Number.isFinite(registered.longitude) ? registered.longitude : null,
+    latitude: Number.isFinite(registered.latitude) ? registered.latitude : null,
     recommender: source === "inchelin" ? safeText(firstPresent(factValue(place, "recommender"), registered.recommender), 120) : "",
-    imageUrl: safeRestaurantUrl(firstPresent(factValue(place, "representative_image"), registered.imageUrl, registered.image_url)),
-    businessStatus: place.business_status,
-    openingHours: safeText(firstPresent(factValue(place, "opening_hours"), registered.opening_hours), 300),
+    imageUrl: safeRestaurantUrl(firstPresent(factValue(place, "representative_image"), registered.imageUrl, registered.image_url)) || null,
+    businessStatus: place.business_status === "unknown" ? null : place.business_status,
+    openingHours: safeText(firstPresent(factValue(place, "opening_hours"), registered.openingHours, registered.opening_hours), 300) || null,
     representativeMenus: normalizedMenus,
     menuPrice: sanitizeDataValue(firstPresent(factValue(place, "menu_price"), registered.menu_price)),
     parking: firstPresent(factValue(place, "parking"), registered.parking),
     naverPlaceUrl: safeRestaurantUrl(firstPresent(factValue(place, "naver_place_url"), registered.naverPlaceUrl, registered.naver_place_url), "naver"),
+    naverLink: safeRestaurantUrl(firstPresent(factValue(place, "naver_place_url"), registered.naverLink, registered.naverPlaceUrl, registered.naver_place_url), "naver") || null,
     isRegisteredInInchelin: source === "inchelin",
     dataSource: source,
   };
@@ -757,7 +963,7 @@ async function handleChat(request, env) {
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
   if (LOCATION_CHANGE_PATTERN.test(latestUserMessage.trim())) return json(locationNeededResponse());
   if (CURRENT_LOCATION_PATTERN.test(latestUserMessage) && !currentLocationName
-    && !LOCATION_PATTERN.test(latestUserMessage.replace(CURRENT_LOCATION_PATTERN, ""))) {
+    && !locationMatches(latestUserMessage.replace(CURRENT_LOCATION_PATTERN, "")).length) {
     return json(needsBrowserLocationResponse());
   }
   const requestedField = findUnavailableDatabaseField(latestUserMessage);
@@ -789,12 +995,13 @@ async function handleChat(request, env) {
       lookup = await provider.searchRestaurants({ query: latestUserMessage, messages, locationName: signals.locationName });
     } catch (error) {
       console.error("Restaurant provider request failed", dataSource, error instanceof Error ? error.message : "unknown error");
-      return json(dataConnectionUnavailableResponse(dataSource));
+      const reason = error instanceof RestaurantProviderError ? error.code : "api_request_failed";
+      return json(providerRequestFailedResponse(dataSource, reason));
     }
 
     if (!lookup.configured) {
-      if (searchNow || venueIntent || LOCATION_PATTERN.test(messages.map(message => message.content).join(" "))) {
-        return json(dataConnectionUnavailableResponse(dataSource));
+      if (searchNow || venueIntent || locationMatches(messages.map(message => message.content).join(" ")).length) {
+        return json(providerConfigurationMissingResponse(dataSource));
       }
     } else {
       const excludedIds = new Set(recentRestaurants.map(restaurant => restaurant.id));
@@ -919,6 +1126,11 @@ export default {
     if (url.pathname === "/api/reverse-geocode") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       return handleReverseGeocode(request, env);
+    }
+
+    if (url.pathname === "/api/geocode") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      return handleGeocode(request, env);
     }
 
     if (url.pathname === "/" || url.pathname === "/index.html") {
