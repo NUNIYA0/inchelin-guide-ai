@@ -1,5 +1,7 @@
 # Inchelin Guide 런타임 API 계약
 
+이 계약은 `RESTAURANT_DATA_SOURCE=inchelin`인 정식 모드에 적용한다. 개발 단계의 네이버 공급자 구조는 `restaurant-provider-architecture.md`를 참고한다.
+
 AI Worker가 등록 매장 정책을 코드 수준에서 강제하기 위한 서버 간 계약이다. 두 API URL은 사용자 입력으로 받지 않고 Sites 런타임 환경 변수로만 설정한다.
 
 ## 1. 등록 매장 검색

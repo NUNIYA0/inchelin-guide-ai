@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="description" content="인슐랭가이드에 등록된 맛집을 자연어로 탐색하고 추천받는 대화형 AI" />
+  <meta name="description" content="자연어 대화와 실제 검색 결과로 원하는 맛집을 찾아주는 Inchelin Guide AI" />
   <title>Inchelin Guide AI</title>
   <link rel="icon" type="image/png" sizes="203x203" href="assets/favicon-inchelin-v2.png?v=2" />
   <link rel="shortcut icon" type="image/png" href="assets/favicon-inchelin-v2.png?v=2" />
@@ -244,18 +244,18 @@
     .suggestion span:last-child { color: #aaa; font-size: 17px; }
     .chat-view { width: min(760px, 100%); height: 100%; display: none; flex-direction: column; }
     .chat-view.active { display: flex; }
-    .messages { flex: 1; overflow: auto; padding: 20px 6px 24px; scrollbar-width: thin; }
-    .message { max-width: 82%; margin: 0 0 20px; line-height: 1.65; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; }
-    .message.user { margin-left: auto; border-radius: 18px 18px 4px 18px; background: #f1f1f1; padding: 11px 15px; }
-    .message.ai { color: #303030; }
-    .message.ai::before { content: ""; width: 30px; height: 30px; display: block; border-radius: 50%; background: url("assets/inchelin-guide-logo.png") center / contain no-repeat; margin-bottom: 8px; }
-    .message-copy { display: flex; flex-direction: column; gap: 10px; white-space: normal; }
+    .messages { flex: 1; overflow: auto; padding: 22px 6px 28px; scrollbar-width: thin; }
+    .message { max-width: 78%; margin: 0 0 24px; line-height: 1.8; font-size: 16px; letter-spacing: -.01em; white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word; }
+    .message.user { margin-left: auto; border-radius: 20px 20px 5px 20px; background: #f1f1f1; padding: 14px 18px; }
+    .message.ai { width: min(720px, 100%); max-width: 100%; color: #303030; border-radius: 20px; background: #f7f7f7; padding: 18px 20px 20px; }
+    .message.ai::before { content: ""; width: 32px; height: 32px; display: block; border-radius: 50%; background: url("assets/inchelin-guide-logo.png") center / contain no-repeat; margin-bottom: 12px; }
+    .message-copy { display: flex; flex-direction: column; gap: 16px; white-space: normal; }
     .message-copy p { margin: 0; font-weight: 400; }
     .message-copy strong { color: #202020; font-weight: 600; }
-    .restaurant-list { margin-top: 16px; display: grid; gap: 12px; }
+    .restaurant-list { margin-top: 18px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
     .restaurant-card { overflow: hidden; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
     .restaurant-image { display: block; width: 100%; aspect-ratio: 16 / 8; object-fit: cover; background: #f3f3f3; }
-    .restaurant-card-body { padding: 15px 16px 16px; }
+    .restaurant-card-body { padding: 14px 14px 15px; }
     .restaurant-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
     .restaurant-card h3 { margin: 0; color: #202020; font-size: 16px; font-weight: 600; line-height: 1.4; }
     .restaurant-status { flex: 0 0 auto; padding: 4px 8px; border-radius: 999px; background: #f2f2f2; color: #666; font-size: 11px; line-height: 1.3; }
@@ -268,8 +268,8 @@
     .restaurant-detail dd { margin: 0; overflow-wrap: anywhere; }
     .restaurant-map-link { display: inline-flex; min-height: 38px; margin-top: 14px; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; color: #333; font-size: 13px; font-weight: 500; text-decoration: none; }
     .restaurant-map-link:hover { background: #f7f7f7; }
-    .quick-replies { margin-top: 14px; display: flex; flex-wrap: wrap; gap: 7px; }
-    .quick-reply { min-height: 36px; padding: 7px 12px; border: 1px solid #dedede; border-radius: 999px; background: #fff; color: #555; font-size: 13px; line-height: 1.35; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
+    .quick-replies { margin-top: 16px; display: flex; flex-wrap: wrap; gap: 9px; }
+    .quick-reply { min-height: 40px; padding: 9px 14px; border: 1px solid #dedede; border-radius: 999px; background: #fff; color: #555; font-size: 14px; line-height: 1.35; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
     .quick-reply:hover { border-color: #bcbcbc; background: #f7f7f7; color: #222; }
     .quick-reply:disabled { opacity: .48; cursor: default; }
     .message.status { color: #555; display: flex; align-items: center; gap: 10px; }
@@ -525,7 +525,10 @@
       .chat-view { width: 100%; height: auto; flex: 1 1 auto; min-height: 0; }
       .main.chat-mode .workspace { padding: 0 16px; overflow: hidden; }
       .messages { min-height: 0; padding: 18px 2px 20px; }
-      .message { max-width: 90%; font-size: clamp(14px, 3.8vw, 15px); }
+      .message { max-width: 84%; font-size: 15px; }
+      .message.user { padding: 12px 15px; }
+      .message.ai { width: 100%; max-width: 100%; padding: 16px; font-size: 16px; }
+      .restaurant-list { grid-template-columns: minmax(0, 1fr); }
       .restaurant-card-body { padding: 14px; }
       .restaurant-detail { grid-template-columns: 60px minmax(0, 1fr); }
       .chat-composer { position: sticky; z-index: 2; bottom: 0; margin: 0; min-height: 88px; border-radius: 22px; background: #fff; }
@@ -693,7 +696,7 @@
     const CONTENT = {
       title: '맛있는 한 끼, 같이 찾아볼까요?',
       placeholder: '먹고 싶은 메뉴나 분위기를 편하게 말해보세요',
-      answer: '말씀하신 내용과 이전 대화를 함께 살펴보고, 인슐랭가이드에 등록된 맛집 안에서 자연스럽게 찾아드릴게요.'
+      answer: '말씀하신 내용과 이전 대화를 함께 살펴보고, 현재 연결된 맛집 검색 결과에서 자연스럽게 찾아드릴게요.'
     };
     const TIME_SUGGESTIONS = {
       morning: [
@@ -733,7 +736,7 @@
       ['상황별 추천', '동행자와 식사 상황에 맞춰 찾아봅니다', 'guide', '상'],
       ['지역별 찾기', '원하는 지역의 등록 맛집을 탐색합니다', 'guide', '지'],
       ['등록 맛집 비교', '확인 가능한 매장 정보를 함께 비교합니다', 'guide', '비'],
-      ['인슐랭가이드 등록 정보', '등록된 맛집 데이터를 기준으로 검색합니다', 'data', 'I'],
+      ['맛집 검색 데이터', '현재 연결된 공급자의 실제 검색 결과를 사용합니다', 'data', 'D'],
       ['최신 매장 정보', '등록 매장의 확인된 최신 정보를 보강합니다', 'data', '최']
     ].map((p, i) => ({ id: i + 1, name: p[0], desc: p[1], type: p[2], icon: p[3] }));
     const GUIDES = [
@@ -849,7 +852,9 @@
       }
     }
     function normalizeRestaurant(restaurant) {
-      if (!restaurant || restaurant.isRegisteredInInchelin !== true) return null;
+      if (!restaurant) return null;
+      const dataSource = restaurant.dataSource === 'inchelin' ? 'inchelin' : restaurant.dataSource === 'naver' ? 'naver' : '';
+      if (!dataSource || (dataSource === 'inchelin' && restaurant.isRegisteredInInchelin !== true)) return null;
       const id = String(restaurant.id || '').trim();
       const name = String(restaurant.name || '').trim();
       const address = String(restaurant.address || '').trim();
@@ -867,7 +872,8 @@
         menuPrice: restaurant.menuPrice ?? null,
         parking: restaurant.parking ?? null,
         naverPlaceUrl: safeHttpUrl(restaurant.naverPlaceUrl, true),
-        isRegisteredInInchelin: true
+        isRegisteredInInchelin: dataSource === 'inchelin',
+        dataSource
       };
     }
     function readStoredConversations() {
@@ -1044,7 +1050,7 @@
     function renderRestaurantCards(restaurants) {
       const list = document.createElement('div');
       list.className = 'restaurant-list';
-      list.setAttribute('aria-label', '인슐랭가이드 등록 맛집');
+      list.setAttribute('aria-label', restaurants.some(restaurant => restaurant.dataSource === 'inchelin') ? '인슐랭가이드 등록 맛집' : '맛집 검색 결과');
       restaurants.forEach(restaurant => {
         const card = document.createElement('article');
         card.className = 'restaurant-card';
@@ -1067,7 +1073,8 @@
         const status = document.createElement('span');
         status.className = `restaurant-status ${restaurant.businessStatus}`;
         status.textContent = restaurantStatusLabel(restaurant.businessStatus);
-        head.append(title, status);
+        head.appendChild(title);
+        if (restaurant.businessStatus && restaurant.businessStatus !== 'unknown') head.appendChild(status);
         const address = document.createElement('p');
         address.className = 'restaurant-address';
         address.textContent = restaurant.address;

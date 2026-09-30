@@ -9,7 +9,7 @@ function request(message, history = []) {
   });
 }
 
-async function runCase({ message, env, dbResponse, enrichmentResponse, expectedStatus = 200 }) {
+async function runCase({ message, env, dbResponse, enrichmentResponse, naverResponse, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -17,8 +17,11 @@ async function runCase({ message, env, dbResponse, enrichmentResponse, expectedS
     calls.push({ href, body: options.body ? JSON.parse(options.body) : null });
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
+    if (href.includes("openapi.naver.com")) return Response.json(naverResponse);
     if (href.includes("api.openai.com")) {
-      return Response.json({ output_text: JSON.stringify({ message: "등록 매장 근거 답변", suggestions: [], selectedRestaurantIds: ["ig-1"] }) });
+      const body = options.body ? JSON.parse(options.body) : {};
+      const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
+      return Response.json({ output_text: JSON.stringify({ message: "검색 결과를 확인했어요.", suggestions: [], selectedRestaurantIds: selectedId ? [selectedId] : [] }) });
     }
     throw new Error(`Unexpected URL: ${href}`);
   };
@@ -33,6 +36,7 @@ async function runCase({ message, env, dbResponse, enrichmentResponse, expectedS
 
 const baseEnv = {
   OPENAI_API_KEY: "test-key",
+  RESTAURANT_DATA_SOURCE: "inchelin",
   INCHELIN_DB_API_URL: "https://db.example",
   INCHELIN_DB_API_TOKEN: "db-token",
 };
@@ -72,7 +76,7 @@ const baseEnv = {
   });
   const openaiCall = result.calls.find(call => call.href.includes("api.openai.com"));
   assert.ok(openaiCall);
-  assert.match(openaiCall.body.instructions, /inchelin_registered_only/);
+  assert.match(openaiCall.body.instructions, /"data_source":"inchelin"/);
   assert.match(openaiCall.body.instructions, /11:00-21:00/);
   assert.equal(result.body.restaurants[0].id, "ig-1");
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, true);
@@ -113,10 +117,47 @@ const baseEnv = {
 {
   const result = await runCase({
     message: "맛집 추천해줘",
-    env: { OPENAI_API_KEY: "test-key" },
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "inchelin" },
     expectedStatus: 200,
   });
   assert.match(result.body.message, /등록 매장 데이터를 연결 중/);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "강남에서 물냉면 맛집 찾아줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_CLIENT_ID: "naver-id",
+      NAVER_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "<b>평양면옥 강남점</b>",
+        roadAddress: "서울특별시 강남구 테헤란로 123",
+        telephone: "02-1234-5678",
+        category: "한식>냉면",
+        link: "https://map.naver.com/p/entry/place/123",
+        mapx: "1270000000",
+        mapy: "375000000",
+      }],
+    },
+  });
+  const naverCall = result.calls.find(call => call.href.includes("openapi.naver.com"));
+  assert.ok(naverCall);
+  assert.equal(result.body.restaurants[0].dataSource, "naver");
+  assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
+  assert.equal(result.body.restaurants[0].recommender, "");
+}
+
+{
+  const result = await runCase({
+    message: "강남 물냉면 맛집 찾아줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /네이버 맛집 검색 연결/);
   assert.equal(result.calls.length, 0);
 }
 
