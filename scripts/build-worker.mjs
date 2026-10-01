@@ -9,6 +9,7 @@ if (!outputRoot.startsWith(`${root}${sep}`)) throw new Error("Invalid build dire
 const mimeTypes = {
   ".png": "image/png",
   ".ttf": "font/ttf",
+  ".woff2": "font/woff2",
 };
 
 async function walk(directory) {

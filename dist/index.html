@@ -9,15 +9,12 @@
   <link rel="shortcut icon" type="image/png" href="assets/favicon-inchelin-v2.png?v=2" />
   <link rel="apple-touch-icon" href="assets/favicon-inchelin-v2.png?v=2" />
   <style>
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-thin.ttf") format("truetype"); font-weight: 100; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-extra-light.ttf") format("truetype"); font-weight: 200; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-light.ttf") format("truetype"); font-weight: 300; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-regular.ttf") format("truetype"); font-weight: 400; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-medium.ttf") format("truetype"); font-weight: 500; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-semi-bold.ttf") format("truetype"); font-weight: 600; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-bold.ttf") format("truetype"); font-weight: 700; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-extra-bold.ttf") format("truetype"); font-weight: 800; font-style: normal; font-display: swap; }
-    @font-face { font-family: "AtoZ"; src: url("assets/fonts/atoz-black.ttf") format("truetype"); font-weight: 900; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Sebang Gothic"; src: url("assets/fonts/sebang-gothic-light.woff2") format("woff2"); font-weight: 300; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Sebang Gothic"; src: url("assets/fonts/sebang-gothic-regular.woff2") format("woff2"); font-weight: 400; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Sebang Gothic"; src: url("assets/fonts/sebang-gothic-bold.woff2") format("woff2"); font-weight: 700; font-style: normal; font-display: swap; }
+    @font-face { font-family: "Sebang Gothic"; src: url("assets/fonts/sebang-gothic-italic-light.woff2") format("woff2"); font-weight: 300; font-style: italic; font-display: swap; }
+    @font-face { font-family: "Sebang Gothic"; src: url("assets/fonts/sebang-gothic-italic-regular.woff2") format("woff2"); font-weight: 400; font-style: italic; font-display: swap; }
+    @font-face { font-family: "Sebang Gothic"; src: url("assets/fonts/sebang-gothic-italic-bold.woff2") format("woff2"); font-weight: 700; font-style: italic; font-display: swap; }
     :root {
       color-scheme: light;
       --ink: #090909;
@@ -36,10 +33,10 @@
       overflow: hidden;
       color: var(--ink);
       background: #fff;
-      font-family: "AtoZ", Pretendard, "Noto Sans KR", sans-serif;
+      font-family: "Sebang Gothic", "Noto Sans KR", sans-serif;
       -webkit-font-smoothing: antialiased;
     }
-    button, textarea { font: inherit; }
+    button, textarea, input, select { font: inherit; }
     button { color: inherit; }
     .app { height: 100dvh; min-height: 0; display: flex; overflow: hidden; }
     .rail {
