@@ -108,6 +108,96 @@ const baseEnv = {
 
 {
   const result = await runCase({
+    message: "맛집 추천하는 기준이 뭐야?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /지역, 음식 종류/);
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "두 번째 식당을 추천한 이유가 뭐야?",
+    context: {
+      hasRestaurantResults: true,
+      recentRestaurants: [
+        { id: "r-1", name: "첫번째식당", address: "서울 강남구 1", recommendationReason: "한식 조건과 일치하는 곳이에요." },
+        { id: "r-2", name: "두번째식당", address: "서울 강남구 2", recommendationReason: "현재 위치에서 420m 거리예요." },
+      ],
+    },
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /두번째식당/);
+  assert.match(result.body.message, /420m/);
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async url => {
+    assert.match(String(url), /query=/);
+    return Response.json({
+      items: [{
+        title: "<b>신주옥미 강남점</b>",
+        roadAddress: "서울특별시 강남구 테헤란로10길 21 A동 1층 103호",
+        address: "서울특별시 강남구 역삼동 123",
+        link: "https://map.naver.com/p/entry/place/123456789",
+      }],
+    });
+  };
+  try {
+    const response = await worker.fetch(new Request("https://example.test/api/naver-place-match", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        restaurantName: "신주옥미 강남점",
+        address: "서울특별시 강남구 테헤란로10길 21 A동 1층 103호",
+      }),
+    }), {
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    }, {});
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.matched, true);
+    assert.equal(body.naverPlaceId, "123456789");
+    assert.equal(body.naverPlaceUrl, "https://map.naver.com/p/entry/place/123456789");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+{
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async () => Response.json({
+    items: [{
+      title: "신주옥미 강남점",
+      roadAddress: "서울특별시 서초구 다른로 99",
+      link: "https://map.naver.com/p/entry/place/999999999",
+    }],
+  });
+  try {
+    const response = await worker.fetch(new Request("https://example.test/api/naver-place-match", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ restaurantName: "신주옥미 강남점", address: "서울특별시 강남구 테헤란로10길 21" }),
+    }), {
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    }, {});
+    assert.equal(response.status, 404);
+    const body = await response.json();
+    assert.equal(body.matched, false);
+    assert.equal(body.code, "exact_match_not_found");
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+}
+
+{
+  const result = await runCase({
     message: "OO식당 어때?",
     env: baseEnv,
     dbResponse: { places: [] },
@@ -245,6 +335,8 @@ const baseEnv = {
   assert.equal(result.body.restaurants[0].latitude, 37.5);
   assert.ok(result.body.restaurants[0].distanceMeters > 0);
   assert.match(result.body.restaurants[0].recommendationReason, /거리에서 찾은/);
+  assert.equal(result.body.restaurants[0].naverPlaceId, "123");
+  assert.equal(result.body.restaurants[0].naverPlaceUrl, "https://map.naver.com/p/entry/place/123");
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
 }
 

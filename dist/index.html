@@ -274,17 +274,23 @@
     .restaurant-placeholder img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: left center; opacity: .72; }
     .restaurant-card-body { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 16px; }
     .restaurant-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .restaurant-card h3 { margin: 0; color: #202020; font-size: 13px; font-weight: 600; line-height: 1.5; }
-    .restaurant-recommender { margin: 6px 0 0; color: #666; font-size: 12px; line-height: 1.45; }
-    .restaurant-category { margin: 7px 0 0; color: #777; font-size: 12px; line-height: 1.45; }
-    .restaurant-reason { margin: 8px 0 0; color: #444; font-size: 13px; line-height: 1.55; }
+    .restaurant-card h3 { margin: 0; color: #202020; font-size: 15px; font-weight: 600; line-height: 1.4; }
+    .restaurant-recommender { margin: 6px 0 0; color: #777; font-size: 11px; line-height: 1.45; }
+    .restaurant-category { margin: 7px 0 0; color: #555; font-size: 12px; font-weight: 500; line-height: 1.45; }
+    .restaurant-reason { margin: 8px 0 0; color: #333; font-size: 13px; line-height: 1.55; }
     .restaurant-badges { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
     .restaurant-badge { padding: 4px 8px; border-radius: 999px; background: #f2f2f2; color: #666; font-size: 11px; line-height: 1.3; }
     .restaurant-badge.active { background: #eef7f0; color: #27723b; }
-    .restaurant-address { margin: 8px 0 14px; color: #777; font-size: 13px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .restaurant-map-link { display: inline-flex; min-height: 38px; margin-top: auto; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; color: #333; font-size: 13px; font-weight: 500; text-decoration: none; }
+    .restaurant-address { margin: 8px 0 14px; color: #8a8a8a; font-size: 12px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .restaurant-detail-area { margin-top: auto; display: grid; gap: 8px; }
+    .restaurant-map-link { display: inline-flex; min-height: 38px; margin: 0; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; background: #fff; color: #333; font-family: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }
     .restaurant-map-link:hover { background: #f7f7f7; }
     .restaurant-map-link:disabled { color: #999; background: #f7f7f7; cursor: default; }
+    .restaurant-detail-fallback { display: grid; gap: 8px; padding: 10px; border-radius: 10px; background: #f7f7f7; }
+    .restaurant-detail-message { margin: 0; color: #666; font-size: 12px; line-height: 1.5; }
+    .restaurant-detail-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+    .restaurant-detail-action { min-height: 32px; padding: 6px 10px; border: 1px solid #d8d8d8; border-radius: 8px; background: #fff; color: #444; font-family: inherit; font-size: 12px; cursor: pointer; }
+    .restaurant-detail-action:hover { background: #f1f1f1; }
     .quick-replies { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 8px; }
     .quick-reply { min-height: 34px; padding: 8px 12px; border: 1px solid #dedede; border-radius: 999px; background: #fff; color: #555; font-size: 12px; font-weight: 500; line-height: 1.4; cursor: pointer; transition: border-color .18s ease, background .18s ease, color .18s ease; }
     .quick-reply:hover { border-color: #bcbcbc; background: #f7f7f7; color: #222; }
@@ -880,6 +886,17 @@
         return '';
       }
     }
+    function normalizeNaverPlaceDetails(value, fallbackPlaceId = '') {
+      let placeId = String(fallbackPlaceId || '').replace(/[^0-9]/g, '');
+      const candidate = safeHttpUrl(value, true);
+      if (candidate) {
+        try {
+          const match = new URL(candidate).pathname.match(/\/(?:entry\/place|restaurant|place)\/(\d+)/);
+          if (match) placeId = match[1];
+        } catch (_) {}
+      }
+      return placeId ? { placeId, url: `https://map.naver.com/p/entry/place/${placeId}` } : { placeId: '', url: '' };
+    }
     function normalizeRestaurant(restaurant) {
       if (!restaurant) return null;
       const dataSource = restaurant.dataSource === 'inchelin' ? 'inchelin' : restaurant.dataSource === 'naver' ? 'naver' : '';
@@ -888,9 +905,14 @@
       const name = String(restaurant.name || '').trim();
       const address = String(restaurant.address || '').trim();
       if (!id || !name || !address) return null;
+      const naverPlace = normalizeNaverPlaceDetails(
+        restaurant.naverPlaceUrl || restaurant.naverLink,
+        restaurant.naverPlaceId
+      );
       return {
         id,
         name,
+        restaurantName: String(restaurant.restaurantName || name).trim(),
         category: String(restaurant.category || '').trim(),
         address,
         roadAddress: String(restaurant.roadAddress || '').trim(),
@@ -908,8 +930,9 @@
         representativeMenus: Array.isArray(restaurant.representativeMenus) ? restaurant.representativeMenus.map(item => String(item).trim()).filter(Boolean).slice(0, 8) : [],
         menuPrice: restaurant.menuPrice ?? null,
         parking: restaurant.parking ?? null,
-        naverPlaceUrl: safeHttpUrl(restaurant.naverPlaceUrl || restaurant.naverLink, true),
-        naverLink: safeHttpUrl(restaurant.naverLink || restaurant.naverPlaceUrl, true),
+        naverPlaceId: naverPlace.placeId,
+        naverPlaceUrl: naverPlace.url,
+        naverLink: naverPlace.url,
         isRegisteredInInchelin: dataSource === 'inchelin',
         dataSource
       };
@@ -940,6 +963,7 @@
         openingHours: restaurant.openingHours,
         parking: restaurant.parking,
         distanceMeters: restaurant.distanceMeters,
+        recommendationReason: restaurant.recommendationReason,
         representativeMenus: restaurant.representativeMenus
       }));
       return {
@@ -1092,6 +1116,90 @@
       if (distanceMeters < 1000) return `${Math.max(10, Math.round(distanceMeters / 10) * 10)}m`;
       return `${(distanceMeters / 1000).toFixed(distanceMeters < 10000 ? 1 : 0)}km`;
     }
+    async function copyRestaurantAddress(restaurant) {
+      const address = restaurant.roadAddress || restaurant.address;
+      if (!address) return showToast('복사할 주소가 없어요.');
+      try {
+        await navigator.clipboard.writeText(address);
+        showToast('주소를 복사했어요.');
+      } catch (_) {
+        const input = document.createElement('textarea');
+        input.value = address;
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        const copied = document.execCommand('copy');
+        input.remove();
+        showToast(copied ? '주소를 복사했어요.' : '주소를 복사하지 못했어요.');
+      }
+    }
+    function showRestaurantDetailFallback(detailArea, restaurant, retry) {
+      detailArea.innerHTML = '';
+      const fallback = document.createElement('div');
+      fallback.className = 'restaurant-detail-fallback';
+      const message = document.createElement('p');
+      message.className = 'restaurant-detail-message';
+      message.textContent = '네이버 지도에서 정확한 매장 정보를 찾지 못했어요.';
+      const actions = document.createElement('div');
+      actions.className = 'restaurant-detail-actions';
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.className = 'restaurant-detail-action';
+      copy.textContent = '주소 복사';
+      copy.addEventListener('click', () => copyRestaurantAddress(restaurant));
+      const retryButton = document.createElement('button');
+      retryButton.type = 'button';
+      retryButton.className = 'restaurant-detail-action';
+      retryButton.textContent = '다시 검색';
+      retryButton.addEventListener('click', retry);
+      actions.append(copy, retryButton);
+      fallback.append(message, actions);
+      detailArea.appendChild(fallback);
+      showToast(message.textContent);
+    }
+    async function resolveRestaurantDetail(restaurant, detailArea) {
+      if (restaurant.naverPlaceUrl) {
+        window.open(restaurant.naverPlaceUrl, '_blank', 'noopener,noreferrer');
+        return;
+      }
+      detailArea.innerHTML = '';
+      const loading = document.createElement('button');
+      loading.type = 'button';
+      loading.className = 'restaurant-map-link';
+      loading.disabled = true;
+      loading.textContent = '정확한 매장 확인 중...';
+      detailArea.appendChild(loading);
+      const retry = () => resolveRestaurantDetail(restaurant, detailArea);
+      try {
+        const response = await fetch('/api/naver-place-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            restaurantName: restaurant.restaurantName || restaurant.name,
+            address: restaurant.address,
+            roadAddress: restaurant.roadAddress
+          })
+        });
+        const data = await response.json().catch(() => ({}));
+        const details = normalizeNaverPlaceDetails(data?.naverPlaceUrl, data?.naverPlaceId);
+        if (!response.ok || data?.matched !== true || !details.url) throw new Error(data?.code || 'exact_match_not_found');
+        restaurant.naverPlaceId = details.placeId;
+        restaurant.naverPlaceUrl = details.url;
+        restaurant.naverLink = details.url;
+        window.open(details.url, '_blank', 'noopener,noreferrer');
+        detailArea.innerHTML = '';
+        const link = document.createElement('a');
+        link.className = 'restaurant-map-link';
+        link.href = details.url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = '상세보기';
+        detailArea.appendChild(link);
+      } catch (_) {
+        showRestaurantDetailFallback(detailArea, restaurant, retry);
+      }
+    }
     function renderRestaurantCards(restaurants) {
       const list = document.createElement('div');
       list.className = 'restaurant-list';
@@ -1155,22 +1263,25 @@
         if (restaurant.recommendationReason) body.appendChild(reason);
         if (badges.children.length) body.appendChild(badges);
         body.appendChild(address);
-        if (restaurant.naverPlaceUrl || restaurant.naverLink) {
+        const detailArea = document.createElement('div');
+        detailArea.className = 'restaurant-detail-area';
+        if (restaurant.naverPlaceUrl) {
           const link = document.createElement('a');
           link.className = 'restaurant-map-link';
-          link.href = restaurant.naverPlaceUrl || restaurant.naverLink;
+          link.href = restaurant.naverPlaceUrl;
           link.target = '_blank';
           link.rel = 'noopener noreferrer';
           link.textContent = '상세보기';
-          body.appendChild(link);
+          detailArea.appendChild(link);
         } else {
-          const unavailable = document.createElement('button');
-          unavailable.type = 'button';
-          unavailable.className = 'restaurant-map-link';
-          unavailable.disabled = true;
-          unavailable.textContent = '상세정보 준비 중';
-          body.appendChild(unavailable);
+          const detailButton = document.createElement('button');
+          detailButton.type = 'button';
+          detailButton.className = 'restaurant-map-link';
+          detailButton.textContent = '상세보기';
+          detailButton.addEventListener('click', () => resolveRestaurantDetail(restaurant, detailArea));
+          detailArea.appendChild(detailButton);
         }
+        body.appendChild(detailArea);
         card.appendChild(body);
         list.appendChild(card);
       });

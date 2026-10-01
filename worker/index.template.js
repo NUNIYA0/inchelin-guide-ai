@@ -35,6 +35,8 @@ suggestions는 필수 단계가 아니라 빠른 응답을 돕는 보조 수단�
 
 실제 맛집을 최종 추천할 때만 selectedRestaurantIds에 <restaurant_grounding>의 restaurant_id를 최대 3개 넣어. 제공되지 않은 ID를 만들지 마. 검색 결과가 없거나 일반적인 메뉴 대화, 추가 조건 질문에는 selectedRestaurantIds를 비워. message에는 사용자에게 보여줄 자연어 답변을, suggestions에는 필요한 경우에만 2~4개의 보조 선택지를 넣어. 식당 카드를 보여줄 때는 짧은 안내 다음에 "아래에서 마음에 드는 곳을 살펴보세요."처럼 자연스럽게 연결하고, suggestions에는 필요하면 "다른 맛집 보기", "다른 메뉴 보기", "지역을 더 넓게 볼래요"를 넣어.
 
+"맛집 추천 기준이 뭐야?", "어떤 데이터로 추천해?" 같은 서비스 설명 질문에는 새 식당을 검색하거나 카드를 만들지 말고 추천 기준만 설명해. "왜 이 식당을 추천했어?", "두 번째 식당 추천 이유가 뭐야?" 같은 질문에는 <recent_restaurants>의 확인된 근거만 설명하고 selectedRestaurantIds는 비워. 새로운 추천 카드는 사용자가 실제로 식당 추천이나 탐색을 요청한 경우에만 보여줘.
+
 사용자의 직접 입력을 이전 대화 맥락보다 우선하고, 이전 대화 맥락을 검색 결과보다 우선하며, 현재 로컬 시간은 가장 낮은 우선순위로 사용해. 사용자가 특정 시간이나 날짜를 말하면 현재 시간보다 그 조건을 우선해.`;
 
 const PROVIDER_PROMPTS = {
@@ -154,6 +156,36 @@ function findUnavailableDatabaseField(text) {
 
 function asksForVenueSearch(text) {
   return /맛집|식당|매장|가게|레스토랑|카페|주소|전화번호|실제\s*(곳|장소)|어디서\s*(먹|가)|근처\s*(다른|괜찮은)?\s*(곳|데)|비슷한\s*(곳|데)|다른\s*(곳|데)\s*(보여|찾아|추천)?/.test(text);
+}
+
+const SERVICE_EXPLANATION_PATTERN = /(?:맛집\s*)?추천.{0,12}(?:기준|방식|원리|어떻게\s*(?:정|하|골라)|데이터)|어떤\s*데이터.{0,12}추천|추천은?.{0,8}어떻게\s*(?:정|하|골라)/;
+const RECOMMENDATION_REASON_PATTERN = /(?:왜|어째서).{0,18}(?:추천|골랐)|추천(?:한|했|된)?.{0,12}(?:이유|근거)|(?:이유|근거).{0,12}추천/;
+
+function serviceExplanationResponse(source) {
+  const sourceLine = source === "inchelin"
+    ? "인슐랭가이드에 등록된 맛집 안에서 조건이 잘 맞는 곳을 골라드려요."
+    : "현재 연결된 맛집 검색 데이터 안에서 조건이 잘 맞는 곳을 골라드려요.";
+  return chatResponse(`지역, 음식 종류, 현재 위치, 확인 가능한 영업 여부 같은 조건을 먼저 보고 있어요.\n\n사용자가 말한 취향과 식사 상황을 함께 반영하고, 위치를 허용한 경우에는 거리도 참고해요. ${sourceLine}`);
+}
+
+function recommendationReasonResponse(text, restaurants) {
+  const restaurant = referencedRecentRestaurant(text, restaurants) || restaurants[0];
+  if (!restaurant) {
+    return chatResponse("아직 이 대화에서 추천한 식당이 없어요.\n\n원하시는 지역과 메뉴를 말씀해 주시면 실제 확인 가능한 정보로 찾아드릴게요.");
+  }
+  const facts = [];
+  if (restaurant.recommendationReason) facts.push(restaurant.recommendationReason);
+  else {
+    if (restaurant.category) facts.push(`${restaurant.category} 조건과 일치해요.`);
+    if (Number.isFinite(restaurant.distanceMeters)) {
+      const distance = restaurant.distanceMeters < 1000 ? `${restaurant.distanceMeters}m` : `${(restaurant.distanceMeters / 1000).toFixed(1)}km`;
+      facts.push(`확인된 위치에서 약 ${distance} 거리예요.`);
+    }
+    if (restaurant.businessStatus === "active") facts.push("현재 영업 중으로 확인됐어요.");
+    if (restaurant.parking === true) facts.push("주차 가능 정보가 확인됐어요.");
+  }
+  const explanation = facts.length ? facts.join(" ") : "상호명과 주소처럼 확인된 정보를 현재 대화의 조건과 비교해 추천했어요.";
+  return chatResponse(`${restaurant.name}은 ${explanation}\n\n확인되지 않은 분위기나 인기 정보는 추천 근거로 만들지 않아요.`);
 }
 
 const LOCATION_TOKEN_SOURCE = "서울|부산|대구|인천|광주|대전|울산|세종|제주|강남|강북|홍대|성수|잠실|판교|분당|일산|수원|용산|여의도|을지로|종로|[가-힣]{2,}(?:시|군|구|동|읍|면|역)";
@@ -629,9 +661,90 @@ function naverWgs84Coordinate(value, type) {
   return coordinate;
 }
 
-function naverMapSearchUrl(name, address) {
-  const query = safeText(`${name} ${address}`, 400);
-  return query ? `https://map.naver.com/p/search/${encodeURIComponent(query)}` : "";
+function naverPlaceDetails(value, fallbackPlaceId = "") {
+  const rawUrl = safeUrl(value);
+  let placeId = safeText(fallbackPlaceId, 80).replace(/[^0-9]/g, "");
+  if (rawUrl) {
+    try {
+      const url = new URL(rawUrl);
+      const host = url.hostname.toLowerCase();
+      if (host === "map.naver.com" || host === "m.map.naver.com" || host === "place.naver.com" || host === "m.place.naver.com") {
+        const match = url.pathname.match(/\/(?:entry\/place|restaurant|place)\/(\d+)/);
+        if (match) placeId = match[1];
+      }
+    } catch {}
+  }
+  return placeId ? { placeId, url: `https://map.naver.com/p/entry/place/${placeId}` } : { placeId: "", url: "" };
+}
+
+function exactRestaurantNameMatch(expected, actual) {
+  const left = normalizeIdentityText(expected);
+  const right = normalizeIdentityText(actual);
+  return Boolean(left && right && left === right);
+}
+
+function exactRestaurantAddressMatch(expected, ...candidates) {
+  const target = normalizeAddressIdentity(expected);
+  if (!target) return false;
+  return candidates.some(candidate => {
+    const normalized = normalizeAddressIdentity(candidate);
+    if (!normalized) return false;
+    if (normalized === target) return true;
+    const shorter = normalized.length < target.length ? normalized : target;
+    const longer = normalized.length < target.length ? target : normalized;
+    return shorter.length >= 12 && longer.includes(shorter);
+  });
+}
+
+async function handleNaverPlaceMatch(request, env) {
+  let payload;
+  try {
+    payload = await request.json();
+  } catch {
+    return json({ matched: false, code: "invalid_request", error: "매장 정보가 올바르지 않아요." }, 400);
+  }
+  const restaurantName = safeText(payload?.restaurantName, 160);
+  const address = safeText(payload?.roadAddress || payload?.address, 300);
+  if (!restaurantName || !address) {
+    return json({ matched: false, code: "invalid_request", error: "매장 이름과 주소가 필요해요." }, 400);
+  }
+  const endpoint = trustedEndpoint(env.NAVER_LOCAL_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/local");
+  const clientId = safeText(env.NAVER_API_HUB_CLIENT_ID, 300);
+  const clientSecret = safeText(env.NAVER_API_HUB_CLIENT_SECRET, 300);
+  if (!endpoint || !clientId || !clientSecret) {
+    return json({ matched: false, code: "missing_credentials", error: "네이버 지도 연결 정보를 확인하지 못했어요." }, 503);
+  }
+  const url = new URL(endpoint);
+  url.searchParams.set("query", `${restaurantName} ${address}`);
+  url.searchParams.set("display", "5");
+  url.searchParams.set("start", "1");
+  url.searchParams.set("sort", "comment");
+  try {
+    const data = await getJsonWithTimeout(url.toString(), {
+      "X-NCP-APIGW-API-KEY-ID": clientId,
+      "X-NCP-APIGW-API-KEY": clientSecret,
+    });
+    const matched = (Array.isArray(data?.items) ? data.items : []).find(item => {
+      const details = naverPlaceDetails(item?.link, item?.naverPlaceId || item?.placeId || item?.id);
+      return details.url
+        && exactRestaurantNameMatch(restaurantName, stripSearchMarkup(item?.title))
+        && exactRestaurantAddressMatch(address, item?.roadAddress, item?.address);
+    });
+    if (!matched) {
+      return json({ matched: false, code: "exact_match_not_found", error: "네이버 지도에서 정확한 매장 정보를 찾지 못했어요." }, 404);
+    }
+    const details = naverPlaceDetails(matched.link, matched.naverPlaceId || matched.placeId || matched.id);
+    return json({
+      matched: true,
+      restaurantName: stripSearchMarkup(matched.title),
+      address: safeText(matched.roadAddress || matched.address, 300),
+      naverPlaceId: details.placeId,
+      naverPlaceUrl: details.url,
+    });
+  } catch (error) {
+    console.error("Naver place exact match failed", error instanceof Error ? error.message : "unknown error");
+    return json({ matched: false, code: "api_request_failed", error: "네이버 지도에서 정확한 매장 정보를 찾지 못했어요." }, 502);
+  }
 }
 
 function sanitizeNaverPlace(item) {
@@ -642,7 +755,7 @@ function sanitizeNaverPlace(item) {
   const mapY = safeText(String(item?.mapy || ""), 40);
   const id = `naver:${normalizeIdentityText(name).slice(0, 48)}:${mapX}:${mapY}`.slice(0, 120);
   const rawLink = safeUrl(item?.link);
-  const naverLink = safeRestaurantUrl(rawLink, "naver") || naverMapSearchUrl(name, address);
+  const details = naverPlaceDetails(rawLink, item?.naverPlaceId || item?.placeId || item?.id);
   const phone = safeText(item?.telephone, 80);
   const longitude = naverWgs84Coordinate(mapX, "longitude");
   const latitude = naverWgs84Coordinate(mapY, "latitude");
@@ -661,8 +774,10 @@ function sanitizeNaverPlace(item) {
       phone: phone || null,
       longitude,
       latitude,
-      naverLink: naverLink || null,
-      naver_place_url: naverLink || null,
+      naverPlaceId: details.placeId || null,
+      naver_place_id: details.placeId || null,
+      naverLink: details.url || null,
+      naver_place_url: details.url || null,
       officialLink: rawLink || null,
       imageUrl: null,
       businessStatus: null,
@@ -670,8 +785,9 @@ function sanitizeNaverPlace(item) {
       representativeMenus: [],
     },
     facts: {
-      ...(phone ? { phone: { value: phone, origin: "naver", checked_at: new Date().toISOString(), source_url: naverLink, resolution_status: "confirmed" } } : {}),
-      ...(naverLink ? { naver_place_url: { value: naverLink, origin: "naver", checked_at: new Date().toISOString(), source_url: naverLink, resolution_status: "confirmed" } } : {}),
+      ...(phone ? { phone: { value: phone, origin: "naver", checked_at: new Date().toISOString(), source_url: details.url, resolution_status: "confirmed" } } : {}),
+      ...(details.placeId ? { naver_place_id: { value: details.placeId, origin: "naver", checked_at: new Date().toISOString(), source_url: details.url, resolution_status: "confirmed" } } : {}),
+      ...(details.url ? { naver_place_url: { value: details.url, origin: "naver", checked_at: new Date().toISOString(), source_url: details.url, resolution_status: "confirmed" } } : {}),
     },
   };
 }
@@ -820,7 +936,7 @@ const ALLOWED_FACT_KEYS = new Set([
   "business_status", "opening_hours", "holiday", "representative_menu", "menu_price",
   "parking", "phone", "official_links", "reservation", "private_room", "pet_friendly",
   "break_time", "atmosphere", "waiting", "price_range", "representative_image",
-  "naver_place_url", "current_name", "current_address", "recommender",
+  "naver_place_id", "naver_place_url", "current_name", "current_address", "recommender",
 ]);
 
 function sanitizeFactMap(value) {
@@ -1057,11 +1173,18 @@ function restaurantCard(place, source, userText = "") {
     : representativeMenus ? [safeText(representativeMenus, 100)].filter(Boolean) : [];
   const currentName = safeText(factValue(place, "current_name"), 160);
   const currentAddress = safeText(factValue(place, "current_address"), 300);
+  const restaurantName = currentName || place.name;
+  const address = currentAddress || place.address;
+  const placeDetails = naverPlaceDetails(
+    firstPresent(factValue(place, "naver_place_url"), registered.naverPlaceUrl, registered.naverLink, registered.naver_place_url),
+    firstPresent(factValue(place, "naver_place_id"), registered.naverPlaceId, registered.naver_place_id)
+  );
   return {
     id: place.id,
-    name: currentName || place.name,
+    name: restaurantName,
+    restaurantName,
     category: safeText(registered.category, 160) || null,
-    address: currentAddress || place.address,
+    address,
     roadAddress: safeText(registered.roadAddress || registered.road_address, 300) || null,
     phone: safeText(firstPresent(factValue(place, "phone"), registered.phone), 80),
     telephone: safeText(firstPresent(factValue(place, "phone"), registered.telephone, registered.phone), 80) || null,
@@ -1076,8 +1199,9 @@ function restaurantCard(place, source, userText = "") {
     parking: firstPresent(factValue(place, "parking"), registered.parking),
     distanceMeters: place.distance_meters !== null && place.distance_meters !== undefined && Number.isFinite(Number(place.distance_meters)) ? Number(place.distance_meters) : null,
     recommendationReason: factualRecommendationReason(place, source, userText),
-    naverPlaceUrl: safeRestaurantUrl(firstPresent(factValue(place, "naver_place_url"), registered.naverPlaceUrl, registered.naver_place_url), "naver"),
-    naverLink: safeRestaurantUrl(firstPresent(factValue(place, "naver_place_url"), registered.naverLink, registered.naverPlaceUrl, registered.naver_place_url), "naver") || null,
+    naverPlaceId: placeDetails.placeId || null,
+    naverPlaceUrl: placeDetails.url || null,
+    naverLink: placeDetails.url || null,
     isRegisteredInInchelin: source === "inchelin",
     dataSource: source,
   };
@@ -1096,6 +1220,7 @@ function sanitizeRecentRestaurants(value) {
     distanceMeters: item?.distanceMeters !== null && item?.distanceMeters !== undefined && Number.isFinite(Number(item.distanceMeters))
       ? Math.max(0, Math.round(Number(item.distanceMeters)))
       : null,
+    recommendationReason: safeText(item?.recommendationReason, 300) || null,
     representativeMenus: Array.isArray(item?.representativeMenus)
       ? item.representativeMenus.slice(0, 8).map(menu => safeText(menu, 100)).filter(Boolean)
       : [],
@@ -1114,6 +1239,7 @@ function recentRestaurantContext(restaurants) {
     opening_hours: restaurant.openingHours,
     parking: restaurant.parking,
     distance_meters: restaurant.distanceMeters,
+    recommendation_reason: restaurant.recommendationReason,
     representative_menus: restaurant.representativeMenus,
   })))}\n</recent_restaurants>`;
 }
@@ -1189,9 +1315,13 @@ async function handleChat(request, env) {
     && !locationMatches(latestUserMessage.replace(CURRENT_LOCATION_PATTERN, "")).length) {
     return json(needsBrowserLocationResponse());
   }
-  const requestedField = findUnavailableDatabaseField(latestUserMessage);
   const provider = createRestaurantProvider(env);
   const dataSource = provider.source;
+  if (SERVICE_EXPLANATION_PATTERN.test(latestUserMessage)) return json(serviceExplanationResponse(dataSource));
+  if (RECOMMENDATION_REASON_PATTERN.test(latestUserMessage)) {
+    return json(recommendationReasonResponse(latestUserMessage, recentRestaurants));
+  }
+  const requestedField = findUnavailableDatabaseField(latestUserMessage);
   const referencedRestaurant = requestedField ? referencedRecentRestaurant(latestUserMessage, recentRestaurants) : null;
   if (referencedRestaurant) return json(recentRestaurantFactResponse(referencedRestaurant, requestedField, dataSource));
   const signals = conversationSignals(messages, currentLocationName, hasRestaurantResults);
@@ -1364,6 +1494,11 @@ export default {
     if (url.pathname === "/api/reverse-geocode") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       return handleReverseGeocode(request, env);
+    }
+
+    if (url.pathname === "/api/naver-place-match") {
+      if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      return handleNaverPlaceMatch(request, env);
     }
 
     if (url.pathname === "/api/geocode") {
