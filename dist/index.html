@@ -64,6 +64,7 @@
     .brand-logo { width: 34px; height: 34px; object-fit: cover; object-position: left center; display: block; }
     .rail-nav { display: flex; flex-direction: column; gap: 9px; }
     .rail-bottom { margin-top: auto; display: flex; flex-direction: column; gap: 8px; }
+    .rail-auth-icon { width: 24px; height: 24px; display: block; object-fit: contain; }
     .icon-btn {
       width: 38px;
       height: 38px;
@@ -597,10 +598,7 @@
         <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><img class="nav-icon" src="assets/intro-icon.png" alt="" /></button>
         <button class="icon-btn" id="guideRail" aria-label="사용 설명서" title="사용 설명서"><img class="nav-icon" src="assets/guide-icon.png" alt="" /></button>
       </div>
-      <div class="rail-bottom">
-        <button class="icon-btn auth-trigger" aria-label="로그인" title="로그인"><svg viewBox="0 0 24 24" fill="none"><path d="M14 8V5H4v14h10v-3M10 12h10m0 0-3-3m3 3-3 3" stroke-width="1.7"/></svg></button>
-        <button class="icon-btn signup-trigger" aria-label="회원가입" title="회원가입"><svg viewBox="0 0 24 24" fill="none"><path d="M15 20a6 6 0 0 0-12 0m6-9a4 4 0 1 0 0-8m10 5v6m-3-3h6" stroke-width="1.7"/></svg></button>
-      </div>
+      <div class="rail-bottom" id="railBottomMenu" aria-label="계정 메뉴"></div>
     </nav>
 
     <aside class="sidebar" id="sidebar" aria-hidden="true">
@@ -610,7 +608,7 @@
       <button class="new-chat" id="guideSide"><img class="nav-icon" src="assets/guide-icon.png" alt="" /><span>사용 설명서</span></button>
       <div class="history-label">최근 대화</div>
       <div class="history-list" id="historyList"></div>
-      <div class="sidebar-foot">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.<button class="sidebar-login auth-trigger">로그인 · 회원가입</button></div>
+      <div class="sidebar-foot" id="sidebarAccountArea"></div>
     </aside>
     <div class="history-action-menu" id="historyActionMenu" role="menu" aria-hidden="true">
       <button type="button" role="menuitem" data-history-action="rename">이름 변경</button>
@@ -692,7 +690,7 @@
       <div class="auth-switch">계정이 없으신가요? <button type="button" id="openSignup">회원가입</button></div><button class="continue-button" type="button" data-close="authOverlay">가입 없이 계속하기</button>
     </div>
     <div class="auth-view" id="planView" hidden>
-      <button class="auth-back" type="button" data-auth-back="login">‹ 뒤로</button><h2>어떤 플랜으로 시작할까요?</h2><p class="dialog-sub">사용량과 기능을 비교해 나에게 맞는 플랜을 선택하세요. Free로 시작하고 필요할 때 변경할 수 있습니다.</p>
+      <button class="auth-back" type="button" data-auth-back="profile">‹ 계정으로</button><h2>요금플랜</h2><p class="dialog-sub">사용량과 기능을 비교해 나에게 맞는 플랜을 선택하세요.</p>
       <div class="billing-toggle" id="billingToggle"><button class="active" type="button" data-billing="monthly">월간</button><button type="button" data-billing="annual">연간</button></div>
       <div class="plan-grid" id="planGrid">
         <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div class="plan-price-row"><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-billing">결제 정보 없이 이용</p><p class="plan-copy">보험이 궁금할 때 부담 없이 시작하세요.</p><ul><li>기본 AI 사용량 제공</li><li>보험 질문과 답변 근거 확인</li><li>채팅 기록 저장</li></ul><span class="plan-card-action">Free 선택</span></button>
@@ -701,7 +699,7 @@
       </div><p class="plan-note">모든 플랜에는 사용량 한도가 있으며, 플랜에 따라 제공량이 다릅니다.</p><button class="signup-continue" id="planContinue" type="button" disabled>플랜을 선택해 주세요</button>
     </div>
     <div class="auth-view" id="verifyView" hidden>
-      <button class="auth-back" type="button" data-auth-back="plan">‹ &nbsp;요금제 선택</button><h2 id="verifyHeading">이메일을 인증해 주세요</h2><p class="dialog-sub">인증을 완료하면 이름과 비밀번호를 설정할 수 있어요.</p><div class="selected-plan"><span id="selectedPlanLabel">Free · 무료</span><button type="button" data-auth-back="plan">변경</button></div>
+      <button class="auth-back" type="button" data-auth-back="login">‹ &nbsp;로그인으로</button><h2 id="verifyHeading">이메일을 인증해 주세요</h2><p class="dialog-sub">인증을 완료하면 이름과 비밀번호를 설정할 수 있어요.</p><div class="selected-plan"><span id="selectedPlanLabel">Free · 무료</span></div>
       <div class="signup-method" id="signupMethod"><button class="active" type="button" data-method="email">이메일로 가입</button><button type="button" data-method="phone">휴대전화로 가입</button></div>
       <form class="auth-form" id="verifyForm" novalidate><label id="verifyLabel">이메일<input id="verifyInput" type="email" placeholder="you@example.com" autocomplete="email" /></label><small class="field-message" id="contactError"></small><button class="primary-action" id="verifySubmit" type="submit">이메일 인증</button></form>
     </div>
@@ -712,14 +710,17 @@
       <button class="auth-back" type="button" data-auth-back="verify">‹ &nbsp;<span id="codeBackText">이메일 주소 수정</span></button><div class="verification-icon">♢</div><h2>인증번호를 입력해 주세요</h2><p class="dialog-sub"><b id="codeContact"></b> <span id="codeDelivery">주소로 인증 메일을 보냈어요.</span><br />6자리 인증번호를 입력해 주세요.</p><p class="verification-dev-code"><span>인증번호</span><b id="codeDemoCode">123456</b><small>데모 화면에서는 위 번호를 입력해 주세요.</small></p><p class="verification-help" id="codeTimer">남은 시간 10:00</p><form id="codeForm"><div class="verification-code" id="verificationCode"><input inputmode="numeric" autocomplete="one-time-code" maxlength="6" aria-label="인증번호 1번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 2번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 3번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 4번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 5번째 자리" /><input inputmode="numeric" maxlength="1" aria-label="인증번호 6번째 자리" /></div><small class="field-message" id="codeError"></small><button class="primary-action" type="submit" style="width:100%">인증 확인</button></form><button class="secondary-action" id="resendFromCode" type="button">인증번호 재발송</button>
     </div>
     <div class="auth-view" id="accountView" hidden>
-      <button class="auth-back" type="button" data-auth-back="verify">‹ &nbsp;가입 정보 수정</button><h2>가입 정보를 입력해 주세요</h2><p class="dialog-sub">인증을 마쳤어요. 이름과 로그인에 사용할 비밀번호를 설정해 주세요.</p><div class="selected-plan"><span id="accountPlanLabel">Free · 무료</span><button type="button" data-auth-back="plan">변경</button></div><div class="confirmed-contact"><div><span id="confirmedKind">이메일 인증 완료</span><b id="confirmedContact"></b></div><button type="button" data-auth-back="verify">변경</button></div>
+      <button class="auth-back" type="button" data-auth-back="verify">‹ &nbsp;가입 정보 수정</button><h2>가입 정보를 입력해 주세요</h2><p class="dialog-sub">인증을 마쳤어요. 이름과 로그인에 사용할 비밀번호를 설정해 주세요.</p><div class="selected-plan"><span id="accountPlanLabel">Free · 무료</span></div><div class="confirmed-contact"><div><span id="confirmedKind">이메일 인증 완료</span><b id="confirmedContact"></b></div><button type="button" data-auth-back="verify">변경</button></div>
       <form class="auth-form" id="accountForm" novalidate><label>이름<input id="signupName" type="text" placeholder="홍길동" autocomplete="name" maxlength="80" /></label><small class="field-message" id="nameError"></small><label>비밀번호<input id="signupPassword" type="password" placeholder="영문·숫자 포함 8자 이상" autocomplete="new-password" maxlength="128" /></label><small class="field-message" id="passwordError"></small><label>비밀번호 확인<input id="signupPasswordConfirm" type="password" placeholder="비밀번호를 다시 입력하세요" autocomplete="new-password" maxlength="128" /></label><small class="field-message" id="passwordConfirmError"></small><div class="auth-consents"><div class="consent-row"><label><input id="termsConsent" type="checkbox" /><span>[필수] 이용약관 및 개인정보 처리방침 동의</span></label><div class="consent-links"><button type="button" data-legal="terms">이용약관 보기</button><button type="button" data-legal="privacy">개인정보 처리방침 보기</button></div></div><div class="consent-row" id="marketingRow"><label><input id="marketingConsent" type="checkbox" /><span>[선택] 마케팅 정보 수신 동의</span></label><small>서비스 소식과 콘텐츠를 이메일로 받아볼 수 있습니다.</small><div class="consent-links"><button type="button" data-legal="marketing">마케팅 수신 동의 내용 보기</button></div></div></div><small class="field-message" id="termsError"></small><button class="primary-action" type="submit">가입 완료</button></form>
     </div>
     <div class="auth-view" id="legalView" hidden>
       <button class="auth-back" id="legalBack" type="button">‹ &nbsp;가입 정보로 돌아가기</button><h2 id="legalTitle">이용약관</h2><div class="legal-copy" id="legalCopy"></div>
     </div>
     <div class="auth-view verification-view" id="successView" hidden>
-      <div class="success-mark">✓</div><h2>회원가입이 완료됐어요</h2><p class="dialog-sub">이제 선택한 플랜으로 시작할 수 있어요.<br />다음에도 <b id="successContact"></b> 계정으로 로그인해 이어서 이용하세요.</p><div class="selected-plan"><span id="successPlanLabel">Free · 무료</span></div><button class="primary-action" id="startAfterSignup" type="button" style="width:100%">채팅 시작하기</button><button class="secondary-action" type="button" data-auth-back="login">로그인 화면으로</button>
+      <div class="success-mark">✓</div><h2>회원가입이 완료됐어요</h2><p class="dialog-sub">이제 선택한 플랜으로 시작할 수 있어요.<br />다음에도 <b id="successContact"></b> 계정으로 로그인해 이어서 이용하세요.</p><div class="selected-plan"><span id="successPlanLabel">Free · 무료</span></div><button class="primary-action" id="startAfterSignup" type="button" style="width:100%">채팅 시작하기</button><button class="secondary-action" type="button" data-auth-back="profile">계정 보기</button>
+    </div>
+    <div class="auth-view" id="profileView" hidden>
+      <h2>계정 / 프로필</h2><p class="dialog-sub">로그인한 계정과 현재 플랜을 확인할 수 있어요.</p><div class="selected-plan"><span id="profileName">사용자</span><b id="profilePlan">Free 플랜</b></div><button class="primary-action" id="profilePlanButton" type="button" style="width:100%">요금플랜 보기</button><button class="secondary-action" id="logoutButton" type="button">로그아웃</button>
     </div>
   </section></div>
 
@@ -824,6 +825,50 @@
     let currentLocationName = '';
     let currentLocationCoords = null;
     let locationRequestInFlight = false;
+    let authState = readAuthState();
+
+    function readAuthState() {
+      try {
+        const stored = JSON.parse(localStorage.getItem('inchelin-auth-state') || 'null');
+        return stored?.isAuthenticated === true
+          ? { isAuthenticated: true, name: String(stored.name || '사용자'), plan: String(stored.plan || 'Free') }
+          : { isAuthenticated: false, name: '', plan: '' };
+      } catch (_) {
+        return { isAuthenticated: false, name: '', plan: '' };
+      }
+    }
+    function setAuthState(nextState) {
+      authState = nextState?.isAuthenticated === true
+        ? { isAuthenticated: true, name: String(nextState.name || '사용자'), plan: String(nextState.plan || 'Free') }
+        : { isAuthenticated: false, name: '', plan: '' };
+      localStorage.setItem('inchelin-auth-state', JSON.stringify(authState));
+      renderAuthNavigation();
+    }
+    function openPlanAccess() {
+      if (!authState.isAuthenticated) {
+        showToast('요금플랜을 확인하려면 먼저 로그인해주세요.');
+        openAuth('login');
+        return;
+      }
+      selectedPlan = authState.plan || 'Free';
+      qsa('.plan-card').forEach(card => card.classList.toggle('selected', card.dataset.plan === selectedPlan));
+      qsa('.plan-card-action').forEach(action => action.textContent = action.closest('.plan-card').dataset.plan === selectedPlan ? '현재 플랜' : `${action.closest('.plan-card').dataset.plan} 선택`);
+      $('#planContinue').disabled = false;
+      $('#planContinue').textContent = `${selectedPlan} 플랜으로 변경`;
+      openAuth('plan');
+    }
+    function renderAuthNavigation() {
+      const railMenu = $('#railBottomMenu');
+      const sidebarAccount = $('#sidebarAccountArea');
+      if (!authState.isAuthenticated) {
+        railMenu.innerHTML = '<button class="icon-btn" type="button" data-auth-menu="login" aria-label="로그인 또는 회원가입" title="로그인 / 회원가입"><img class="rail-auth-icon" src="assets/login-icon.png" alt=""></button>';
+        sidebarAccount.innerHTML = '로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.<button class="sidebar-login" type="button" data-auth-menu="login">로그인 · 회원가입</button>';
+      } else {
+        railMenu.innerHTML = '<button class="icon-btn" type="button" data-auth-menu="plan" aria-label="요금플랜" title="요금플랜"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="2" stroke-width="1.7"/><path d="M4 9h16M8 14h4" stroke-width="1.7" stroke-linecap="round"/></svg></button><button class="icon-btn" type="button" data-auth-menu="profile" aria-label="계정 또는 프로필" title="계정 / 프로필"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke-width="1.7"/><path d="M5 20a7 7 0 0 1 14 0" stroke-width="1.7" stroke-linecap="round"/></svg></button>';
+        sidebarAccount.innerHTML = '<span id="sidebarProfileName"></span><button class="sidebar-login" type="button" data-auth-menu="plan">요금플랜</button><button class="sidebar-login" type="button" data-auth-menu="profile">계정 · 프로필</button>';
+        $('#sidebarProfileName').textContent = `${authState.name} · ${authState.plan} 플랜`;
+      }
+    }
     const AI_API_ENDPOINT = '/api/chat';
     const REVERSE_GEOCODE_ENDPOINT = '/api/reverse-geocode';
 
@@ -1037,16 +1082,27 @@
     function openOverlay(id) { moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); document.getElementById(id).classList.add('open'); }
     function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
     function showAuthView(view) {
-      ['login', 'plan', 'verify', 'sent', 'code', 'account', 'legal', 'success'].forEach(name => {
+      ['login', 'plan', 'verify', 'sent', 'code', 'account', 'legal', 'success', 'profile'].forEach(name => {
         document.getElementById(`${name}View`).hidden = name !== view;
       });
       $('#authDialog').classList.toggle('plan-mode', view === 'plan');
       $('#authDialog').scrollTop = 0;
       if (view !== 'code') clearInterval(verificationTimer);
+      if (view === 'profile') {
+        $('#profileName').textContent = authState.name || '사용자';
+        $('#profilePlan').textContent = `${authState.plan || 'Free'} 플랜`;
+      }
     }
     function openAuth(view = 'login') {
       openOverlay('authOverlay');
       showAuthView(view);
+    }
+    function beginSignup() {
+      selectedPlan = 'Free';
+      $('#selectedPlanLabel').textContent = 'Free · 무료';
+      $('#accountPlanLabel').textContent = 'Free · 무료';
+      $('#successPlanLabel').textContent = 'Free · 무료';
+      openAuth('verify');
     }
     function resizeInput(el) {
       el.style.height = 'auto';
@@ -1677,10 +1733,22 @@
     ['newChatRail', 'newChatSide', 'topNewChat'].forEach(id => document.getElementById(id).addEventListener('click', newChat));
     ['aboutRail', 'aboutSide'].forEach(id => document.getElementById(id).addEventListener('click', () => { if (window.innerWidth <= 768) setSidebar(false); openOverlay('aboutOverlay'); }));
     ['guideRail', 'guideSide'].forEach(id => document.getElementById(id).addEventListener('click', showGuide));
-    qsa('.auth-trigger').forEach(button => button.addEventListener('click', () => openAuth('login')));
-    qsa('.signup-trigger').forEach(button => button.addEventListener('click', () => openAuth('plan')));
-    $('#startButton').addEventListener('click', () => openAuth('login'));
-    $('#mobileStartButton').addEventListener('click', () => openAuth('login'));
+    qsa('.auth-trigger').forEach(button => button.addEventListener('click', () => openAuth(authState.isAuthenticated ? 'profile' : 'login')));
+    qsa('.signup-trigger').forEach(button => button.addEventListener('click', beginSignup));
+    $('#startButton').addEventListener('click', () => openAuth(authState.isAuthenticated ? 'profile' : 'login'));
+    $('#mobileStartButton').addEventListener('click', () => openAuth(authState.isAuthenticated ? 'profile' : 'login'));
+    $('#railBottomMenu').addEventListener('click', event => {
+      const action = event.target.closest('[data-auth-menu]')?.dataset.authMenu;
+      if (action === 'login') openAuth('login');
+      if (action === 'plan') openPlanAccess();
+      if (action === 'profile') openAuth('profile');
+    });
+    $('#sidebarAccountArea').addEventListener('click', event => {
+      const action = event.target.closest('[data-auth-menu]')?.dataset.authMenu;
+      if (action === 'login') openAuth('login');
+      if (action === 'plan') openPlanAccess();
+      if (action === 'profile') openAuth('profile');
+    });
     qsa('.more-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const open = moreMenu.classList.toggle('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', String(open))); }));
     $('#releaseButton').addEventListener('click', () => openOverlay('releaseOverlay'));
     qsa('.task-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const rect = button.getBoundingClientRect(); taskMenu.style.left = `${Math.max(10, rect.left)}px`; taskMenu.style.top = `${Math.max(10, rect.top - 102)}px`; const open = taskMenu.classList.toggle('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', String(open && b === button))); }));
@@ -1701,8 +1769,14 @@
       resizeInput(input); input.focus(); showToast(`${plugin.name} 플러그인을 선택했습니다.`);
     });
     $('#guideList').addEventListener('click', event => { const button = event.target.closest('button'); if (button) button.parentElement.classList.toggle('open'); });
-    $('#authForm').addEventListener('submit', event => { event.preventDefault(); closeOverlay('authOverlay'); showToast('데모 계정으로 로그인되었습니다.'); });
-    $('#openSignup').addEventListener('click', () => showAuthView('plan'));
+    $('#authForm').addEventListener('submit', event => {
+      event.preventDefault();
+      const identifier = event.currentTarget.querySelector('input[autocomplete="username"]')?.value.trim();
+      setAuthState({ isAuthenticated: true, name: identifier || '사용자', plan: 'Free' });
+      closeOverlay('authOverlay');
+      showToast('로그인되었습니다.');
+    });
+    $('#openSignup').addEventListener('click', beginSignup);
     qsa('[data-auth-back]').forEach(button => button.addEventListener('click', () => showAuthView(button.dataset.authBack)));
     $('#billingToggle').addEventListener('click', event => {
       const button = event.target.closest('[data-billing]');
@@ -1728,6 +1802,12 @@
     }
     $('#planContinue').addEventListener('click', () => {
       if (!selectedPlan) return;
+      if (authState.isAuthenticated) {
+        setAuthState({ ...authState, plan: selectedPlan });
+        showAuthView('profile');
+        showToast(`${selectedPlan} 플랜으로 변경했습니다.`);
+        return;
+      }
       $('#selectedPlanLabel').textContent = planSummary();
       $('#accountPlanLabel').textContent = planSummary();
       $('#successPlanLabel').textContent = planSummary();
@@ -1899,16 +1979,24 @@
       setFieldError('passwordConfirmError', confirmation === password && confirmation ? '' : '비밀번호가 일치하지 않습니다.');
       setFieldError('termsError', $('#termsConsent').checked ? '' : '필수 약관에 동의해 주세요.');
       if (!name || !passwordValid || confirmation !== password || !$('#termsConsent').checked) return;
+      setAuthState({ isAuthenticated: true, name, plan: selectedPlan || 'Free' });
       $('#successContact').textContent = signupContact;
       showAuthView('success');
     });
     $('#startAfterSignup').addEventListener('click', () => { closeOverlay('authOverlay'); showWelcome(); showToast('회원가입이 완료되었습니다.'); });
+    $('#profilePlanButton').addEventListener('click', openPlanAccess);
+    $('#logoutButton').addEventListener('click', () => {
+      setAuthState({ isAuthenticated: false });
+      closeOverlay('authOverlay');
+      showToast('로그아웃되었습니다.');
+    });
     qsa('[data-close]').forEach(button => button.addEventListener('click', () => closeOverlay(button.dataset.close)));
     qsa('.overlay').forEach(overlay => overlay.addEventListener('click', event => { if (event.target === overlay) closeOverlay(overlay.id); }));
     qsa('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
     document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
     window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
+    renderAuthNavigation();
     renderHistory();
     renderPlugins();
   })(
