@@ -154,9 +154,25 @@
       gap: 8px;
     }
     .mobile-header { display: none; }
-    .top-chat { width: 34px; height: 34px; border-radius: 11px; background: #000; }
-    .top-chat svg { stroke: #fff; width: 17px; height: 17px; }
     .dots { font-weight: 800; color: #737373; letter-spacing: 2px; }
+    .share-action {
+      min-height: 34px;
+      padding: 0 12px;
+      border: 1px solid #dedede;
+      border-radius: 999px;
+      background: #fff;
+      color: #333;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      font-size: 13px;
+      font-weight: 400;
+      cursor: pointer;
+    }
+    .share-action:hover { background: #f5f5f5; }
+    .share-action svg { width: 16px; height: 16px; stroke: currentColor; }
+    .share-action[hidden] { display: none !important; }
     .start-btn {
       height: 34px;
       border: 0;
@@ -251,6 +267,8 @@
     .suggestion-arrow { width: 18px; height: auto; display: block; object-fit: contain; }
     .chat-view { width: min(760px, 100%); height: 100%; min-height: 0; display: none; flex-direction: column; overflow: hidden; margin: 0 auto; }
     .chat-view.active { display: flex; }
+    .shared-banner { flex: 0 0 auto; padding: 8px 2px 10px; color: #777; font-size: 12px; line-height: 1.4; }
+    .shared-banner[hidden] { display: none; }
     .chat-scroll-area { flex: 1 1 auto; min-height: 0; width: 100%; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     @media (min-width: 769px) {
       .chat-scroll-area { scrollbar-width: thin; scrollbar-color: #cfcfcf transparent; }
@@ -344,6 +362,12 @@
     .eyebrow { margin-bottom: 8px; font-size: 11px; letter-spacing: .14em; font-weight: 800; color: #888; }
     .dialog h2 { margin: 0 42px 8px 0; font-size: 21px; line-height: 1.45; letter-spacing: -.025em; font-weight: 600; }
     .dialog-sub { margin: 0 0 18px; color: #666; font-size: 13.5px; line-height: 1.55; }
+    .share-dialog { width: min(460px, 100%); }
+    .share-dialog-copy { margin: 0 0 20px; color: #666; font-size: 14px; line-height: 1.6; }
+    .share-link-result[hidden] { display: none; }
+    .share-link-row { display: flex; gap: 8px; align-items: stretch; }
+    .share-link-output { min-width: 0; flex: 1; height: 42px; padding: 0 12px; border: 1px solid #ddd; border-radius: 10px; background: #f8f8f8; color: #555; font-size: 12px; }
+    .share-copy-button { flex: 0 0 auto; min-width: 82px; height: 42px; padding: 0 14px; border: 0; border-radius: 10px; background: #111; color: #fff; cursor: pointer; }
     .about-dialog { width: min(560px, calc(100vw - 32px)); max-width: 560px; max-height: calc(100dvh - 24px); overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: clamp(20px, 5vw, 36px); text-align: left; }
     .about-shell { width: 100%; max-width: 480px; text-align: left; word-break: keep-all; overflow-wrap: break-word; }
     .about-dialog .eyebrow { margin-bottom: 4px; color: #858585; font-size: clamp(11px, 3vw, 13px); font-weight: 700; letter-spacing: .12em; }
@@ -512,6 +536,7 @@
       .mobile-brand { min-width: 0; display: flex; align-items: center; white-space: nowrap; }
       .mobile-brand img { display: block; width: min(150px, 42vw); max-width: 100%; height: auto; object-fit: contain; object-position: left center; flex: 0 1 auto; }
       .mobile-header .dots { width: 36px; height: 36px; }
+      .mobile-share-action { width: 36px; height: 36px; min-height: 36px; padding: 0; border-radius: 10px; }
       .mobile-start { height: 32px; padding: 0 13px; font-size: 12.5px; }
       .sidebar {
         z-index: 1000;
@@ -568,6 +593,8 @@
       .mobile-start { padding: 0 11px; }
       .overlay { padding: 10px; }
       .dialog { max-height: calc(100dvh - 20px); border-radius: 17px; padding: 24px 18px; }
+      .share-link-row { flex-direction: column; }
+      .share-copy-button { width: 100%; }
       .about-dialog { width: calc(100vw - 24px); padding-top: max(20px, env(safe-area-inset-top)); padding-right: clamp(20px, 5vw, 28px); padding-bottom: max(20px, env(safe-area-inset-bottom)); padding-left: clamp(20px, 5vw, 28px); }
       .plugin-grid { grid-template-columns: 1fr; }
       .auth-dialog.plan-mode { width: min(420px, 100%); }
@@ -626,13 +653,12 @@
           <span class="mobile-brand"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span>
         </div>
         <div class="mobile-header-actions">
-          <button class="icon-btn dots more-trigger" id="mobileMoreButton" aria-label="더 보기" aria-expanded="false">···</button>
+          <button class="share-action mobile-share-action" id="mobileShareButton" type="button" aria-label="대화 공유하기" hidden><svg viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8h14v-8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="start-btn mobile-start" id="mobileStartButton">시작하기</button>
         </div>
       </header>
       <header class="topbar">
-        <button class="icon-btn top-chat" id="topNewChat" aria-label="새 채팅"><svg viewBox="0 0 24 24" fill="none"><path d="M20 11.5a8 8 0 0 1-8.4 8L5 21l1.6-4.4A8 8 0 1 1 20 11.5Z" stroke-width="1.7"/></svg></button>
-        <button class="icon-btn dots more-trigger" id="moreButton" aria-label="더 보기" aria-expanded="false">···</button>
+        <button class="share-action" id="shareButton" type="button" hidden><svg viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8h14v-8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>공유하기</span></button>
         <button class="start-btn" id="startButton">시작하기</button>
       </header>
 
@@ -650,6 +676,7 @@
         </div>
 
         <div class="chat-view" id="chatView">
+          <div class="shared-banner" id="sharedBanner" hidden>공유된 대화입니다. 위치 및 로그인 정보는 포함되지 않았습니다.</div>
           <div class="chat-scroll-area" id="chatScrollArea">
             <div class="messages" id="messages" aria-live="polite"></div>
           </div>
@@ -684,6 +711,8 @@
   </div>
 
   <div class="overlay" id="aboutOverlay"><section class="dialog about-dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="about-shell"><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">인슐랭가이드 AI 소개</h2><div class="about-copy"><div class="about-intro"><p><strong>인슐랭 가이드</strong>는 보험(Insurance)과 미슐랭 가이드(Michelin Guide)를 더한 이름입니다.</p><p>보험인과 고객이 함께 <strong>좋은 맛집을 발견하고 공유하는 맛집 앱</strong>입니다.</p></div><section class="about-story" aria-labelledby="aboutStoryTitle"><h3 id="aboutStoryTitle">우리가 인슐랭 가이드를 만든 이유</h3><p>맛있는 한 끼는 평범한 하루를 조금 더 즐겁게 만들어줍니다.</p><p>전국의 보험인과 고객이 좋았던 맛집을 함께 공유하고, 누구나 좋은 한 끼를 쉽게 만날 수 있도록 인슐랭 가이드를 시작했습니다.</p></section><p class="about-vision"><span>맛집을 고를 때 믿고 찾을 수 있는</span><strong>‘맛집 앱의 보험’이 되겠습니다.</strong></p></div></div></section></div>
+
+  <div class="overlay" id="shareOverlay"><section class="dialog share-dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle"><button class="dialog-close" data-close="shareOverlay" aria-label="닫기">×</button><h2 id="shareTitle">이 대화 공유하기</h2><p class="share-dialog-copy">현재 대화 내용을 다른 사람과 공유할 수 있어요. 위치 좌표와 로그인 정보는 공유 내용에서 제외됩니다.</p><div id="shareCreateView"><button class="primary-action" id="createShareLinkButton" type="button" style="width:100%">공유 링크 만들기</button></div><div class="share-link-result" id="shareLinkResult" hidden><div class="share-link-row"><input class="share-link-output" id="shareLinkOutput" type="text" readonly aria-label="공유 링크"><button class="share-copy-button" id="copyShareLinkButton" type="button">링크 복사</button></div></div></section></div>
 
   <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
     <div class="auth-view" id="loginView">
@@ -803,6 +832,7 @@
     let currentLocationName = '';
     let currentLocationCoords = null;
     let locationRequestInFlight = false;
+    let isSharedConversation = false;
     let authState = readAuthState();
 
     function readAuthState() {
@@ -969,6 +999,143 @@
         dataSource
       };
     }
+    function encodeSharePayload(payload) {
+      const bytes = new TextEncoder().encode(JSON.stringify(payload));
+      let binary = '';
+      for (let index = 0; index < bytes.length; index += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000));
+      }
+      return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/g, '');
+    }
+    function decodeSharePayload(value) {
+      const padded = String(value || '').replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(String(value || '').length / 4) * 4, '=');
+      const binary = atob(padded);
+      const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
+      return JSON.parse(new TextDecoder().decode(bytes));
+    }
+    function redactShareText(value) {
+      let text = String(value || '');
+      const privateTerms = [currentLocationName, authState.name]
+        .map(term => String(term || '').trim())
+        .filter(term => term.length >= 2);
+      privateTerms.forEach(term => { text = text.split(term).join('개인정보 숨김'); });
+      return text
+        .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, '[이메일 숨김]')
+        .replace(/(?:\+?82[-.\s]?)?0?1[016789][-.\s]?\d{3,4}[-.\s]?\d{4}/g, '[전화번호 숨김]')
+        .replace(/\b-?\d{1,3}\.\d{4,}\s*[,/]\s*-?\d{1,3}\.\d{4,}\b/g, '[좌표 숨김]');
+    }
+    function sanitizeRestaurantForShare(restaurant) {
+      const item = normalizeRestaurant(restaurant);
+      if (!item) return null;
+      return {
+        id: item.id,
+        name: item.name,
+        restaurantName: item.restaurantName,
+        category: item.category,
+        address: item.address,
+        roadAddress: item.roadAddress,
+        recommendedBy: item.recommendedBy,
+        imageUrl: item.imageUrl,
+        businessStatus: item.businessStatus,
+        recommendationReason: item.recommendationReason,
+        openingHours: item.openingHours,
+        representativeMenus: item.representativeMenus,
+        menuPrice: item.menuPrice,
+        parking: item.parking,
+        naverPlaceId: item.naverPlaceId,
+        naverPlaceUrl: item.naverPlaceUrl,
+        isRegisteredInInchelin: item.isRegisteredInInchelin,
+        dataSource: item.dataSource
+      };
+    }
+    function currentConversationTitle() {
+      const stored = histories.find(history => history.id === currentId)?.title;
+      const firstQuestion = chatMessages.find(message => message.role === 'user')?.content;
+      return redactShareText(stored || firstQuestion || 'Inchelin Guide AI 대화').slice(0, 60);
+    }
+    function buildShareSnapshot() {
+      return {
+        version: 1,
+        title: currentConversationTitle(),
+        createdAt: new Date().toISOString(),
+        messages: chatMessages.map(message => ({
+          role: message.role,
+          content: redactShareText(message.content),
+          quickReplies: [],
+          restaurants: (message.restaurants || []).map(sanitizeRestaurantForShare).filter(Boolean)
+        }))
+      };
+    }
+    function buildShareUrl() {
+      const encoded = encodeSharePayload(buildShareSnapshot());
+      return `${location.origin}${location.pathname}#share=${encoded}`;
+    }
+    function updateShareVisibility() {
+      const visible = !isSharedConversation && chatView.classList.contains('active') && chatMessages.some(message => message.role === 'user');
+      $('#shareButton').hidden = !visible;
+      $('#mobileShareButton').hidden = !visible;
+    }
+    function resetShareDialog() {
+      $('#shareCreateView').hidden = false;
+      $('#shareLinkResult').hidden = true;
+      $('#shareLinkOutput').value = '';
+    }
+    function openShareDialog() {
+      if (!chatMessages.some(message => message.role === 'user')) return;
+      resetShareDialog();
+      openOverlay('shareOverlay');
+    }
+    async function copyShareLink() {
+      const value = $('#shareLinkOutput').value;
+      if (!value) return;
+      try {
+        await navigator.clipboard.writeText(value);
+        showToast('공유 링크를 복사했어요.');
+      } catch (_) {
+        $('#shareLinkOutput').select();
+        const copied = document.execCommand('copy');
+        showToast(copied ? '공유 링크를 복사했어요.' : '링크를 복사하지 못했어요.');
+      }
+    }
+    function leaveSharedConversation() {
+      if (!isSharedConversation) return;
+      isSharedConversation = false;
+      $('#sharedBanner').hidden = true;
+      $('#chatForm').hidden = false;
+      $('.disclaimer').hidden = false;
+      history.replaceState(null, '', `${location.pathname}${location.search}`);
+      document.title = 'Inchelin Guide AI';
+    }
+    function loadSharedConversationFromHash() {
+      if (!location.hash.startsWith('#share=')) return false;
+      try {
+        const payload = decodeSharePayload(location.hash.slice(7));
+        if (payload?.version !== 1 || !Array.isArray(payload.messages)) return false;
+        const messages = payload.messages.map(normalizeMessage).filter(Boolean);
+        if (!messages.length) return false;
+        isSharedConversation = true;
+        currentId = null;
+        currentLocationName = '';
+        currentLocationCoords = null;
+        chatMessages = messages;
+        renderConversation();
+        welcome.style.display = 'none';
+        guidePanel.classList.remove('active');
+        chatView.classList.add('active');
+        main.classList.add('chat-mode');
+        $('#chatForm').hidden = true;
+        $('.disclaimer').hidden = true;
+        const title = String(payload.title || '공유된 대화').slice(0, 60);
+        $('#sharedBanner').textContent = `공유된 대화 · ${title}`;
+        $('#sharedBanner').hidden = false;
+        document.title = `${title} | Inchelin Guide AI`;
+        updateShareVisibility();
+        return true;
+      } catch (_) {
+        showToast('공유 링크를 불러오지 못했어요.');
+        return false;
+      }
+    }
     function readStoredConversations() {
       try {
         const stored = JSON.parse(localStorage.getItem('insight-ai-history') || '[]');
@@ -1106,10 +1273,12 @@
       }
     }
     function showWelcome() {
+      leaveSharedConversation();
       main.classList.remove('chat-mode');
       welcome.style.display = '';
       chatView.classList.remove('active');
       guidePanel.classList.remove('active');
+      updateShareVisibility();
     }
     function newChat() {
       stopGeneration(false);
@@ -1379,6 +1548,7 @@
       chatMessages = [...chatMessages, message];
       const item = renderMessage(message, '', shouldFollow);
       if (save) saveConversation();
+      updateShareVisibility();
       return item;
     }
     function renderConversation() {
@@ -1414,6 +1584,7 @@
       const history = histories.find(h => h.id === id);
       if (!history) return;
       stopGeneration(false);
+      leaveSharedConversation();
       currentId = id;
       currentLocationName = String(history.locationName || '');
       currentLocationCoords = history.locationCoords && Number.isFinite(Number(history.locationCoords.latitude)) && Number.isFinite(Number(history.locationCoords.longitude))
@@ -1425,6 +1596,7 @@
       guidePanel.classList.remove('active');
       chatView.classList.add('active');
       main.classList.add('chat-mode');
+      updateShareVisibility();
       if (window.innerWidth <= 768) setSidebar(false);
     }
     function escapeHTML(value) {
@@ -1554,6 +1726,7 @@
       guidePanel.classList.remove('active');
       chatView.classList.add('active');
       main.classList.add('chat-mode');
+      updateShareVisibility();
     }
     function focusManualLocationInput() {
       showChatView();
@@ -1740,10 +1913,12 @@
     }
     function showGuide() {
       stopGeneration(false);
+      leaveSharedConversation();
       welcome.style.display = 'none';
       chatView.classList.remove('active');
       guidePanel.classList.add('active');
       main.classList.remove('chat-mode');
+      updateShareVisibility();
       if (window.innerWidth <= 768) setSidebar(false);
     }
     function renderPlugins() {
@@ -1791,7 +1966,20 @@
     $('#mobileSidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
     $('#sidebarClose').addEventListener('click', () => setSidebar(false));
     scrim.addEventListener('click', () => setSidebar(false));
-    ['newChatRail', 'newChatSide', 'topNewChat'].forEach(id => document.getElementById(id).addEventListener('click', newChat));
+    ['newChatRail', 'newChatSide'].forEach(id => document.getElementById(id).addEventListener('click', newChat));
+    ['shareButton', 'mobileShareButton'].forEach(id => document.getElementById(id).addEventListener('click', openShareDialog));
+    $('#createShareLinkButton').addEventListener('click', () => {
+      try {
+        const shareUrl = buildShareUrl();
+        if (shareUrl.length > 180000) throw new Error('share_too_large');
+        $('#shareLinkOutput').value = shareUrl;
+        $('#shareCreateView').hidden = true;
+        $('#shareLinkResult').hidden = false;
+      } catch (_) {
+        showToast('대화가 너무 길어 공유 링크를 만들지 못했어요.');
+      }
+    });
+    $('#copyShareLinkButton').addEventListener('click', copyShareLink);
     ['aboutRail', 'aboutSide'].forEach(id => document.getElementById(id).addEventListener('click', () => { if (window.innerWidth <= 768) setSidebar(false); openOverlay('aboutOverlay'); }));
     ['guideRail', 'guideSide'].forEach(id => document.getElementById(id).addEventListener('click', showGuide));
     qsa('.auth-trigger').forEach(button => button.addEventListener('click', () => openAuth(authState.isAuthenticated ? 'profile' : 'login')));
@@ -2060,6 +2248,7 @@
     renderAuthNavigation();
     renderHistory();
     renderPlugins();
+    if (!loadSharedConversationFromHash()) updateShareVisibility();
   })(
     selector => document.querySelector(selector),
     selector => [...document.querySelectorAll(selector)]
