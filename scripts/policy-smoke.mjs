@@ -9,7 +9,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, aiResponse, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, aiResponse, intentAnalysis, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -21,13 +21,17 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     if (href.includes("openapi.naver.com/v1/search/image")) return Response.json(imageResponse || { items: [] });
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
+      if (body.text?.format?.name === "inchelin_intent_analysis") {
+        assert.ok(intentAnalysis, "Semantic routing tests must provide intentAnalysis");
+        return Response.json({ output_text: JSON.stringify(intentAnalysis) });
+      }
       const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
       return Response.json({ output_text: JSON.stringify(aiResponse || { message: "검색 결과를 확인했어요.", suggestions: [], selectedRestaurantIds: selectedId ? [selectedId] : [] }) });
     }
     throw new Error(`Unexpected URL: ${href}`);
   };
   try {
-    const response = await worker.fetch(request(message, history, context), env, {});
+    const response = await worker.fetch(request(message, history, context), { INTENT_ANALYZER_DISABLED: "true", ...env }, {});
     assert.equal(response.status, expectedStatus);
     return { body: await response.json(), calls };
   } finally {
@@ -105,6 +109,29 @@ const baseEnv = {
   INCHELIN_DB_API_URL: "https://db.example",
   INCHELIN_DB_API_TOKEN: "db-token",
 };
+
+function semanticAnalysis(overrides = {}) {
+  return {
+    intent: "food_conversation",
+    requestedAction: "none",
+    restaurantName: "",
+    location: "",
+    foodCategory: "",
+    foodPreference: "",
+    situation: "",
+    mealTime: "",
+    parking: null,
+    distancePreference: "",
+    pricePreference: "",
+    openingStatus: "unknown",
+    partySize: "",
+    otherConditions: [],
+    referencesPreviousResults: false,
+    needsRestaurantSearch: false,
+    needsLocation: false,
+    ...overrides,
+  };
+}
 
 {
   const result = await runCase({
@@ -629,6 +656,213 @@ const baseEnv = {
   const openaiCall = result.calls.find(call => call.href.includes("api.openai.com"));
   assert.match(openaiCall.body.instructions, /고정된 질문 순서/);
   assert.match(openaiCall.body.instructions, /추가 질문 없이 즉시 검색 결과/);
+}
+
+// Semantic QA: the model-provided intent/state drives routing, not exact input strings.
+{
+  const result = await runCase({
+    message: "여기는 어떤 원칙으로 가게를 골라 보여주는 거야?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
+    intentAnalysis: semanticAnalysis({ intent: "service_explanation" }),
+    aiResponse: {
+      message: "**지역과 음식 종류**, 현재 확인 가능한 영업 정보와 사용자가 말한 상황을 함께 보고 있어요.",
+      suggestions: [],
+      selectedRestaurantIds: [],
+    },
+  });
+  assert.match(result.body.message, /지역과 음식 종류/);
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 2);
+  assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "속 편한 따뜻한 메뉴가 생각나",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
+    intentAnalysis: semanticAnalysis({
+      intent: "menu_recommendation",
+      foodPreference: "따뜻하고 속 편한 음식",
+    }),
+    aiResponse: { message: "따뜻하고 부담이 적다면 **순두부찌개**나 **쌀국수**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
+  });
+  assert.match(result.body.message, /순두부찌개/);
+  assert.doesNotMatch(result.body.message, /어느 지역/);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 2);
+  assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "회사 사람들이랑 갈 만한 곳 좀 찾아봐",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
+    intentAnalysis: semanticAnalysis({
+      intent: "restaurant_recommendation",
+      situation: "직장 동료 회식",
+      needsRestaurantSearch: true,
+      needsLocation: true,
+    }),
+  });
+  assert.match(result.body.message, /어느 지역에서 찾을까요/);
+  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+}
+
+{
+  const result = await runCase({
+    message: "판교 쪽에서 팀 저녁 모임 장소 부탁해",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      INTENT_ANALYZER_DISABLED: "false",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    intentAnalysis: semanticAnalysis({
+      intent: "restaurant_recommendation",
+      location: "판교",
+      situation: "직장 동료 회식",
+      mealTime: "저녁",
+      needsRestaurantSearch: true,
+    }),
+    naverResponse: {
+      items: [{
+        title: "판교모임식당",
+        roadAddress: "경기도 성남시 분당구 판교역로 1",
+        category: "한식",
+        link: "https://map.naver.com/p/entry/place/777",
+        mapx: "1271110000",
+        mapy: "374000000",
+      }],
+    },
+  });
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "판교 직장 동료 회식");
+  assert.equal(result.body.restaurants[0].name, "판교모임식당");
+}
+
+{
+  const recentRestaurants = [
+    { id: "one", name: "첫번째식당", address: "서울 강남구 1", recommendationReason: "한식 조건과 일치해요." },
+    { id: "two", name: "두번째식당", address: "서울 강남구 2", recommendationReason: "확인된 위치에서 약 420m 거리예요." },
+  ];
+  const result = await runCase({
+    message: "아까 두 번째를 고른 까닭은 뭐였어?",
+    history: [{ role: "user", content: "강남역 근처 한식집 보여줘" }],
+    context: { hasRestaurantResults: true, recentRestaurants },
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
+    intentAnalysis: semanticAnalysis({
+      intent: "recommendation_followup",
+      requestedAction: "recommendation_reason",
+      location: "강남역",
+      foodCategory: "한식",
+      referencesPreviousResults: true,
+    }),
+  });
+  assert.match(result.body.message, /두번째식당/);
+  assert.match(result.body.message, /420m/);
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "송도에서 신선한 회를 먹을 식당 찾아줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      INTENT_ANALYZER_DISABLED: "false",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    intentAnalysis: semanticAnalysis({
+      intent: "restaurant_recommendation",
+      location: "송도",
+      foodCategory: "회",
+      needsRestaurantSearch: true,
+    }),
+    naverResponse: {
+      items: [{
+        title: "송도횟집",
+        roadAddress: "인천광역시 연수구 송도동 1",
+        category: "일식>생선회",
+        link: "https://map.naver.com/p/entry/place/778",
+        mapx: "1266000000",
+        mapy: "374000000",
+      }],
+    },
+  });
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "송도 회");
+  assert.doesNotMatch(new URL(naverCall.href).searchParams.get("query"), /회식/);
+}
+
+{
+  const result = await runCase({
+    message: "아까 조건에서 음식만 중식으로 바꿔서 다시 볼래",
+    history: [
+      { role: "user", content: "강남에서 한식집 찾아줘" },
+      { role: "assistant", content: "강남 한식집을 찾아봤어요." },
+    ],
+    context: {
+      hasRestaurantResults: true,
+      recentRestaurants: [{ id: "old", name: "이전식당", address: "서울 강남구 1" }],
+    },
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      INTENT_ANALYZER_DISABLED: "false",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    intentAnalysis: semanticAnalysis({
+      intent: "condition_change",
+      location: "강남",
+      foodCategory: "중식",
+      referencesPreviousResults: true,
+      needsRestaurantSearch: true,
+    }),
+    naverResponse: {
+      items: [{
+        title: "새한식당",
+        roadAddress: "서울특별시 강남구 강남대로 3",
+        category: "한식",
+        link: "https://map.naver.com/p/entry/place/779",
+        mapx: "1272000000",
+        mapy: "375000000",
+      }],
+    },
+  });
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 중식");
+  assert.equal(result.body.restaurants[0].name, "새한식당");
+}
+
+{
+  const recentRestaurants = [
+    { id: "r1", name: "첫번째식당", address: "서울 강남구 1", distanceMeters: 310 },
+    { id: "r2", name: "두번째식당", address: "서울 강남구 2", distanceMeters: 700 },
+    { id: "r3", name: "세번째식당", address: "서울 강남구 3", distanceMeters: 480 },
+  ];
+  const result = await runCase({
+    message: "처음 거랑 마지막 거 중 어디가 더 가까워?",
+    history: [{ role: "user", content: "강남에서 점심 먹을 곳 보여줘" }],
+    context: { hasRestaurantResults: true, recentRestaurants },
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
+    intentAnalysis: semanticAnalysis({
+      intent: "restaurant_comparison",
+      requestedAction: "compare",
+      location: "강남",
+      referencesPreviousResults: true,
+    }),
+    aiResponse: { message: "확인된 거리 기준으로는 **첫 번째 식당**이 더 가까워요.", suggestions: [], selectedRestaurantIds: [] },
+  });
+  assert.match(result.body.message, /첫 번째 식당/);
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
+  const answerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
+  assert.match(answerCall.body.instructions, /"position":1/);
+  assert.match(answerCall.body.instructions, /310/);
 }
 
 console.log("Inchelin data policy smoke tests passed.");

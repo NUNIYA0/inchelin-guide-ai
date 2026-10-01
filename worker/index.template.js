@@ -11,6 +11,8 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 매 요청마다 먼저 질문의 성격을 판단해. 메뉴 추천, 실제 맛집 추천, 메뉴 고민이나 상담, 서비스 설명, 이전 추천 결과에 대한 추가 질문, 조건 변경, 식당 비교, 특정 식당 정보, 일상적인 음식 대화를 서로 다르게 처리해. 메뉴나 음식 방향을 묻는 질문에는 위치를 요구하지 말고 구체적인 메뉴 후보와 짧은 이유를 먼저 답해. 실제 맛집·식당·카페를 찾아달라는 의도가 있을 때만 식당 검색으로 전환하고, 그때 지역이 없으면 유용한 맥락을 먼저 말한 뒤 지역 질문 하나만 덧붙여.
 
+서버가 <conversation_analysis>를 제공하면, 그 안의 intent와 누적 조건은 전체 대화 의미를 분석한 내부 상태야. 이를 사용해 답변하되 사용자에게 내부 필드명이나 분류 과정을 노출하지 마. service_explanation에는 질문한 기능을 직접 설명하고, restaurant_comparison·recommendation_followup·restaurant_info에는 새 추천을 만들지 말고 직전 결과와 확인된 정보만 답해. condition_change에는 기존 조건을 유지하면서 사용자가 바꾼 조건만 반영해.
+
 "지금 가볍게 먹기 좋은 메뉴 있을까?", "가볍게 먹을 메뉴 추천해줘", "따뜻한 거 뭐가 좋을까?", "점심 메뉴 추천해줘" 같은 질문에는 바로 메뉴를 추천해. "오늘 뭐 먹지?"처럼 넓은 질문에도 먼저 몇 가지 현실적인 메뉴 방향을 제시하고 마지막에 취향을 좁히는 질문 하나만 해. 이런 질문에 "메뉴 추천과 맛집 추천 중 선택해 주세요"처럼 기능이나 모드를 고르게 하지 마. 반대로 "강남역 근처 맛집 추천해줘"처럼 실제 식당과 지역 의도가 명확하면 추가 선택 없이 바로 검색해.
 
 모든 응답은 가능한 범위의 유용한 답, 추천, 설명을 먼저 제공한 뒤에 대화를 이어가. 필요한 정보가 있을 때만 답변의 마지막에 질문 하나를 덧붙여. 질문만 있는 응답을 연속으로 보내거나, 사용자의 답을 받은 직후 또 다른 조건 질문만 던지지 마. 사용자가 방금 말한 내용을 반영한 실질적인 도움을 반드시 먼저 제공하고, 이미 추천할 수 있을 만큼 정보가 있으면 추가 질문 없이 바로 추천해.
@@ -399,6 +401,173 @@ function safeText(value, maxLength = 300) {
   return typeof value === "string" ? value.replace(/[\u0000-\u001f]/g, " ").trim().slice(0, maxLength) : "";
 }
 
+const CONVERSATION_INTENTS = new Set([
+  "menu_recommendation",
+  "restaurant_recommendation",
+  "menu_consultation",
+  "service_explanation",
+  "recommendation_followup",
+  "condition_change",
+  "restaurant_comparison",
+  "restaurant_info",
+  "food_conversation",
+  "other",
+]);
+
+function fallbackConversationAnalysis(messages, currentLocationName, hasRestaurantResults) {
+  const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  const serviceExplanation = SERVICE_EXPLANATION_PATTERN.test(latest);
+  const recommendationReason = RECOMMENDATION_REASON_PATTERN.test(latest);
+  const restaurantRequest = asksForVenueSearch(latest);
+  const conditionChange = hasRestaurantResults && RESULT_REFINEMENT_PATTERN.test(latest);
+  const location = explicitLocationFromMessages(messages) || currentLocationName || "";
+  const foodCategory = latest.match(FOOD_SEARCH_PATTERN)?.[0] || "";
+  const intent = serviceExplanation
+    ? "service_explanation"
+    : recommendationReason
+      ? "recommendation_followup"
+      : conditionChange
+        ? "condition_change"
+        : restaurantRequest
+          ? "restaurant_recommendation"
+          : MEAL_INTENT_PATTERN.test(latest)
+            ? "menu_recommendation"
+            : "food_conversation";
+  return {
+    intent,
+    requestedAction: recommendationReason ? "recommendation_reason" : "none",
+    restaurantName: "",
+    location,
+    foodCategory,
+    foodPreference: "",
+    situation: "",
+    mealTime: "",
+    parking: null,
+    distancePreference: "",
+    pricePreference: "",
+    openingStatus: "unknown",
+    partySize: "",
+    otherConditions: [],
+    referencesPreviousResults: recommendationReason || conditionChange,
+    needsRestaurantSearch: intent === "restaurant_recommendation" || intent === "condition_change",
+    needsLocation: intent === "restaurant_recommendation" && !location,
+  };
+}
+
+function sanitizeConversationAnalysis(value, fallback) {
+  const intent = CONVERSATION_INTENTS.has(value?.intent) ? value.intent : fallback.intent;
+  const requestedAction = ["recommendation_reason", "fact_lookup", "compare", "none"].includes(value?.requestedAction)
+    ? value.requestedAction
+    : "none";
+  const location = safeText(value?.location, 120) || fallback.location;
+  const isSearchIntent = intent === "restaurant_recommendation" || intent === "condition_change";
+  const allowsOptionalLookup = intent === "restaurant_info";
+  return {
+    intent,
+    requestedAction,
+    restaurantName: safeText(value?.restaurantName, 160),
+    location,
+    foodCategory: safeText(value?.foodCategory, 120),
+    foodPreference: safeText(value?.foodPreference, 160),
+    situation: safeText(value?.situation, 160),
+    mealTime: safeText(value?.mealTime, 80),
+    parking: typeof value?.parking === "boolean" ? value.parking : null,
+    distancePreference: safeText(value?.distancePreference, 120),
+    pricePreference: safeText(value?.pricePreference, 120),
+    openingStatus: ["active", "any", "unknown"].includes(value?.openingStatus) ? value.openingStatus : "unknown",
+    partySize: safeText(value?.partySize, 80),
+    otherConditions: Array.isArray(value?.otherConditions)
+      ? value.otherConditions.map(item => safeText(item, 120)).filter(Boolean).slice(0, 8)
+      : [],
+    referencesPreviousResults: value?.referencesPreviousResults === true,
+    needsRestaurantSearch: isSearchIntent || (allowsOptionalLookup && value?.needsRestaurantSearch === true),
+    needsLocation: isSearchIntent && !location,
+  };
+}
+
+async function analyzeConversationIntent(env, messages, currentLocationName, recentRestaurants) {
+  const fallback = fallbackConversationAnalysis(messages, currentLocationName, recentRestaurants.length > 0);
+  if (env.INTENT_ANALYZER_DISABLED === "true") return fallback;
+  const recentSummary = recentRestaurants.slice(0, 3).map((restaurant, index) => ({
+    position: index + 1,
+    id: restaurant.id,
+    name: restaurant.name,
+    address: restaurant.address,
+  }));
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: {
+        "authorization": `Bearer ${env.OPENAI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: env.OPENAI_INTENT_MODEL || env.OPENAI_MODEL || "gpt-5-mini",
+        instructions: `너는 Inchelin Guide AI의 대화 의도 분석기야. 사용자의 마지막 문장을 exact match나 단순 키워드 하나로 분류하지 말고, 전체 문장 의미와 이전 대화, 직전 추천 결과를 함께 해석해.
+
+intent는 다음 중 하나야.
+- menu_recommendation: 실제 식당이 아니라 먹을 메뉴 아이디어를 묻는 질문
+- restaurant_recommendation: 실제 맛집·식당·카페 탐색이나 추천 요청
+- menu_consultation: 오늘 무엇을 먹을지 함께 고민하는 상담형 대화
+- service_explanation: 추천 기준, 데이터, 서비스 동작 원리를 묻는 질문
+- recommendation_followup: 직전 추천 결과의 이유나 순서를 묻는 질문
+- condition_change: 직전 검색 조건을 추가·제외·변경해 재추천을 요구
+- restaurant_comparison: 이미 제시된 식당들을 비교하는 질문
+- restaurant_info: 특정 식당의 주차·영업시간 등 사실을 묻는 질문
+- food_conversation: 인사, 배고픔, 음식에 관한 가벼운 대화
+- other: 그 밖의 질문
+
+메뉴명 속 글자를 상황 단어로 오인하지 마. 예를 들어 음식명인 '회'와 모임인 '회식'은 문장 의미로 구분해. '추천 기준이 뭐야'는 restaurant_recommendation이 아니라 service_explanation이고, '왜 두 번째를 추천했어'는 recommendation_followup이야. '강남역에서 한식집 찾아줘'는 restaurant_recommendation이야. 이미 추천된 결과에 '더 가까운 데', '매운 건 빼줘', '주차되는 곳만'이라고 하면 condition_change야.
+
+이전 조건은 유지하되 마지막 사용자 발화가 바꾸거나 제외한 조건만 갱신해. restaurantName, location, foodCategory, foodPreference, situation, mealTime, parking, distancePreference, pricePreference, openingStatus, partySize, otherConditions에 현재 유효한 조건을 누적해. 실제 식당 검색이 필요한 경우에만 needsRestaurantSearch=true로 설정해. 메뉴 아이디어·서비스 설명·현재 추천 이유 설명에는 false야. 실제 식당 검색에 지역이 꼭 부족할 때만 needsLocation=true로 설정해.
+
+<runtime_context>${JSON.stringify({ currentLocationName: currentLocationName || null, recentRestaurants: recentSummary })}</runtime_context>`,
+        input: messages,
+        reasoning: { effort: "minimal" },
+        text: {
+          verbosity: "low",
+          format: {
+            type: "json_schema",
+            name: "inchelin_intent_analysis",
+            strict: true,
+            schema: {
+              type: "object",
+              properties: {
+                intent: { type: "string", enum: [...CONVERSATION_INTENTS] },
+                requestedAction: { type: "string", enum: ["recommendation_reason", "fact_lookup", "compare", "none"] },
+                restaurantName: { type: "string" },
+                location: { type: "string" },
+                foodCategory: { type: "string" },
+                foodPreference: { type: "string" },
+                situation: { type: "string" },
+                mealTime: { type: "string" },
+                parking: { type: ["boolean", "null"] },
+                distancePreference: { type: "string" },
+                pricePreference: { type: "string" },
+                openingStatus: { type: "string", enum: ["active", "any", "unknown"] },
+                partySize: { type: "string" },
+                otherConditions: { type: "array", items: { type: "string" }, maxItems: 8 },
+                referencesPreviousResults: { type: "boolean" },
+                needsRestaurantSearch: { type: "boolean" },
+                needsLocation: { type: "boolean" },
+              },
+              required: ["intent", "requestedAction", "restaurantName", "location", "foodCategory", "foodPreference", "situation", "mealTime", "parking", "distancePreference", "pricePreference", "openingStatus", "partySize", "otherConditions", "referencesPreviousResults", "needsRestaurantSearch", "needsLocation"],
+              additionalProperties: false,
+            },
+          },
+        },
+        max_output_tokens: 650,
+        store: false,
+      }),
+    });
+    if (!response.ok) throw new Error(`intent_analysis_${response.status}`);
+    return sanitizeConversationAnalysis(JSON.parse(extractOutputText(await response.json())), fallback);
+  } catch (error) {
+    console.error("Intent analysis failed", error instanceof Error ? error.message : "unknown error");
+    return fallback;
+  }
+}
+
 function safeUrl(value) {
   try {
     const url = new URL(String(value || ""));
@@ -632,7 +801,21 @@ function mostSpecificSearchLocation(value) {
     || parts.at(-1);
 }
 
-function extractRestaurantSearchIntent(messages) {
+function extractRestaurantSearchIntent(messages, intentAnalysis = null) {
+  const semanticTerms = intentAnalysis && typeof intentAnalysis === "object"
+    ? [
+      intentAnalysis.restaurantName,
+      intentAnalysis.foodCategory,
+      intentAnalysis.foodPreference,
+      intentAnalysis.situation,
+      intentAnalysis.pricePreference,
+      intentAnalysis.distancePreference,
+      ...(Array.isArray(intentAnalysis.otherConditions) ? intentAnalysis.otherConditions : []),
+    ]
+      .map(item => safeText(item, 80))
+      .filter(Boolean)
+    : [];
+  if (semanticTerms.length) return [...new Set(semanticTerms)].join(" ");
   const userTexts = messages
     .filter(message => message.role === "user")
     .slice(-8)
@@ -657,10 +840,10 @@ function extractRestaurantSearchIntent(messages) {
   return [...new Set([primary, modifier].filter(Boolean))].join(" ") || "맛집";
 }
 
-function buildRestaurantSearchQuery(messages, locationName = "") {
-  const explicitLocation = explicitLocationFromMessages(messages);
+function buildRestaurantSearchQuery(messages, locationName = "", intentAnalysis = null) {
+  const explicitLocation = safeText(intentAnalysis?.location, 120) || explicitLocationFromMessages(messages);
   const verifiedLocation = mostSpecificSearchLocation(explicitLocation || locationName);
-  const intent = extractRestaurantSearchIntent(messages);
+  const intent = extractRestaurantSearchIntent(messages, intentAnalysis);
   return safeText(`${verifiedLocation} ${intent}`.replace(/\s+/g, " ").trim(), 200);
 }
 
@@ -872,11 +1055,11 @@ class NaverRestaurantProvider {
     this.source = "naver";
   }
 
-  async searchRestaurants({ messages, locationName }) {
+  async searchRestaurants({ messages, locationName, intentAnalysis }) {
     const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/local");
     const clientId = safeText(this.env.NAVER_API_HUB_CLIENT_ID, 300);
     const clientSecret = safeText(this.env.NAVER_API_HUB_CLIENT_SECRET, 300);
-    const query = buildRestaurantSearchQuery(messages, locationName);
+    const query = buildRestaurantSearchQuery(messages, locationName, intentAnalysis);
     if (!endpoint || !clientId || !clientSecret) {
       providerDebugLog(this.env, "search_skipped", {
         provider: this.source,
@@ -930,8 +1113,8 @@ class InchelinRestaurantProvider {
     this.source = "inchelin";
   }
 
-  async searchRestaurants({ query, messages }) {
-    return searchInchelinDatabase(this.env, query, messages);
+  async searchRestaurants({ query, messages, intentAnalysis }) {
+    return searchInchelinDatabase(this.env, query, messages, intentAnalysis);
   }
 
   async getRestaurantDetail(place) {
@@ -992,14 +1175,15 @@ function sanitizeRegisteredPlace(place) {
   };
 }
 
-async function searchInchelinDatabase(env, query, messages) {
+async function searchInchelinDatabase(env, query, messages, intentAnalysis = null) {
   const baseUrl = trustedEndpoint(env.INCHELIN_DB_API_URL);
   if (!baseUrl) return { configured: false, places: [], ambiguous: false };
   const conversation = messages.filter(message => message.role === "user").slice(-6).map(message => safeText(message.content, 500));
   const data = await postJsonWithTimeout(`${baseUrl}/v1/places/search`, env.INCHELIN_DB_API_TOKEN, {
     query: safeText(query, 1000),
     conversation,
-    mode: asksForVenueSearch(query) ? "recommend_or_lookup" : "lookup",
+    conditions: intentAnalysis ? sanitizeDataValue(intentAnalysis) : null,
+    mode: intentAnalysis?.needsRestaurantSearch || asksForVenueSearch(query) ? "recommend_or_lookup" : "lookup",
     scope: "inchelin_registered_only",
     match_fields: ["name", "address", "branch"],
     limit: 6,
@@ -1329,38 +1513,65 @@ async function handleChat(request, env) {
   }
   const provider = createRestaurantProvider(env);
   const dataSource = provider.source;
-  if (SERVICE_EXPLANATION_PATTERN.test(latestUserMessage)) return json(serviceExplanationResponse(dataSource));
-  if (RECOMMENDATION_REASON_PATTERN.test(latestUserMessage)) {
+  const intentAnalysis = await analyzeConversationIntent(env, messages, currentLocationName, recentRestaurants);
+  const semanticRouting = env.INTENT_ANALYZER_DISABLED !== "true";
+  if (!semanticRouting && SERVICE_EXPLANATION_PATTERN.test(latestUserMessage)) {
+    return json(serviceExplanationResponse(dataSource));
+  }
+  if ((semanticRouting && intentAnalysis.requestedAction === "recommendation_reason")
+    || (!semanticRouting && RECOMMENDATION_REASON_PATTERN.test(latestUserMessage))) {
     return json(recommendationReasonResponse(latestUserMessage, recentRestaurants));
   }
   const requestedField = findUnavailableDatabaseField(latestUserMessage);
   const referencedRestaurant = requestedField ? referencedRecentRestaurant(latestUserMessage, recentRestaurants) : null;
   if (referencedRestaurant) return json(recentRestaurantFactResponse(referencedRestaurant, requestedField, dataSource));
-  const signals = conversationSignals(messages, currentLocationName, hasRestaurantResults);
-  const explicitRestaurantRecommendation = asksForVenueSearch(latestUserMessage);
-  const directVenueIntent = /(?:식당|카페|레스토랑|매장).{0,12}(?:어때|알려줘|정보)|(?:어때|알려줘|정보).{0,12}(?:식당|카페|레스토랑|매장)/.test(latestUserMessage)
-    || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage));
+  const baseSignals = conversationSignals(messages, currentLocationName, hasRestaurantResults);
+  const semanticLocation = safeText(intentAnalysis.location, 120);
+  const signals = {
+    ...baseSignals,
+    locationName: semanticLocation || baseSignals.locationName,
+    hasLocation: Boolean(semanticLocation || baseSignals.locationName),
+  };
+  const explicitRestaurantRecommendation = semanticRouting
+    ? intentAnalysis.intent === "restaurant_recommendation" || intentAnalysis.intent === "condition_change"
+    : asksForVenueSearch(latestUserMessage);
+  const directVenueIntent = semanticRouting
+    ? ["restaurant_info", "restaurant_comparison", "recommendation_followup"].includes(intentAnalysis.intent)
+    : /(?:식당|카페|레스토랑|매장).{0,12}(?:어때|알려줘|정보)|(?:어때|알려줘|정보).{0,12}(?:식당|카페|레스토랑|매장)/.test(latestUserMessage)
+      || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage));
   if (!directVenueIntent && !signals.hasLocation && explicitRestaurantRecommendation) return json(locationNeededResponse(messages));
-  if (!directVenueIntent && signals.hasLocation && !signals.hasMealIntent) return json(mealDirectionNeededResponse(signals.locationName));
+  if (!directVenueIntent && signals.hasLocation && !signals.hasMealIntent
+    && (!semanticRouting || intentAnalysis.intent === "restaurant_recommendation")) {
+    return json(mealDirectionNeededResponse(signals.locationName));
+  }
   if (!directVenueIntent && signals.latestIsLocationOnly && !signals.hadMealIntent && !signals.hasRestaurantResults) {
     return json(mealDirectionNeededResponse(signals.locationName));
   }
-  const venueIntent = asksForVenueSearch(latestUserMessage) || Boolean(requestedField)
-    || Boolean(currentLocationName && CURRENT_LOCATION_PATTERN.test(latestUserMessage));
+  const venueIntent = semanticRouting
+    ? ["restaurant_recommendation", "condition_change", "restaurant_info"].includes(intentAnalysis.intent)
+    : asksForVenueSearch(latestUserMessage) || Boolean(requestedField)
+      || Boolean(currentLocationName && CURRENT_LOCATION_PATTERN.test(latestUserMessage));
   let groundedPlaces = [];
-  const searchNow = directVenueIntent || (
-    signals.hasLocation && signals.hasMealIntent && (
-      shouldSearchRestaurants(latestUserMessage, messages, requestedField)
-      || signals.latestHasLocation
-      || Boolean(currentLocationName && CURRENT_LOCATION_PATTERN.test(latestUserMessage))
-      || (signals.hasRestaurantResults && RESULT_REFINEMENT_PATTERN.test(latestUserMessage))
-    )
-  );
+  const searchNow = semanticRouting
+    ? intentAnalysis.needsRestaurantSearch && (signals.hasLocation || intentAnalysis.intent === "restaurant_info")
+    : directVenueIntent || (
+      signals.hasLocation && signals.hasMealIntent && (
+        shouldSearchRestaurants(latestUserMessage, messages, requestedField)
+        || signals.latestHasLocation
+        || Boolean(currentLocationName && CURRENT_LOCATION_PATTERN.test(latestUserMessage))
+        || (signals.hasRestaurantResults && RESULT_REFINEMENT_PATTERN.test(latestUserMessage))
+      )
+    );
 
   if (searchNow) {
     let lookup;
     try {
-      lookup = await provider.searchRestaurants({ query: latestUserMessage, messages, locationName: signals.locationName });
+      lookup = await provider.searchRestaurants({
+        query: latestUserMessage,
+        messages,
+        locationName: signals.locationName,
+        intentAnalysis,
+      });
     } catch (error) {
       console.error("Restaurant provider request failed", dataSource, error instanceof Error ? error.message : "unknown error");
       const reason = error instanceof RestaurantProviderError ? error.code : "api_request_failed";
@@ -1389,8 +1600,10 @@ async function handleChat(request, env) {
         { messages, locationName: signals.locationName, currentLocation }
       );
 
-      const wantsParkingOnly = /주차.{0,8}(?:가능|되는|할\s*수).{0,8}(?:곳|데|식당)?\s*만?/.test(latestUserMessage);
-      const wantsActiveOnly = /(?:지금|현재)?.{0,5}영업.{0,8}(?:중|하는|곳|데|식당)?\s*만?/.test(latestUserMessage);
+      const wantsParkingOnly = intentAnalysis.parking === true
+        || /주차.{0,8}(?:가능|되는|할\s*수).{0,8}(?:곳|데|식당)?\s*만?/.test(latestUserMessage);
+      const wantsActiveOnly = intentAnalysis.openingStatus === "active"
+        || /(?:지금|현재)?.{0,5}영업.{0,8}(?:중|하는|곳|데|식당)?\s*만?/.test(latestUserMessage);
       if (wantsParkingOnly) groundedPlaces = groundedPlaces.filter(place => factValue(place, "parking") === true || place.registered_data?.parking === true);
       if (wantsActiveOnly) groundedPlaces = groundedPlaces.filter(place => place.business_status === "active");
 
@@ -1432,7 +1645,7 @@ async function handleChat(request, env) {
     },
     body: JSON.stringify({
       model: env.OPENAI_MODEL || "gpt-5-mini",
-      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
+      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
       input: messages,
       reasoning: { effort: "minimal" },
       text: {
