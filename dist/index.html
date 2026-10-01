@@ -838,7 +838,7 @@
       const railMenu = $('#railBottomMenu');
       const sidebarAccount = $('#sidebarAccountArea');
       if (!authState.isAuthenticated) {
-        railMenu.innerHTML = '<button class="icon-btn rail-auth-button" type="button" data-auth-menu="login" aria-label="로그인 또는 회원가입" title="로그인 / 회원가입"><img class="rail-auth-icon" src="assets/login-icon.png" alt=""></button>';
+        railMenu.innerHTML = '<button class="icon-btn rail-auth-button" type="button" data-auth-menu="login" aria-label="로그인 또는 회원가입" title="로그인 / 회원가입"><img class="rail-auth-icon" src="assets/login-icon-thin.png" alt=""></button>';
         sidebarAccount.innerHTML = '로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.<button class="sidebar-login" type="button" data-auth-menu="login">로그인 · 회원가입</button>';
       } else {
         railMenu.innerHTML = '<button class="icon-btn" type="button" data-auth-menu="plan" aria-label="요금플랜" title="요금플랜"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="5" width="16" height="14" rx="2" stroke-width="1.7"/><path d="M4 9h16M8 14h4" stroke-width="1.7" stroke-linecap="round"/></svg></button><button class="icon-btn" type="button" data-auth-menu="profile" aria-label="계정 또는 프로필" title="계정 / 프로필"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="3.5" stroke-width="1.7"/><path d="M5 20a7 7 0 0 1 14 0" stroke-width="1.7" stroke-linecap="round"/></svg></button>';
