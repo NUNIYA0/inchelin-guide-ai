@@ -2,4 +2,6 @@
 .env.*
 !.env.example
 /build/
+/dist/server/
+/dist/.openai/
 

@@ -4,7 +4,9 @@ import { fileURLToPath } from "node:url";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = resolve(root, "build");
+const hostingOutputRoot = resolve(root, "dist");
 if (!outputRoot.startsWith(`${root}${sep}`)) throw new Error("Invalid build directory");
+if (!hostingOutputRoot.startsWith(`${root}${sep}`)) throw new Error("Invalid hosting build directory");
 
 const mimeTypes = {
   ".png": "image/png",
@@ -24,8 +26,12 @@ async function walk(directory) {
 }
 
 await rm(outputRoot, { recursive: true, force: true });
+await rm(join(hostingOutputRoot, "server"), { recursive: true, force: true });
+await rm(join(hostingOutputRoot, ".openai"), { recursive: true, force: true });
 await mkdir(join(outputRoot, "dist", "server"), { recursive: true });
 await mkdir(join(outputRoot, ".openai"), { recursive: true });
+await mkdir(join(hostingOutputRoot, "server"), { recursive: true });
+await mkdir(join(hostingOutputRoot, ".openai"), { recursive: true });
 
 const html = await readFile(join(root, "dist", "index.html"), "utf8");
 const assetsRoot = join(root, "dist", "assets");
@@ -43,6 +49,11 @@ const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
   .replace("__ASSETS__", JSON.stringify(assets));
 
-await writeFile(join(outputRoot, "dist", "server", "index.js"), worker);
-await writeFile(join(outputRoot, ".openai", "hosting.json"), await readFile(join(root, ".openai", "hosting.json")));
+const hostingManifest = await readFile(join(root, ".openai", "hosting.json"));
+await Promise.all([
+  writeFile(join(outputRoot, "dist", "server", "index.js"), worker),
+  writeFile(join(outputRoot, ".openai", "hosting.json"), hostingManifest),
+  writeFile(join(hostingOutputRoot, "server", "index.js"), worker),
+  writeFile(join(hostingOutputRoot, ".openai", "hosting.json"), hostingManifest),
+]);
 console.log(`Built Worker with ${Object.keys(assets).length} embedded assets.`);
