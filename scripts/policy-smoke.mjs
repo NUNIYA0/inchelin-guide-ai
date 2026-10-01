@@ -185,8 +185,19 @@ const baseEnv = {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "inchelin" },
     expectedStatus: 200,
   });
-  assert.match(result.body.message, /어느 지역/);
-  assert.deepEqual(result.body.suggestions, ["현재 위치 근처", "지역 직접 입력"]);
+  assert.match(result.body.message, /지금 계신 곳 근처/);
+  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기", "지역 정하기"]);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "든든하게",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /든든한 한 끼가 당기시는군요/);
+  assert.match(result.body.message, /국밥이나 찌개/);
+  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기", "지역 정하기"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -341,8 +352,9 @@ const baseEnv = {
     message: "강남",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.match(result.body.message, /오늘 뭐 드시고 싶으세요/);
-  assert.deepEqual(result.body.suggestions, ["한식", "중식", "일식", "양식", "가볍게", "직접 입력"]);
+  assert.match(result.body.message, /강남에서 찾고 계시는군요/);
+  assert.match(result.body.message, /어떤 음식이 생각나세요/);
+  assert.deepEqual(result.body.suggestions, []);
   assert.equal(result.calls.length, 0);
 }
 

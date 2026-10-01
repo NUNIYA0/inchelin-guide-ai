@@ -7,6 +7,8 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 가장 중요한 원칙은 "답변 우선"이야. 사용자가 메뉴나 식사를 물으면 현재 알고 있는 정보만으로도 도움을 먼저 제공해. 정보가 완벽하게 모일 때까지 답변을 미루거나 조건부터 요구하지 마. 선택 가능한 메뉴나 방향이 여러 개라면 본문에 길게 나열하지 말고 suggestions에 분리해.
 
+사용자가 선택하거나 새 조건을 말하면 다음 답변의 첫 문장에서 그 내용을 자연스럽게 받아줘. "좋아요", "알겠습니다"만 단독으로 말하지 말고, "든든한 한 끼가 당기시는군요"처럼 직전 선택의 의미를 짧게 연결한 다음 도움이나 다음 질문으로 이어가. 이전 선택에 따라 문구를 동적으로 바꾸고, 모든 단계마다 버튼을 반복하지 마. 자연어 입력을 기본으로 두되 위치 확인처럼 빠른 행동이 도움이 되는 단계에만 1~2개의 suggestions를 사용해.
+
 추가 정보가 정말 필요할 때만 답변 마지막에 자연스러운 질문 하나를 덧붙여. 한 응답에 질문은 최대 하나만 사용하고, 질문 없이 충분히 답할 수 있으면 묻지 않아도 돼. "하나 골라줘", "골라보세요", "선택해줘", "조건을 알려줘", "지역·메뉴·예산을 입력해줘"처럼 설문이나 폼을 작성시키는 명령형 표현은 사용하지 마. 여러 선택 항목을 한꺼번에 나열해 답을 요구하지 말고, "어떤 쪽이 더 좋으세요?", "따뜻한 메뉴가 좋으세요?", "밥과 면 중에서는 어떤 게 좋으세요?", "어느 동네에서 찾고 계세요?"처럼 실제 사람이 이어 말하듯 물어봐.
 
 사용자의 말이 짧거나 불완전하거나 반말이어도 이전 대화 전체를 참고해 자연스럽게 이해해. 메뉴, 지역, 동행자, 식사 시간 같은 새 조건은 이전 조건과 합쳐서 기억해. "국물", "부모님이랑", "다른 거 없어?", "그중 두 번째" 같은 말은 독립 검색어가 아니라 바로 앞 대화의 연속으로 해석해. 사용자가 새 조건을 말하면 그 조건을 자연스럽게 반영해 추천을 갱신하고, 이미 답한 질문을 반복하지 마.
@@ -15,7 +17,7 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 사용자가 가볍게 말하면 답변도 가볍고 친근하게 해. "안녕", "배고파", "뭐 먹지" 같은 말에는 1~2문장의 자연스러운 대화로 답해. 보고서, 업무 분석, 체크리스트, 메뉴판, 검색 필터 같은 딱딱한 형식은 사용하지 마. "추천 4가지", "선택지는 다음과 같아요", "상황을 모르면" 같은 안내 문구로 시작하지 마. 한국어 중심의 편안한 대화체로 답하고, 사용자의 말투와 흐름에 맞춰. 기본 톤에서는 "당겨요?", "땡겨요?" 같은 과도한 구어체를 사용하지 말고 "오늘 뭐 드시고 싶으세요?", "어떤 쪽이 더 좋으세요?"를 우선해. 고유명사가 아닌데 중국어나 일본어 문자를 섞지 마.
 
-답변은 눈으로 빠르게 읽을 수 있게 짧게 작성해. suggestions가 있으면 message는 반드시 1~2개의 짧은 문장만 사용해. 첫 문장은 상황을 자연스럽게 이어 주고, 질문은 빈 줄을 넣어 별도 문단으로 마지막에 배치해. 한 문장 안에 여러 선택지를 쉼표, 슬래시, 대시로 연결하거나 메뉴명을 반복해서 나열하지 마. 선택 가능한 내용은 message에 쓰지 말고 suggestions에만 넣어.
+답변은 눈으로 빠르게 읽을 수 있게 짧게 작성해. suggestions가 있으면 message는 짧은 맥락 연결 1문장, 실질적인 도움 1문장, 필요한 경우 마지막 질문 1문장 정도로 제한해. 질문은 빈 줄을 넣어 별도 문단으로 마지막에 배치해. 한 문장 안에 여러 선택지를 쉼표, 슬래시, 대시로 연결하거나 메뉴명을 반복해서 나열하지 마. 선택 가능한 내용은 message에 쓰지 말고 suggestions에만 넣어.
 
 suggestions는 2~4개의 짧은 단어나 짧은 구로 작성해. "가볍게", "든든하게", "매콤하게", "다른 메뉴"처럼 버튼만 보고도 이해할 수 있게 하고, 긴 문장이나 질문형 문구는 사용하지 마. 필요하면 마지막에 "다른 메뉴", "다른 맛집", "다른 느낌" 중 하나를 넣어 빠져나갈 수 있게 해. suggestions는 보조 수단이며 사용자는 언제든 직접 입력할 수 있어. 단순 인사처럼 선택지가 도움이 되지 않는 답변에는 suggestions를 비워.
 
@@ -96,7 +98,8 @@ function normalizeQuickReplies(value) {
   const replies = [...new Set(value.map(item => typeof item === "string" ? normalizeQuickReplyLabel(item) : "").filter(Boolean))].slice(0, 6);
   if (!replies.length) return [];
   const hasEscape = replies.some(item => /(다른|또 다른|별로|안 끌|직접\s*입력)/.test(item));
-  if (!hasEscape) {
+  const isLocationActionSet = replies.every(item => /(내\s*주변|현재\s*위치|지역|직접\s*입력)/.test(item));
+  if (!hasEscape && !isLocationActionSet) {
     if (replies.length >= 6) replies[5] = "다른 메뉴";
     else replies.push("다른 메뉴");
   }
@@ -115,10 +118,10 @@ function compactMessageForQuickReplies(value, replies) {
     .map(unit => unit.trim())
     .filter(Boolean)
     .filter(unit => !optionTerms.some(term => unit.includes(term)));
-  if (!units.length) return "좋아요. 취향에 맞는 방향으로 좁혀볼게요.\n\n어떤 쪽이 더 좋으세요?";
+  if (!units.length) return "말씀해주신 취향을 반영해 볼게요.\n\n어떤 쪽이 더 좋으세요?";
   const question = [...units].reverse().find(unit => /[?？]$/.test(unit));
-  const intro = units.find(unit => unit !== question);
-  if (intro && question) return `${intro}\n\n${question}`;
+  const intros = units.filter(unit => unit !== question).slice(0, 2);
+  if (intros.length && question) return [...intros, question].join("\n\n");
   return units.slice(0, 2).join("\n\n");
 }
 
@@ -204,18 +207,30 @@ function conversationSignals(messages, currentLocationName, hasRestaurantResults
   };
 }
 
-function locationNeededResponse() {
+function locationContextMessage(messages) {
+  const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  const food = latest.match(FOOD_SEARCH_PATTERN)?.[0];
+  if (/든든/.test(latest)) return "든든한 한 끼가 당기시는군요.\n\n국밥이나 찌개처럼 묵직한 메뉴부터 찾아볼 수 있어요.";
+  if (/가볍/.test(latest)) return "부담 없이 가볍게 드시고 싶으시군요.\n\n간단한 식사로 찾아볼게요.";
+  if (/매운|매콤/.test(latest)) return "매콤한 음식이 생각나시는군요.\n\n입맛을 살려줄 메뉴가 있는 곳으로 찾아볼게요.";
+  if (/부모님|가족/.test(latest)) return "부모님이나 가족과 함께할 식사를 찾고 계시는군요.\n\n함께 편하게 식사할 수 있는 곳부터 살펴볼게요.";
+  if (/데이트/.test(latest)) return "데이트하면서 함께 먹을 곳을 찾고 계시는군요.\n\n말씀하신 상황에 맞는 식당부터 살펴볼게요.";
+  if (food) return `${food} 메뉴를 찾고 계시는군요.\n\n말씀하신 메뉴를 기준으로 찾아볼게요.`;
+  return "원하시는 한 끼의 방향을 확인했어요.\n\n말씀해주신 내용을 기준으로 찾아볼게요.";
+}
+
+function locationNeededResponse(messages = []) {
   return chatResponse(
-    "좋아요. 어느 지역에서 찾고 계세요?",
-    ["현재 위치 근처", "지역 직접 입력"]
+    `${locationContextMessage(messages)}\n\n지금 계신 곳 근처로 볼까요, 아니면 원하는 지역이 있으세요?`,
+    ["내 주변에서 찾기", "지역 정하기"]
   );
 }
 
 function mealDirectionNeededResponse(locationName) {
   const shortLocation = safeText(locationName, 80);
   return chatResponse(
-    `${shortLocation}에서 찾아볼게요.\n\n오늘 뭐 드시고 싶으세요?`,
-    ["한식", "중식", "일식", "양식", "가볍게", "직접 입력"]
+    `${shortLocation}에서 찾고 계시는군요.\n\n오늘은 어떤 음식이 생각나세요?`,
+    []
   );
 }
 
@@ -1124,7 +1139,7 @@ async function handleChat(request, env) {
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
-  if (LOCATION_CHANGE_PATTERN.test(latestUserMessage.trim())) return json(locationNeededResponse());
+  if (LOCATION_CHANGE_PATTERN.test(latestUserMessage.trim())) return json(locationNeededResponse(messages));
   if (CURRENT_LOCATION_PATTERN.test(latestUserMessage) && !currentLocationName
     && !locationMatches(latestUserMessage.replace(CURRENT_LOCATION_PATTERN, "")).length) {
     return json(needsBrowserLocationResponse());
@@ -1133,7 +1148,7 @@ async function handleChat(request, env) {
   const signals = conversationSignals(messages, currentLocationName, hasRestaurantResults);
   const directVenueIntent = /(?:식당|카페|레스토랑|매장).{0,12}(?:어때|알려줘|정보)|(?:어때|알려줘|정보).{0,12}(?:식당|카페|레스토랑|매장)/.test(latestUserMessage)
     || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage));
-  if (!directVenueIntent && signals.hasMealIntent && !signals.hasLocation) return json(locationNeededResponse());
+  if (!directVenueIntent && signals.hasMealIntent && !signals.hasLocation) return json(locationNeededResponse(messages));
   if (!directVenueIntent && signals.hasLocation && !signals.hasMealIntent) return json(mealDirectionNeededResponse(signals.locationName));
   if (!directVenueIntent && signals.latestIsLocationOnly && !signals.hadMealIntent && !signals.hasRestaurantResults) {
     return json(mealDirectionNeededResponse(signals.locationName));
