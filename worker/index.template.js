@@ -1472,6 +1472,7 @@ function restaurantCard(place, source, userText = "") {
     firstPresent(factValue(place, "naver_place_id"), registered.naverPlaceId, registered.naver_place_id)
   );
   return {
+    validationVersion: 2,
     id: place.id,
     name: restaurantName,
     restaurantName,

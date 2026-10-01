@@ -425,6 +425,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(naverCall.headers.get("X-NCP-APIGW-API-KEY-ID"), "naver-id");
   assert.equal(naverCall.headers.get("X-NCP-APIGW-API-KEY"), "naver-secret");
   assert.equal(result.body.restaurants[0].dataSource, "naver");
+  assert.equal(result.body.restaurants[0].validationVersion, 2);
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
   assert.ok(["김민준", "이서연", "박도윤"].includes(result.body.restaurants[0].recommendedBy));
   assert.equal(result.body.restaurants[0].imageUrl, "https://images.example/pyongyang-thumb.jpg");

@@ -963,10 +963,14 @@
       if (!restaurant) return null;
       const dataSource = restaurant.dataSource === 'inchelin' ? 'inchelin' : restaurant.dataSource === 'naver' ? 'naver' : '';
       if (!dataSource || (dataSource === 'inchelin' && restaurant.isRegisteredInInchelin !== true)) return null;
+      if (dataSource === 'naver' && Number(restaurant.validationVersion || 0) < 2) return null;
       const id = String(restaurant.id || '').trim();
       const name = String(restaurant.name || '').trim();
       const address = String(restaurant.address || '').trim();
-      if (!id || !name || !address) return null;
+      const categoryValue = String(restaurant.category || '').trim();
+      if (!id || !name || !address || (dataSource === 'naver' && !categoryValue)) return null;
+      if (/[<>�\r\n\t]|https?:\/\//i.test(name) || name.length > 80) return null;
+      if (/애견|반려동물|동물카페|당구|스포츠|오락|게임|노래방|미용|헤어|네일|병원|의원|약국|학원|교육|편의점|마트|부동산/.test(categoryValue)) return null;
       const naverPlace = normalizeNaverPlaceDetails(
         restaurant.naverPlaceUrl || restaurant.naverLink,
         restaurant.naverPlaceId
@@ -975,7 +979,8 @@
         id,
         name,
         restaurantName: String(restaurant.restaurantName || name).trim(),
-        category: String(restaurant.category || '').trim(),
+        validationVersion: Number(restaurant.validationVersion || 0),
+        category: categoryValue,
         address,
         roadAddress: String(restaurant.roadAddress || '').trim(),
         phone: String(restaurant.phone || restaurant.telephone || '').trim(),
@@ -1028,6 +1033,7 @@
       const item = normalizeRestaurant(restaurant);
       if (!item) return null;
       return {
+        validationVersion: item.validationVersion,
         id: item.id,
         name: item.name,
         restaurantName: item.restaurantName,
