@@ -266,18 +266,18 @@
     .message-copy { display: flex; flex-direction: column; gap: 7px; white-space: normal; }
     .message-copy p { margin: 0; font-weight: 400; }
     .message-copy strong { color: #202020; font-weight: 600; }
-    .restaurant-list { margin: 16px 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 16px; }
+    .restaurant-list { width: 100%; max-width: 100%; margin: 16px 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 12px; }
     .restaurant-card { min-width: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
-    .restaurant-media { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center; background: #f1f1f1; }
+    .restaurant-media { position: relative; width: 100%; height: clamp(130px, 35vw, 150px); aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center; background: #f1f1f1; }
     .restaurant-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; background: #f3f3f3; }
     .restaurant-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: #8a8a8a; font-size: 12px; }
     .restaurant-placeholder img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: left center; opacity: .72; }
-    .restaurant-card-body { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 16px; }
+    .restaurant-card-body { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 12px; }
     .restaurant-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .restaurant-card h3 { margin: 0; color: #202020; font-size: 15px; font-weight: 600; line-height: 1.4; }
-    .restaurant-recommender { margin: 6px 0 0; color: #777; font-size: 11px; line-height: 1.45; }
+    .restaurant-card h3 { margin: 0; color: #202020; font-size: 14px; font-weight: 600; line-height: 1.4; }
+    .restaurant-recommender { margin: 6px 0 0; color: #777; font-size: 12px; line-height: 1.45; }
     .restaurant-category { margin: 7px 0 0; color: #555; font-size: 12px; font-weight: 500; line-height: 1.45; }
-    .restaurant-reason { margin: 8px 0 0; color: #333; font-size: 13px; line-height: 1.55; }
+    .restaurant-reason { margin: 8px 0 0; color: #333; font-size: 13px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .restaurant-badges { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
     .restaurant-badge { padding: 4px 8px; border-radius: 999px; background: #f2f2f2; color: #666; font-size: 11px; line-height: 1.3; }
     .restaurant-badge.active { background: #eef7f0; color: #27723b; }
@@ -556,7 +556,7 @@
       .ai-avatar { width: 32px; height: 32px; margin: 0; }
       .ai-bubble { padding: 0; border-radius: 0; }
       .restaurant-list { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 12px; }
-      .restaurant-card-body { padding: 16px; }
+      .restaurant-card-body { padding: 12px; }
       .chat-composer { position: sticky; z-index: 2; bottom: 0; margin: 0; min-height: 88px; border-radius: 22px; background: #fff; }
       .disclaimer { flex: 0 0 auto; background: #fff; padding: 7px 0 max(8px, env(safe-area-inset-bottom)); }
     }
@@ -569,6 +569,18 @@
       .auth-dialog.plan-mode { width: min(420px, 100%); }
       .plan-grid { grid-template-columns: 1fr; }
       .plan-card { min-height: 0; }
+    }
+    @media (min-width: 768px) {
+      .restaurant-list { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 14px; }
+      .restaurant-media { height: clamp(140px, 18vw, 160px); }
+      .restaurant-card-body { padding: 14px; }
+      .restaurant-card h3 { font-size: clamp(14px, 1.4vw, 15px); }
+    }
+    @media (min-width: 1200px) {
+      .restaurant-list { max-width: 720px; gap: 16px; }
+      .restaurant-media { height: clamp(150px, 13vw, 170px); }
+      .restaurant-card-body { padding: 16px; }
+      .restaurant-card h3 { font-size: 15px; }
     }
     @media (max-width: 360px) {
       .mobile-start { display: none; }
