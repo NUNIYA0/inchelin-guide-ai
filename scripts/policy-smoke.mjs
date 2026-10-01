@@ -9,7 +9,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, aiResponse, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, aiResponse, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -18,6 +18,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
     if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(naverResponse, { status: naverStatus });
+    if (href.includes("openapi.naver.com/v1/search/image")) return Response.json(imageResponse || { items: [] });
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
       const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
@@ -192,11 +193,14 @@ const baseEnv = {
 {
   const result = await runCase({
     message: "강남에서 물냉면 맛집 찾아줘",
+    context: { currentLocation: { latitude: 37.5, longitude: 127.001 } },
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
       NAVER_API_HUB_CLIENT_ID: "naver-id",
       NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+      NAVER_IMAGE_SEARCH_CLIENT_ID: "image-id",
+      NAVER_IMAGE_SEARCH_CLIENT_SECRET: "image-secret",
     },
     naverResponse: {
       items: [{
@@ -209,6 +213,13 @@ const baseEnv = {
         mapy: "375000000",
       }],
     },
+    imageResponse: {
+      items: [{
+        title: "평양면옥 강남점 서울특별시 강남구 테헤란로",
+        link: "https://images.example/pyongyang.jpg",
+        thumbnail: "https://images.example/pyongyang-thumb.jpg",
+      }],
+    },
   });
   const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
   assert.ok(naverCall);
@@ -216,10 +227,13 @@ const baseEnv = {
   assert.equal(naverCall.headers.get("X-NCP-APIGW-API-KEY"), "naver-secret");
   assert.equal(result.body.restaurants[0].dataSource, "naver");
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
-  assert.equal(result.body.restaurants[0].recommender, "");
+  assert.ok(["김민준", "이서연", "박도윤"].includes(result.body.restaurants[0].recommendedBy));
+  assert.equal(result.body.restaurants[0].imageUrl, "https://images.example/pyongyang-thumb.jpg");
   assert.equal(result.body.restaurants[0].category, "한식>냉면");
   assert.equal(result.body.restaurants[0].longitude, 127);
   assert.equal(result.body.restaurants[0].latitude, 37.5);
+  assert.ok(result.body.restaurants[0].distanceMeters > 0);
+  assert.match(result.body.restaurants[0].recommendationReason, /거리에서 찾은/);
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
 }
 
