@@ -444,8 +444,8 @@ const baseEnv = {
     message: "강남",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.match(result.body.message, /강남에서 찾고 계시는군요/);
-  assert.match(result.body.message, /어떤 음식이 생각나세요/);
+  assert.match(result.body.message, /\*\*강남\*\*에서 찾고 계시는군요/);
+  assert.match(result.body.message, /\*\*오늘은 어떤 음식이 생각나세요\?\*\*/);
   assert.deepEqual(result.body.suggestions, []);
   assert.equal(result.calls.length, 0);
 }

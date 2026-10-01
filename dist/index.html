@@ -260,13 +260,14 @@
     }
     .messages { min-height: 100%; padding: 22px 6px 28px; }
     .message { max-width: 74%; margin: 0 0 24px; font-size: 14px; letter-spacing: -.01em; white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word; }
-    .message.user { width: fit-content; margin-left: auto; border-radius: 20px 20px 5px 20px; background: #f1f1f1; padding: 12px 16px; font-size: 14px; font-weight: 500; line-height: 1.58; }
+    .message.user { width: fit-content; margin-left: auto; border-radius: 20px 20px 5px 20px; background: #f1f1f1; padding: 12px 16px; font-size: 14px; font-weight: 400; line-height: 1.58; }
     .message.ai { width: 100%; max-width: 100%; margin-bottom: 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: #303030; font-size: 14px; font-weight: 400; line-height: 1.6; }
     .ai-avatar { width: 36px; height: 36px; margin: 0; display: block; border-radius: 50%; object-fit: cover; object-position: left center; flex: 0 0 auto; }
     .ai-bubble { width: 100%; min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; box-shadow: none; }
     .message-copy { display: flex; flex-direction: column; gap: 7px; white-space: normal; }
     .message-copy p { margin: 0; font-weight: 400; }
     .message-copy strong { color: #202020; font-weight: 600; }
+    .message.user .message-copy strong { color: inherit; font-weight: 400; }
     .restaurant-list { width: 100%; max-width: 100%; margin: 16px 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 12px; }
     .restaurant-card { min-width: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
     .restaurant-media { position: relative; width: 100%; height: clamp(130px, 35vw, 150px); aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center; background: #f1f1f1; }
@@ -1598,24 +1599,24 @@
     }
     function locationFallbackMessage(reason = 'unknown') {
       if (reason === 'insecure') {
-        return '현재 페이지에서는 위치 기능을 사용할 수 없어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
+        return '현재 페이지에서는 **위치 기능을 사용할 수 없어요.**\n\n**어느 지역에서 찾고 계세요?** 지역명을 편하게 입력해 주세요.';
       }
       if (reason === 'unsupported') {
-        return '이 브라우저에서는 현재 위치를 불러올 수 없어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
+        return '이 브라우저에서는 **현재 위치를 불러올 수 없어요.**\n\n**어느 지역에서 찾고 계세요?** 지역명을 편하게 입력해 주세요.';
       }
       if (reason === 'denied') {
-        return '브라우저의 위치 권한이 꺼져 있어 현재 위치를 확인하지 못했어요.\n\n주소창의 위치 권한을 허용한 뒤 ‘내 주변에서 찾기’를 다시 눌러주세요. 지역명을 직접 입력해도 괜찮아요.';
+        return '브라우저의 **위치 권한이 꺼져 있어** 현재 위치를 확인하지 못했어요.\n\n주소창의 위치 권한을 허용한 뒤 **내 주변에서 찾기**를 다시 눌러주세요. **지역명을 직접 입력**해도 괜찮아요.';
       }
       if (reason === 'timeout') {
-        return '현재 위치를 두 번 확인했지만 응답이 늦어 시간 초과됐어요.\n\nPC나 휴대폰의 위치 서비스와 브라우저 위치 권한을 확인한 뒤 다시 시도하거나, 지역명을 직접 입력해 주세요.';
+        return '현재 위치를 두 번 확인했지만 **응답이 늦어 시간 초과됐어요.**\n\nPC나 휴대폰의 위치 서비스와 브라우저 위치 권한을 확인한 뒤 **내 주변에서 찾기**를 다시 누르거나, **지역명을 직접 입력**해 주세요.';
       }
       if (reason === 'unavailable') {
-        return '기기에서 현재 위치 정보를 가져오지 못했어요.\n\nPC나 휴대폰의 위치 서비스가 켜져 있는지 확인한 뒤 다시 시도하거나, 지역명을 직접 입력해 주세요.';
+        return '기기에서 **현재 위치 정보를 가져오지 못했어요.**\n\nPC나 휴대폰의 위치 서비스가 켜져 있는지 확인한 뒤 **내 주변에서 찾기**를 다시 누르거나, **지역명을 직접 입력**해 주세요.';
       }
       if (reason === 'reverse-geocode') {
-        return '현재 좌표는 확인했지만 지역명으로 변환하지 못했어요.\n\n잠시 후 다시 시도하거나 찾고 싶은 지역명을 직접 입력해 주세요.';
+        return '현재 좌표는 확인했지만 **지역명으로 변환하지 못했어요.**\n\n잠시 후 **내 주변에서 찾기**를 다시 누르거나, 찾고 싶은 **지역명을 직접 입력**해 주세요.';
       }
-      return '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
+      return '**현재 위치를 확인하지 못했어요.**\n\n**어느 지역에서 찾고 계세요?** 지역명을 편하게 입력해 주세요.';
     }
     function appendLocationFallback(reason) {
       const retryable = ['denied', 'timeout', 'unavailable', 'reverse-geocode'].includes(reason);
