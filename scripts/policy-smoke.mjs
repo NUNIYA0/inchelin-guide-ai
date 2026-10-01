@@ -14,10 +14,10 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
     const href = String(url);
-    calls.push({ href, body: options.body ? JSON.parse(options.body) : null });
+    calls.push({ href, headers: new Headers(options.headers), body: options.body ? JSON.parse(options.body) : null });
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
-    if (href.includes("openapi.naver.com")) return Response.json(naverResponse, { status: naverStatus });
+    if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(naverResponse, { status: naverStatus });
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
       const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
@@ -195,8 +195,8 @@ const baseEnv = {
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
-      NAVER_CLIENT_ID: "naver-id",
-      NAVER_CLIENT_SECRET: "naver-secret",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
     },
     naverResponse: {
       items: [{
@@ -210,8 +210,10 @@ const baseEnv = {
       }],
     },
   });
-  const naverCall = result.calls.find(call => call.href.includes("openapi.naver.com"));
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
   assert.ok(naverCall);
+  assert.equal(naverCall.headers.get("X-NCP-APIGW-API-KEY-ID"), "naver-id");
+  assert.equal(naverCall.headers.get("X-NCP-APIGW-API-KEY"), "naver-secret");
   assert.equal(result.body.restaurants[0].dataSource, "naver");
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
   assert.equal(result.body.restaurants[0].recommender, "");
@@ -237,8 +239,8 @@ const baseEnv = {
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
-      NAVER_CLIENT_ID: "wrong-id",
-      NAVER_CLIENT_SECRET: "wrong-secret",
+      NAVER_API_HUB_CLIENT_ID: "wrong-id",
+      NAVER_API_HUB_CLIENT_SECRET: "wrong-secret",
     },
     naverResponse: { errorMessage: "Authentication failed" },
     naverStatus: 401,
@@ -253,8 +255,8 @@ const baseEnv = {
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
-      NAVER_CLIENT_ID: "naver-id",
-      NAVER_CLIENT_SECRET: "naver-secret",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
     },
     naverResponse: { errorMessage: "Temporary upstream error" },
     naverStatus: 500,
@@ -269,8 +271,8 @@ const baseEnv = {
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
-      NAVER_CLIENT_ID: "naver-id",
-      NAVER_CLIENT_SECRET: "naver-secret",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
     },
     naverResponse: { items: [] },
   });
@@ -289,8 +291,8 @@ const baseEnv = {
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
-      NAVER_CLIENT_ID: "naver-id",
-      NAVER_CLIENT_SECRET: "naver-secret",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
     },
     naverResponse: {
       items: [{
@@ -304,7 +306,7 @@ const baseEnv = {
       }],
     },
   });
-  const naverCall = result.calls.find(call => call.href.includes("openapi.naver.com"));
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
   assert.ok(naverCall);
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "역삼동 든든한 식사");
   assert.equal(result.body.restaurants[0].name, "역삼식당");
@@ -340,8 +342,8 @@ const baseEnv = {
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
-      NAVER_CLIENT_ID: "naver-id",
-      NAVER_CLIENT_SECRET: "naver-secret",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
     },
     naverResponse: {
       items: [{
@@ -375,7 +377,7 @@ const baseEnv = {
   assert.ok(openaiCall);
   assert.match(openaiCall.body.instructions, /"position":2/);
   assert.match(openaiCall.body.instructions, /두번째식당/);
-  assert.equal(result.calls.filter(call => call.href.includes("openapi.naver.com")).length, 0);
+  assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
 }
 
 {

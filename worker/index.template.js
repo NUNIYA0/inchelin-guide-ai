@@ -664,9 +664,9 @@ class NaverRestaurantProvider {
   }
 
   async searchRestaurants({ messages, locationName }) {
-    const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://openapi.naver.com/v1/search/local.json");
-    const clientId = safeText(this.env.NAVER_CLIENT_ID, 300);
-    const clientSecret = safeText(this.env.NAVER_CLIENT_SECRET, 300);
+    const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/local");
+    const clientId = safeText(this.env.NAVER_API_HUB_CLIENT_ID, 300);
+    const clientSecret = safeText(this.env.NAVER_API_HUB_CLIENT_SECRET, 300);
     const query = buildRestaurantSearchQuery(messages, locationName);
     if (!endpoint || !clientId || !clientSecret) {
       providerDebugLog(this.env, "search_skipped", {
@@ -685,8 +685,8 @@ class NaverRestaurantProvider {
     providerDebugLog(this.env, "search_started", { provider: this.source, query });
     try {
       const data = await getJsonWithTimeout(url.toString(), {
-        "X-Naver-Client-Id": clientId,
-        "X-Naver-Client-Secret": clientSecret,
+        "X-NCP-APIGW-API-KEY-ID": clientId,
+        "X-NCP-APIGW-API-KEY": clientSecret,
       });
       const places = (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean).slice(0, 5);
       providerDebugLog(this.env, "search_completed", {

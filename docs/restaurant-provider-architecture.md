@@ -29,9 +29,9 @@ getRestaurantDetail(place)
 필요한 런타임 값:
 
 - `RESTAURANT_DATA_SOURCE=naver`
-- `NAVER_CLIENT_ID`
-- `NAVER_CLIENT_SECRET`
-- `NAVER_LOCAL_SEARCH_API_URL` — 선택값. 기본값은 기존 지역 검색 API URL이며 API HUB 이관 시 새 엔드포인트로 교체한다.
+- `NAVER_API_HUB_CLIENT_ID`
+- `NAVER_API_HUB_CLIENT_SECRET`
+- `NAVER_LOCAL_SEARCH_API_URL` — 선택값. 기본값은 NAVER API HUB 지역 검색 엔드포인트다.
 - `PROVIDER_DEBUG_LOGS=true` — 개발 환경에서 데이터 소스, provider, 검색 query, API 상태, 결과 수, 오류 원인을 서버 로그에 기록한다. 인증정보는 기록하지 않는다.
 
 자연어 대화에서 최근 지역과 음식 카테고리/메뉴를 분리해 `지역 + 음식 의도` 형태의 검색어를 만든다. 예를 들어 `강남에서 한식 먹고 싶어`는 `강남 한식`, 현재 위치가 `서울특별시 강남구 역삼동`이고 사용자가 국밥을 원하면 `역삼동 국밥`으로 요청한다.
