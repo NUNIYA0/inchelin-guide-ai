@@ -922,7 +922,13 @@
       const recentRestaurants = (latestRestaurantMessage?.restaurants || []).slice(0, 3).map(restaurant => ({
         id: restaurant.id,
         name: restaurant.name,
-        address: restaurant.address
+        address: restaurant.address,
+        category: restaurant.category,
+        businessStatus: restaurant.businessStatus,
+        openingHours: restaurant.openingHours,
+        parking: restaurant.parking,
+        distanceMeters: restaurant.distanceMeters,
+        representativeMenus: restaurant.representativeMenus
       }));
       return {
         conversationId: currentId,

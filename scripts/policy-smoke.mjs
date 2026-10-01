@@ -386,6 +386,30 @@ const baseEnv = {
 }
 
 {
+  const result = await runCase({
+    message: "강남에서 오늘 점심 든든한 거 먹고 싶어",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "강남점심식당",
+        roadAddress: "서울특별시 강남구 강남대로 2",
+        link: "https://map.naver.com/p/entry/place/222",
+        mapx: "127222",
+        mapy: "37222",
+      }],
+    },
+  });
+  assert.equal(result.body.restaurants[0].name, "강남점심식당");
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 든든한 식사");
+}
+
+{
   const recentRestaurants = [
     { id: "naver:이전식당:127100:37100", name: "이전식당", address: "서울 강남구 1" },
     { id: "naver:두번째식당:127200:37200", name: "두번째식당", address: "서울 강남구 2" },
@@ -408,6 +432,27 @@ const baseEnv = {
 
 {
   const result = await runCase({
+    message: "두 번째 괜찮은데 주차돼?",
+    history: [
+      { role: "user", content: "강남역 근처 한식 추천해줘" },
+      { role: "assistant", content: "강남역 근처에서 한식 맛집을 찾아봤어요." },
+    ],
+    context: {
+      hasRestaurantResults: true,
+      recentRestaurants: [
+        { id: "one", name: "첫번째식당", address: "서울 강남구 1", parking: null },
+        { id: "two", name: "두번째식당", address: "서울 강남구 2", parking: true },
+      ],
+    },
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /두번째식당/);
+  assert.match(result.body.message, /주차가 가능/);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
     message: "안녕",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     aiResponse: {
@@ -418,6 +463,9 @@ const baseEnv = {
   });
   assert.equal(result.body.message, "점심 메뉴 같이 골라볼까요?");
   assert.deepEqual(result.body.suggestions, ["가볍게", "든든하게", "매콤하게", "다른 메뉴"]);
+  const openaiCall = result.calls.find(call => call.href.includes("api.openai.com"));
+  assert.match(openaiCall.body.instructions, /고정된 질문 순서/);
+  assert.match(openaiCall.body.instructions, /추가 질문 없이 즉시 검색 결과/);
 }
 
 console.log("Inchelin data policy smoke tests passed.");
