@@ -9,6 +9,10 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 가장 중요한 원칙은 "답변 우선"이야. 사용자가 메뉴나 식사를 물으면 현재 알고 있는 정보만으로도 도움을 먼저 제공해. 정보가 완벽하게 모일 때까지 답변을 미루거나 조건부터 요구하지 마. 선택 가능한 메뉴나 방향이 여러 개라면 본문에 길게 나열하지 말고 suggestions에 분리해.
 
+매 요청마다 먼저 질문의 성격을 판단해. 메뉴 추천, 실제 맛집 추천, 메뉴 고민이나 상담, 서비스 설명, 이전 추천 결과에 대한 추가 질문, 조건 변경, 식당 비교, 특정 식당 정보, 일상적인 음식 대화를 서로 다르게 처리해. 메뉴나 음식 방향을 묻는 질문에는 위치를 요구하지 말고 구체적인 메뉴 후보와 짧은 이유를 먼저 답해. 실제 맛집·식당·카페를 찾아달라는 의도가 있을 때만 식당 검색으로 전환하고, 그때 지역이 없으면 유용한 맥락을 먼저 말한 뒤 지역 질문 하나만 덧붙여.
+
+"지금 가볍게 먹기 좋은 메뉴 있을까?", "가볍게 먹을 메뉴 추천해줘", "따뜻한 거 뭐가 좋을까?", "점심 메뉴 추천해줘" 같은 질문에는 바로 메뉴를 추천해. "오늘 뭐 먹지?"처럼 넓은 질문에도 먼저 몇 가지 현실적인 메뉴 방향을 제시하고 마지막에 취향을 좁히는 질문 하나만 해. 이런 질문에 "메뉴 추천과 맛집 추천 중 선택해 주세요"처럼 기능이나 모드를 고르게 하지 마. 반대로 "강남역 근처 맛집 추천해줘"처럼 실제 식당과 지역 의도가 명확하면 추가 선택 없이 바로 검색해.
+
 모든 응답은 가능한 범위의 유용한 답, 추천, 설명을 먼저 제공한 뒤에 대화를 이어가. 필요한 정보가 있을 때만 답변의 마지막에 질문 하나를 덧붙여. 질문만 있는 응답을 연속으로 보내거나, 사용자의 답을 받은 직후 또 다른 조건 질문만 던지지 마. 사용자가 방금 말한 내용을 반영한 실질적인 도움을 반드시 먼저 제공하고, 이미 추천할 수 있을 만큼 정보가 있으면 추가 질문 없이 바로 추천해.
 
 사용자가 선택하거나 새 조건을 말하면 다음 답변의 첫 문장에서 그 내용을 자연스럽게 받아줘. "좋아요", "알겠습니다"만 단독으로 말하지 말고, "든든한 한 끼가 당기시는군요"처럼 직전 선택의 의미를 짧게 연결한 다음 도움이나 다음 질문으로 이어가. 이전 선택에 따라 문구를 동적으로 바꾸고, 모든 단계마다 버튼을 반복하지 마. 자연어 입력을 기본으로 두되 위치 확인처럼 빠른 행동이 도움이 되는 단계에만 1~2개의 suggestions를 사용해.
@@ -165,9 +169,6 @@ function asksForVenueSearch(text) {
 
 const SERVICE_EXPLANATION_PATTERN = /(?:맛집\s*)?추천.{0,12}(?:기준|방식|원리|어떻게\s*(?:정|하|골라)|데이터)|어떤\s*데이터.{0,12}추천|추천은?.{0,8}어떻게\s*(?:정|하|골라)/;
 const RECOMMENDATION_REASON_PATTERN = /(?:왜|어째서).{0,18}(?:추천|골랐)|추천(?:한|했|된)?.{0,12}(?:이유|근거)|(?:이유|근거).{0,12}추천/;
-const MENU_RECOMMENDATION_CHOICE_PATTERN = /^메뉴\s*추천$/;
-const RESTAURANT_RECOMMENDATION_CHOICE_PATTERN = /^맛집\s*추천$/;
-const EXPLICIT_MENU_IDEA_PATTERN = /(?:먹을|먹기\s*좋은)\s*메뉴.{0,8}(?:뭐가|무엇이)\s*(?:좋|괜찮)|메뉴\s*(?:아이디어|골라줘)/;
 
 function serviceExplanationResponse(source) {
   const sourceLine = source === "inchelin"
@@ -250,10 +251,7 @@ function conversationSignals(messages, currentLocationName, hasRestaurantResults
 
 function locationContextMessage(messages) {
   const userMessages = messages.filter(message => message.role === "user").map(message => message.content);
-  const latest = userMessages.at(-1) || "";
-  const relevant = MENU_RECOMMENDATION_CHOICE_PATTERN.test(latest) || RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(latest)
-    ? userMessages.at(-2) || latest
-    : latest;
+  const relevant = userMessages.at(-1) || "";
   const food = relevant.match(FOOD_SEARCH_PATTERN)?.[0];
   if (/든든/.test(relevant)) return "**든든한 한 끼**가 당기시는군요.\n\n국밥이나 찌개처럼 묵직한 메뉴부터 찾아볼 수 있어요.";
   if (/가볍/.test(relevant)) return "부담 없이 **가볍게** 드시고 싶으시군요.\n\n간단한 식사로 찾아볼게요.";
@@ -264,23 +262,6 @@ function locationContextMessage(messages) {
   if (/데이트/.test(relevant)) return "**데이트하면서 함께 먹을 곳**을 찾고 계시는군요.\n\n말씀하신 상황에 맞는 식당부터 살펴볼게요.";
   if (food) return `**${food} 메뉴**를 찾고 계시는군요.\n\n말씀하신 메뉴를 기준으로 찾아볼게요.`;
   return "원하시는 **한 끼의 방향**을 확인했어요.\n\n말씀해주신 내용을 기준으로 찾아볼게요.";
-}
-
-function recommendationMode(messages) {
-  const selection = [...userMessagesOnly(messages)].reverse().find(message =>
-    MENU_RECOMMENDATION_CHOICE_PATTERN.test(message) || RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(message)
-  );
-  if (MENU_RECOMMENDATION_CHOICE_PATTERN.test(selection || "")) return "menu";
-  if (RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(selection || "")) return "restaurant";
-  return "";
-}
-
-function recommendationIntentNeededResponse(messages = []) {
-  const acknowledgement = locationContextMessage(messages).split(/\n{2,}/)[0];
-  return chatResponse(
-    `${acknowledgement}\n\n**메뉴 아이디어**를 먼저 추천해드릴까요? 아니면 바로 **실제 맛집**을 찾아드릴까요?`,
-    ["메뉴 추천", "맛집 추천"]
-  );
 }
 
 function locationNeededResponse(messages = []) {
@@ -1356,21 +1337,10 @@ async function handleChat(request, env) {
   const referencedRestaurant = requestedField ? referencedRecentRestaurant(latestUserMessage, recentRestaurants) : null;
   if (referencedRestaurant) return json(recentRestaurantFactResponse(referencedRestaurant, requestedField, dataSource));
   const signals = conversationSignals(messages, currentLocationName, hasRestaurantResults);
-  const activeRecommendationMode = recommendationMode(messages);
-  const currentMenuIdeaIntent = EXPLICIT_MENU_IDEA_PATTERN.test(latestUserMessage)
-    || MENU_RECOMMENDATION_CHOICE_PATTERN.test(latestUserMessage);
-  const currentRestaurantIntent = RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(latestUserMessage)
-    || asksForVenueSearch(latestUserMessage);
-  const explicitMenuIdea = currentMenuIdeaIntent
-    || (activeRecommendationMode === "menu" && !currentRestaurantIntent);
-  const explicitRestaurantRecommendation = currentRestaurantIntent
-    || (activeRecommendationMode === "restaurant" && !currentMenuIdeaIntent);
+  const explicitRestaurantRecommendation = asksForVenueSearch(latestUserMessage);
   const directVenueIntent = /(?:식당|카페|레스토랑|매장).{0,12}(?:어때|알려줘|정보)|(?:어때|알려줘|정보).{0,12}(?:식당|카페|레스토랑|매장)/.test(latestUserMessage)
     || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage));
   if (!directVenueIntent && !signals.hasLocation && explicitRestaurantRecommendation) return json(locationNeededResponse(messages));
-  if (!directVenueIntent && signals.hasMealIntent && !signals.hasLocation && !explicitMenuIdea) {
-    return json(recommendationIntentNeededResponse(messages));
-  }
   if (!directVenueIntent && signals.hasLocation && !signals.hasMealIntent) return json(mealDirectionNeededResponse(signals.locationName));
   if (!directVenueIntent && signals.latestIsLocationOnly && !signals.hadMealIntent && !signals.hasRestaurantResults) {
     return json(mealDirectionNeededResponse(signals.locationName));

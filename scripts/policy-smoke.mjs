@@ -284,20 +284,22 @@ const baseEnv = {
   const result = await runCase({
     message: "든든하게",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: { message: "한 끼 제대로 먹고 싶다면 **국밥**이나 **찌개**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.match(result.body.message, /든든한 한 끼/);
-  assert.match(result.body.message, /메뉴 아이디어/);
-  assert.deepEqual(result.body.suggestions, ["메뉴 추천", "맛집 추천"]);
-  assert.equal(result.calls.length, 0);
+  assert.match(result.body.message, /국밥/);
+  assert.deepEqual(result.body.suggestions, []);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
 }
 
 {
   const result = await runCase({
     message: "점심 메뉴 추천해줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: { message: "점심이라면 **제육덮밥**, **메밀소바**, **순두부찌개**가 좋아요.", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.deepEqual(result.body.suggestions, ["메뉴 추천", "맛집 추천"]);
-  assert.equal(result.calls.length, 0);
+  assert.match(result.body.message, /제육덮밥/);
+  assert.deepEqual(result.body.suggestions, []);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
 }
 
 {
@@ -307,6 +309,28 @@ const baseEnv = {
     aiResponse: { message: "가볍게 먹기엔 **메밀소바**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
   });
   assert.match(result.body.message, /메밀소바/);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+}
+
+{
+  const result = await runCase({
+    message: "지금 가볍게 먹기 좋은 메뉴 있을까?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: { message: "가볍게 먹기엔 **샌드위치**나 **메밀소바**가 괜찮아요.\n\n오늘은 따뜻한 쪽이 좋아요?", suggestions: [], selectedRestaurantIds: [] },
+  });
+  assert.match(result.body.message, /샌드위치/);
+  assert.doesNotMatch(result.body.message, /어느 지역/);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+}
+
+{
+  const result = await runCase({
+    message: "오늘 뭐 먹지?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: { message: "오늘은 **김치찌개**, **쌀국수**, **덮밥**처럼 방향이 다른 메뉴부터 떠올려볼 수 있어요.\n\n따뜻한 음식이 더 끌려요?", suggestions: [], selectedRestaurantIds: [] },
+  });
+  assert.match(result.body.message, /김치찌개/);
+  assert.doesNotMatch(result.body.message, /메뉴 추천.*맛집 추천/);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
 }
 
