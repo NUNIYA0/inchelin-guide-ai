@@ -254,8 +254,8 @@ function locationContextMessage(messages) {
 
 function locationNeededResponse(messages = []) {
   return chatResponse(
-    `${locationContextMessage(messages)}\n\n지금 계신 곳 근처로 볼까요, 아니면 원하는 지역이 있으세요?`,
-    ["내 주변에서 찾기", "지역 정하기"]
+    `${locationContextMessage(messages)}\n\n어느 지역에서 찾을까요? 지역명을 편하게 입력해 주세요.`,
+    ["내 주변에서 찾기"]
   );
 }
 
@@ -277,8 +277,8 @@ function shouldSearchRestaurants(text, messages, requestedField) {
 
 function needsBrowserLocationResponse() {
   return chatResponse(
-    "현재 위치는 제가 임의로 추정하지 않아요.\n\n아래 버튼을 누르면 브라우저에서 위치 권한을 요청할게요. 직접 지역을 입력해도 좋아요.",
-    ["현재 위치 근처", "직접 입력"]
+    "현재 위치는 제가 임의로 추정하지 않아요.\n\n위치 기능을 사용할 수 있으면 아래 버튼으로 확인할 수 있어요. 아니면 찾고 싶은 지역명을 편하게 입력해 주세요.",
+    ["내 주변에서 찾기"]
   );
 }
 

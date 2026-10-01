@@ -275,8 +275,8 @@ const baseEnv = {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "inchelin" },
     expectedStatus: 200,
   });
-  assert.match(result.body.message, /지금 계신 곳 근처/);
-  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기", "지역 정하기"]);
+  assert.match(result.body.message, /어느 지역에서 찾을까요/);
+  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -287,7 +287,7 @@ const baseEnv = {
   });
   assert.match(result.body.message, /든든한 한 끼가 당기시는군요/);
   assert.match(result.body.message, /국밥이나 찌개/);
-  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기", "지역 정하기"]);
+  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -435,7 +435,7 @@ const baseEnv = {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.match(result.body.message, /임의로 추정하지 않아요/);
-  assert.ok(result.body.suggestions.includes("현재 위치 근처"));
+  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
   assert.equal(result.calls.length, 0);
 }
 

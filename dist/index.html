@@ -866,7 +866,7 @@
       activeSuggestionKey = nextKey;
       activeSuggestions = [
         ...TIME_SUGGESTIONS[state.period].map(text => ({ label: text, prompt: text })),
-        { label: '현재 위치 근처 맛집 찾기', prompt: '현재 위치 근처', locationAction: true }
+        ...(canUseCurrentLocation() ? [{ label: '현재 위치 근처 맛집 찾기', prompt: '내 주변에서 찾기', locationAction: true }] : [])
       ];
       const container = $('#suggestions');
       container.dataset.period = state.period;
@@ -1314,11 +1314,16 @@
         bubble.className = 'ai-bubble';
         bubble.appendChild(copy);
         if (message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
-        if (message.quickReplies?.length) {
+        const visibleQuickReplies = (message.quickReplies || []).filter(reply => {
+          if (/^(?:지역 정하기|지역 직접 입력|직접 입력)$/.test(reply)) return false;
+          if (isCurrentLocationIntent(reply) && !canUseCurrentLocation()) return false;
+          return true;
+        });
+        if (visibleQuickReplies.length) {
           const replies = document.createElement('div');
           replies.className = 'quick-replies';
           replies.setAttribute('aria-label', '빠른 답변');
-          message.quickReplies.forEach(reply => {
+          visibleQuickReplies.forEach(reply => {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'quick-reply';
@@ -1510,7 +1515,7 @@
       }
     }
     function isCurrentLocationIntent(value) {
-      return /^(?:현재\s*위치|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾아줘|추천해줘|검색해줘))?)?$/.test(String(value || '').trim());
+      return /^(?:현재\s*위치|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*에서\s*(?:찾기|찾아줘))?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾기|찾아줘|추천해줘|검색해줘))?)?$/.test(String(value || '').trim());
     }
     function showChatView() {
       if (!currentId) currentId = `chat-${Date.now()}`;
@@ -1528,13 +1533,15 @@
     function locationPermissionWasDenied() {
       try { return sessionStorage.getItem('inchelin-location-denied') === 'true'; } catch (_) { return false; }
     }
+    function canUseCurrentLocation() {
+      return Boolean(window.isSecureContext && navigator.geolocation && !locationPermissionWasDenied());
+    }
     function rememberLocationPermissionDenied() {
       try { sessionStorage.setItem('inchelin-location-denied', 'true'); } catch (_) {}
+      refreshTimeSuggestions(true);
     }
     function appendLocationFallback() {
-      appendMessage('assistant', '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요?', {
-        quickReplies: ['서울', '강남', '직접 입력']
-      });
+      appendMessage('assistant', '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.');
     }
     function geolocationPosition() {
       return new Promise((resolve, reject) => {
