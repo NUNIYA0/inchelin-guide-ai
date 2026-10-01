@@ -105,7 +105,8 @@ function normalizeQuickReplies(value) {
   if (!replies.length) return [];
   const hasEscape = replies.some(item => /(다른|또 다른|별로|안 끌|직접\s*입력)/.test(item));
   const isLocationActionSet = replies.every(item => /(내\s*주변|현재\s*위치|지역|직접\s*입력)/.test(item));
-  if (!hasEscape && !isLocationActionSet) {
+  const isRecommendationIntentSet = replies.length === 2 && replies.includes("메뉴 추천") && replies.includes("맛집 추천");
+  if (!hasEscape && !isLocationActionSet && !isRecommendationIntentSet) {
     if (replies.length >= 6) replies[5] = "다른 메뉴";
     else replies.push("다른 메뉴");
   }
@@ -164,6 +165,9 @@ function asksForVenueSearch(text) {
 
 const SERVICE_EXPLANATION_PATTERN = /(?:맛집\s*)?추천.{0,12}(?:기준|방식|원리|어떻게\s*(?:정|하|골라)|데이터)|어떤\s*데이터.{0,12}추천|추천은?.{0,8}어떻게\s*(?:정|하|골라)/;
 const RECOMMENDATION_REASON_PATTERN = /(?:왜|어째서).{0,18}(?:추천|골랐)|추천(?:한|했|된)?.{0,12}(?:이유|근거)|(?:이유|근거).{0,12}추천/;
+const MENU_RECOMMENDATION_CHOICE_PATTERN = /^메뉴\s*추천$/;
+const RESTAURANT_RECOMMENDATION_CHOICE_PATTERN = /^맛집\s*추천$/;
+const EXPLICIT_MENU_IDEA_PATTERN = /(?:먹을|먹기\s*좋은)\s*메뉴.{0,8}(?:뭐가|무엇이)\s*(?:좋|괜찮)|메뉴\s*(?:아이디어|골라줘)/;
 
 function serviceExplanationResponse(source) {
   const sourceLine = source === "inchelin"
@@ -195,7 +199,7 @@ function recommendationReasonResponse(text, restaurants) {
 const LOCATION_TOKEN_SOURCE = "서울|부산|대구|인천|광주|대전|울산|세종|제주|강남|강북|홍대|성수|잠실|판교|분당|일산|수원|용산|여의도|을지로|종로|[가-힣]{2,}(?:시|군|구|동|읍|면|역)";
 const LOCATION_FALSE_POSITIVE_PATTERN = /^(?:냉면|물냉면|비빔냉면|회냉면|라면|짜장면|우동면)$/;
 const CURRENT_LOCATION_PATTERN = /(?:현재\s*위치|내\s*(?:위치|주변))(?:\s*근처)?/;
-const MEAL_INTENT_PATTERN = /먹|식사|한\s*끼|배고|맛집|식당|카페|한식|중식|일식|양식|분식|면|밥|고기|국물|냉면|국밥|찌개|돈까스|매운|매콤|가볍|든든|부모님|가족|데이트|회식|모임|친구|동료/;
+const MEAL_INTENT_PATTERN = /먹|식사|한\s*끼|배고|메뉴|아침|점심|저녁|야식|맛집|식당|카페|한식|중식|일식|양식|분식|면|밥|고기|국물|냉면|국밥|찌개|돈까스|매운|매콤|가볍|든든|따뜻|시원|산뜻|부모님|가족|데이트|회식|모임|친구|동료/;
 const RESULT_REFINEMENT_PATTERN = /다른\s*(?:곳|데|맛집|메뉴)|비슷한\s*(?:곳|데)|별로|안\s*끌|더\s*가까|거리|국물|부모님|가족|데이트|한식|중식|일식|양식|면|밥|고기|가볍|든든|매운|매콤|빼줘|제외|조용|분위기|주차|예약|영업|휴무|저렴|비싸|가격|예산/;
 const LOCATION_CHANGE_PATTERN = /^(?:지역\s*바꾸기|다른\s*지역|지역\s*변경)$/;
 
@@ -245,15 +249,38 @@ function conversationSignals(messages, currentLocationName, hasRestaurantResults
 }
 
 function locationContextMessage(messages) {
-  const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
-  const food = latest.match(FOOD_SEARCH_PATTERN)?.[0];
-  if (/든든/.test(latest)) return "**든든한 한 끼**가 당기시는군요.\n\n국밥이나 찌개처럼 묵직한 메뉴부터 찾아볼 수 있어요.";
-  if (/가볍/.test(latest)) return "부담 없이 **가볍게** 드시고 싶으시군요.\n\n간단한 식사로 찾아볼게요.";
-  if (/매운|매콤/.test(latest)) return "**매콤한 음식**이 생각나시는군요.\n\n입맛을 살려줄 메뉴가 있는 곳으로 찾아볼게요.";
-  if (/부모님|가족/.test(latest)) return "**부모님이나 가족과 함께할 식사**를 찾고 계시는군요.\n\n함께 편하게 식사할 수 있는 곳부터 살펴볼게요.";
-  if (/데이트/.test(latest)) return "**데이트하면서 함께 먹을 곳**을 찾고 계시는군요.\n\n말씀하신 상황에 맞는 식당부터 살펴볼게요.";
+  const userMessages = messages.filter(message => message.role === "user").map(message => message.content);
+  const latest = userMessages.at(-1) || "";
+  const relevant = MENU_RECOMMENDATION_CHOICE_PATTERN.test(latest) || RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(latest)
+    ? userMessages.at(-2) || latest
+    : latest;
+  const food = relevant.match(FOOD_SEARCH_PATTERN)?.[0];
+  if (/든든/.test(relevant)) return "**든든한 한 끼**가 당기시는군요.\n\n국밥이나 찌개처럼 묵직한 메뉴부터 찾아볼 수 있어요.";
+  if (/가볍/.test(relevant)) return "부담 없이 **가볍게** 드시고 싶으시군요.\n\n간단한 식사로 찾아볼게요.";
+  if (/따뜻/.test(relevant)) return "오늘은 **따뜻한 음식**이 생각나시는군요.\n\n속을 편안하게 채울 메뉴부터 살펴볼게요.";
+  if (/시원/.test(relevant)) return "오늘은 **시원한 음식**이 생각나시는군요.\n\n가볍게 즐길 수 있는 메뉴부터 살펴볼게요.";
+  if (/매운|매콤/.test(relevant)) return "**매콤한 음식**이 생각나시는군요.\n\n입맛을 살려줄 메뉴가 있는 곳으로 찾아볼게요.";
+  if (/부모님|가족/.test(relevant)) return "**부모님이나 가족과 함께할 식사**를 찾고 계시는군요.\n\n함께 편하게 식사할 수 있는 곳부터 살펴볼게요.";
+  if (/데이트/.test(relevant)) return "**데이트하면서 함께 먹을 곳**을 찾고 계시는군요.\n\n말씀하신 상황에 맞는 식당부터 살펴볼게요.";
   if (food) return `**${food} 메뉴**를 찾고 계시는군요.\n\n말씀하신 메뉴를 기준으로 찾아볼게요.`;
   return "원하시는 **한 끼의 방향**을 확인했어요.\n\n말씀해주신 내용을 기준으로 찾아볼게요.";
+}
+
+function recommendationMode(messages) {
+  const selection = [...userMessagesOnly(messages)].reverse().find(message =>
+    MENU_RECOMMENDATION_CHOICE_PATTERN.test(message) || RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(message)
+  );
+  if (MENU_RECOMMENDATION_CHOICE_PATTERN.test(selection || "")) return "menu";
+  if (RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(selection || "")) return "restaurant";
+  return "";
+}
+
+function recommendationIntentNeededResponse(messages = []) {
+  const acknowledgement = locationContextMessage(messages).split(/\n{2,}/)[0];
+  return chatResponse(
+    `${acknowledgement}\n\n**메뉴 아이디어**를 먼저 추천해드릴까요? 아니면 바로 **실제 맛집**을 찾아드릴까요?`,
+    ["메뉴 추천", "맛집 추천"]
+  );
 }
 
 function locationNeededResponse(messages = []) {
@@ -1329,9 +1356,21 @@ async function handleChat(request, env) {
   const referencedRestaurant = requestedField ? referencedRecentRestaurant(latestUserMessage, recentRestaurants) : null;
   if (referencedRestaurant) return json(recentRestaurantFactResponse(referencedRestaurant, requestedField, dataSource));
   const signals = conversationSignals(messages, currentLocationName, hasRestaurantResults);
+  const activeRecommendationMode = recommendationMode(messages);
+  const currentMenuIdeaIntent = EXPLICIT_MENU_IDEA_PATTERN.test(latestUserMessage)
+    || MENU_RECOMMENDATION_CHOICE_PATTERN.test(latestUserMessage);
+  const currentRestaurantIntent = RESTAURANT_RECOMMENDATION_CHOICE_PATTERN.test(latestUserMessage)
+    || asksForVenueSearch(latestUserMessage);
+  const explicitMenuIdea = currentMenuIdeaIntent
+    || (activeRecommendationMode === "menu" && !currentRestaurantIntent);
+  const explicitRestaurantRecommendation = currentRestaurantIntent
+    || (activeRecommendationMode === "restaurant" && !currentMenuIdeaIntent);
   const directVenueIntent = /(?:식당|카페|레스토랑|매장).{0,12}(?:어때|알려줘|정보)|(?:어때|알려줘|정보).{0,12}(?:식당|카페|레스토랑|매장)/.test(latestUserMessage)
     || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage));
-  if (!directVenueIntent && signals.hasMealIntent && !signals.hasLocation) return json(locationNeededResponse(messages));
+  if (!directVenueIntent && !signals.hasLocation && explicitRestaurantRecommendation) return json(locationNeededResponse(messages));
+  if (!directVenueIntent && signals.hasMealIntent && !signals.hasLocation && !explicitMenuIdea) {
+    return json(recommendationIntentNeededResponse(messages));
+  }
   if (!directVenueIntent && signals.hasLocation && !signals.hasMealIntent) return json(mealDirectionNeededResponse(signals.locationName));
   if (!directVenueIntent && signals.latestIsLocationOnly && !signals.hadMealIntent && !signals.hasRestaurantResults) {
     return json(mealDirectionNeededResponse(signals.locationName));

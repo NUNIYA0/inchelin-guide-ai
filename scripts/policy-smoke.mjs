@@ -285,8 +285,55 @@ const baseEnv = {
     message: "든든하게",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.match(result.body.message, /든든한 한 끼가 당기시는군요/);
-  assert.match(result.body.message, /국밥이나 찌개/);
+  assert.match(result.body.message, /든든한 한 끼/);
+  assert.match(result.body.message, /메뉴 아이디어/);
+  assert.deepEqual(result.body.suggestions, ["메뉴 추천", "맛집 추천"]);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "점심 메뉴 추천해줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.deepEqual(result.body.suggestions, ["메뉴 추천", "맛집 추천"]);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "가볍게 먹을 메뉴 뭐가 좋아?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: { message: "가볍게 먹기엔 **메밀소바**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
+  });
+  assert.match(result.body.message, /메밀소바/);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+}
+
+{
+  const result = await runCase({
+    message: "메뉴 추천",
+    history: [
+      { role: "user", content: "지금 가볍게 먹기 좋은 메뉴 있을까?" },
+      { role: "assistant", content: "메뉴 아이디어를 먼저 추천해드릴까요? 아니면 실제 맛집을 찾아드릴까요?" },
+    ],
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: { message: "가볍게 먹기엔 **샐러드**나 **메밀소바**가 좋아요.", suggestions: [], selectedRestaurantIds: [] },
+  });
+  assert.match(result.body.message, /샐러드/);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+}
+
+{
+  const result = await runCase({
+    message: "맛집 추천",
+    history: [
+      { role: "user", content: "지금 가볍게 먹기 좋은 메뉴 있을까?" },
+      { role: "assistant", content: "메뉴 아이디어를 먼저 추천해드릴까요? 아니면 실제 맛집을 찾아드릴까요?" },
+    ],
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.match(result.body.message, /어느 지역에서 찾을까요/);
   assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
   assert.equal(result.calls.length, 0);
 }
