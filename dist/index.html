@@ -740,38 +740,13 @@
       placeholder: '먹고 싶은 메뉴나 분위기를 편하게 말해보세요',
       answer: '말씀하신 내용과 이전 대화를 함께 살펴보고, 현재 연결된 맛집 검색 결과에서 자연스럽게 찾아드릴게요.'
     };
-    const TIME_SUGGESTIONS = {
-      morning: [
-        '오늘 아침 뭐 드시고 싶으세요?',
-        '가볍게 먹기 좋은 메뉴 추천해줘',
-        '든든한 아침 식사 추천해줘',
-        '아침에 가기 좋은 식당 찾아줘'
-      ],
-      lunch: [
-        '오늘 점심 뭐 드시고 싶으세요?',
-        '부담 없이 먹기 좋은 메뉴 추천해줘',
-        '동료들과 가기 좋은 점심 맛집 찾아줘',
-        '빠르게 먹기 좋은 식당 추천해줘'
-      ],
-      afternoon: [
-        '지금 가볍게 먹기 좋은 메뉴 있을까?',
-        '간단하게 먹기 좋은 곳 추천해줘',
-        '커피랑 같이 먹기 좋은 디저트 추천해줘',
-        '조용하게 쉬기 좋은 곳 찾아줘'
-      ],
-      evening: [
-        '오늘 저녁 뭐 드시고 싶으세요?',
-        '분위기 좋은 저녁 맛집 추천해줘',
-        '가족이랑 가기 좋은 식당 찾아줘',
-        '든든하게 먹기 좋은 메뉴 추천해줘'
-      ],
-      lateNight: [
-        '지금 먹기 좋은 야식 추천해줘',
-        '늦게까지 하는 식당 찾아줘',
-        '가볍게 먹을 수 있는 메뉴 추천해줘',
-        '지금 먹기 좋은 메뉴 알려줘'
-      ]
-    };
+    const CORE_SUGGESTIONS = [
+      { label: '오늘 뭐 먹을지 같이 골라줘', prompt: '오늘 뭐 먹을지 같이 골라줘' },
+      { label: '강남에서 회식하기 좋은 고깃집 추천해줘', prompt: '강남에서 회식하기 좋은 고깃집 추천해줘' },
+      { label: '혼자 먹기 편한 한식집 찾아줘', prompt: '혼자 먹기 편한 한식집 찾아줘' },
+      { label: '주차 가능한 맛집으로 추천해줘', prompt: '주차 가능한 맛집으로 추천해줘' },
+      { label: '지금 내 주변에서 영업 중인 곳 찾아줘', prompt: '지금 내 주변에서 영업 중인 곳 찾아줘', locationAction: true }
+    ];
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
       ['메뉴 탐색', '먹고 싶은 메뉴를 자연스럽게 좁혀봅니다', 'guide', '메'],
@@ -908,13 +883,10 @@
     }
     function refreshTimeSuggestions(force = false) {
       const state = getLocalTimeState();
-      const nextKey = `${state.timeZone}:${state.period}`;
+      const nextKey = `core:${state.timeZone}`;
       if (!force && nextKey === activeSuggestionKey) return;
       activeSuggestionKey = nextKey;
-      activeSuggestions = [
-        ...TIME_SUGGESTIONS[state.period].map(text => ({ label: text, prompt: text })),
-        ...(canUseCurrentLocation() ? [{ label: '현재 위치 근처 맛집 찾기', prompt: '내 주변에서 찾기', locationAction: true }] : [])
-      ];
+      activeSuggestions = CORE_SUGGESTIONS.map(item => ({ ...item }));
       const container = $('#suggestions');
       container.dataset.period = state.period;
       container.dataset.timezone = state.timeZone;
@@ -1666,10 +1638,11 @@
         clearTimeout(progressTimer);
       }
     }
-    async function requestCurrentLocation() {
+    async function requestCurrentLocation(displayPrompt = '현재 위치 근처') {
       if (generating || locationRequestInFlight) return;
       showChatView();
-      appendMessage('user', '현재 위치 근처');
+      const visiblePrompt = String(displayPrompt || '').trim() || '현재 위치 근처';
+      appendMessage('user', visiblePrompt);
       if (!window.isSecureContext) {
         appendLocationFallback('insecure');
         return;
@@ -1792,7 +1765,14 @@
     });
     $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); routeQuestion($('#welcomeInput').value); });
     $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else routeQuestion($('#chatInput').value); });
-    $('#suggestions').addEventListener('click', event => { const button = event.target.closest('.suggestion'); if (!button) return; const item = activeSuggestions[Number(button.dataset.index)]; if (!item) return; routeQuestion(item.prompt); });
+    $('#suggestions').addEventListener('click', event => {
+      const button = event.target.closest('.suggestion');
+      if (!button) return;
+      const item = activeSuggestions[Number(button.dataset.index)];
+      if (!item) return;
+      if (item.locationAction) requestCurrentLocation(item.prompt);
+      else routeQuestion(item.prompt);
+    });
     $('#historyList').addEventListener('click', event => {
       const open = event.target.closest('[data-open-history]');
       const menu = event.target.closest('[data-history-menu]');
