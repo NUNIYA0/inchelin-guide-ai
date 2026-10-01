@@ -594,8 +594,8 @@
     <nav class="rail" aria-label="주 메뉴">
       <button class="brand" id="sidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><img class="brand-logo" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI" /></button>
       <div class="rail-nav">
-        <button class="icon-btn" id="aboutRail" aria-label="Inchelin Guide AI 소개" title="Inchelin Guide AI 소개"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /></button>
-        <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><img class="nav-icon" src="assets/intro-icon.png" alt="" /></button>
+        <button class="icon-btn" id="aboutRail" aria-label="Inchelin Guide AI 소개" title="Inchelin Guide AI 소개"><img class="nav-icon" src="assets/intro-icon.png" alt="" /></button>
+        <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /></button>
         <button class="icon-btn" id="guideRail" aria-label="사용 설명서" title="사용 설명서"><img class="nav-icon" src="assets/guide-icon.png" alt="" /></button>
       </div>
       <div class="rail-bottom" id="railBottomMenu" aria-label="계정 메뉴"></div>
@@ -603,8 +603,8 @@
 
     <aside class="sidebar" id="sidebar" aria-hidden="true">
       <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.6"/><path d="M15 4v16" stroke-width="1.6"/></svg></button></div>
-      <button class="new-chat" id="aboutSide"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /><span>Inchelin Guide AI 소개</span></button>
-      <button class="new-chat" id="newChatSide"><img class="nav-icon" src="assets/intro-icon.png" alt="" /><span>새 채팅</span></button>
+      <button class="new-chat" id="aboutSide"><img class="nav-icon" src="assets/intro-icon.png" alt="" /><span>Inchelin Guide AI 소개</span></button>
+      <button class="new-chat" id="newChatSide"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /><span>새 채팅</span></button>
       <button class="new-chat" id="guideSide"><img class="nav-icon" src="assets/guide-icon.png" alt="" /><span>사용 설명서</span></button>
       <div class="history-label">최근 대화</div>
       <div class="history-list" id="historyList"></div>
@@ -693,9 +693,9 @@
       <button class="auth-back" type="button" data-auth-back="profile">‹ 계정으로</button><h2>요금플랜</h2><p class="dialog-sub">사용량과 기능을 비교해 나에게 맞는 플랜을 선택하세요.</p>
       <div class="billing-toggle" id="billingToggle"><button class="active" type="button" data-billing="monthly">월간</button><button type="button" data-billing="annual">연간</button></div>
       <div class="plan-grid" id="planGrid">
-        <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div class="plan-price-row"><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-billing">결제 정보 없이 이용</p><p class="plan-copy">보험이 궁금할 때 부담 없이 시작하세요.</p><ul><li>기본 AI 사용량 제공</li><li>보험 질문과 답변 근거 확인</li><li>채팅 기록 저장</li></ul><span class="plan-card-action">Free 선택</span></button>
-        <button class="plan-card" type="button" data-plan="Pro"><span class="plan-check">✓</span><h3>Pro</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩9,900" data-annual="₩8,250">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩99,000 결제">매월 결제</p><p class="plan-copy">보험을 자주 확인한다면, 더 넉넉하게 이용하세요.</p><ul><li>Free의 모든 기능</li><li>Free보다 넉넉한 AI 사용량</li><li>찾는 상품이 없을 때 약관 요청</li></ul><span class="plan-card-action">Pro 선택</span></button>
-        <button class="plan-card" type="button" data-plan="Max"><span class="plan-check">✓</span><h3>Max</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩29,000" data-annual="₩24,167">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩290,000 결제">매월 결제</p><p class="plan-copy">여러 보험을 깊이 살펴볼 때, 가장 넉넉하게 이용하세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>찾는 상품이 없을 때 약관 요청</li></ul><span class="plan-card-action">Max 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div class="plan-price-row"><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-billing">결제 정보 없이 이용</p><p class="plan-copy">맛있는 한 끼를 부담 없이 찾아보세요.</p><ul><li>기본 AI 사용량 제공</li><li>맛집 검색과 추천</li><li>채팅 기록 저장</li></ul><span class="plan-card-action">Free 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Pro"><span class="plan-check">✓</span><h3>Pro</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩9,900" data-annual="₩8,250">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩99,000 결제">매월 결제</p><p class="plan-copy">맛집을 자주 찾는다면 더 넉넉하게 이용하세요.</p><ul><li>Free의 모든 기능</li><li>Free보다 넉넉한 AI 사용량</li><li>대화형 맛집 탐색</li></ul><span class="plan-card-action">Pro 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Max"><span class="plan-check">✓</span><h3>Max</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩29,000" data-annual="₩24,167">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩290,000 결제">매월 결제</p><p class="plan-copy">여러 지역과 메뉴를 충분히 살펴보세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>자유로운 조건 변경과 재추천</li></ul><span class="plan-card-action">Max 선택</span></button>
       </div><p class="plan-note">모든 플랜에는 사용량 한도가 있으며, 플랜에 따라 제공량이 다릅니다.</p><button class="signup-continue" id="planContinue" type="button" disabled>플랜을 선택해 주세요</button>
     </div>
     <div class="auth-view" id="verifyView" hidden>
@@ -1586,18 +1586,48 @@
       input.placeholder = '찾고 싶은 지역을 입력하세요';
       input.focus();
     }
-    function locationPermissionWasDenied() {
-      try { return sessionStorage.getItem('inchelin-location-denied') === 'true'; } catch (_) { return false; }
-    }
     function canUseCurrentLocation() {
-      return Boolean(window.isSecureContext && navigator.geolocation && !locationPermissionWasDenied());
+      return Boolean(window.isSecureContext && navigator.geolocation);
     }
     function rememberLocationPermissionDenied() {
       try { sessionStorage.setItem('inchelin-location-denied', 'true'); } catch (_) {}
       refreshTimeSuggestions(true);
     }
-    function appendLocationFallback() {
-      appendMessage('assistant', '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.');
+    function clearLocationPermissionDenied() {
+      try { sessionStorage.removeItem('inchelin-location-denied'); } catch (_) {}
+    }
+    function locationFallbackMessage(reason = 'unknown') {
+      if (reason === 'insecure') {
+        return '현재 페이지에서는 위치 기능을 사용할 수 없어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
+      }
+      if (reason === 'unsupported') {
+        return '이 브라우저에서는 현재 위치를 불러올 수 없어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
+      }
+      if (reason === 'denied') {
+        return '브라우저의 위치 권한이 꺼져 있어 현재 위치를 확인하지 못했어요.\n\n주소창의 위치 권한을 허용한 뒤 ‘내 주변에서 찾기’를 다시 눌러주세요. 지역명을 직접 입력해도 괜찮아요.';
+      }
+      if (reason === 'timeout') {
+        return '현재 위치를 확인하는 데 시간이 오래 걸렸어요.\n\n잠시 후 ‘내 주변에서 찾기’를 다시 눌러보거나 지역명을 직접 입력해 주세요.';
+      }
+      if (reason === 'unavailable') {
+        return '기기에서 현재 위치 정보를 가져오지 못했어요.\n\n위치 서비스가 켜져 있는지 확인하거나 지역명을 직접 입력해 주세요.';
+      }
+      if (reason === 'reverse-geocode') {
+        return '현재 좌표는 확인했지만 지역명으로 변환하지 못했어요.\n\n잠시 후 다시 시도하거나 찾고 싶은 지역명을 직접 입력해 주세요.';
+      }
+      return '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
+    }
+    function appendLocationFallback(reason) {
+      appendMessage('assistant', locationFallbackMessage(reason));
+    }
+    async function geolocationPermissionState() {
+      if (!navigator.permissions?.query) return '';
+      try {
+        const result = await navigator.permissions.query({ name: 'geolocation' });
+        return String(result?.state || '');
+      } catch (_) {
+        return '';
+      }
     }
     function geolocationPosition() {
       return new Promise((resolve, reject) => {
@@ -1612,8 +1642,12 @@
       if (generating || locationRequestInFlight) return;
       showChatView();
       appendMessage('user', '현재 위치 근처');
-      if (!window.isSecureContext || !navigator.geolocation || locationPermissionWasDenied()) {
-        appendLocationFallback();
+      if (!window.isSecureContext) {
+        appendLocationFallback('insecure');
+        return;
+      }
+      if (!navigator.geolocation) {
+        appendLocationFallback('unsupported');
         return;
       }
 
@@ -1624,6 +1658,14 @@
       messagesEl.appendChild(status);
       chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' });
       try {
+        const permissionState = await geolocationPermissionState();
+        if (permissionState === 'denied') {
+          rememberLocationPermissionDenied();
+          const deniedError = new Error('Geolocation permission denied.');
+          deniedError.locationReason = 'denied';
+          throw deniedError;
+        }
+        if (permissionState === 'granted' || permissionState === 'prompt') clearLocationPermissionDenied();
         const position = await geolocationPosition();
         status.querySelector('.ai-bubble > span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
         const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
@@ -1634,10 +1676,19 @@
             longitude: position.coords.longitude
           })
         });
-        if (!response.ok) throw new Error(`Reverse geocoding failed: ${response.status}`);
+        if (!response.ok) {
+          const reverseGeocodeError = new Error(`Reverse geocoding failed: ${response.status}`);
+          reverseGeocodeError.locationReason = 'reverse-geocode';
+          throw reverseGeocodeError;
+        }
         const data = await response.json();
         const locationName = String(data?.locationName || '').trim();
-        if (!locationName) throw new Error('Reverse geocoding did not return a location name.');
+        if (!locationName) {
+          const reverseGeocodeError = new Error('Reverse geocoding did not return a location name.');
+          reverseGeocodeError.locationReason = 'reverse-geocode';
+          throw reverseGeocodeError;
+        }
+        clearLocationPermissionDenied();
         currentLocationName = locationName;
         currentLocationCoords = {
           latitude: Number(position.coords.latitude),
@@ -1649,8 +1700,12 @@
         generateAnswer(lastAIRequest);
       } catch (error) {
         status.remove();
-        if (error?.code === 1) rememberLocationPermissionDenied();
-        appendLocationFallback();
+        let reason = String(error?.locationReason || '');
+        if (!reason && error?.code === 1) reason = 'denied';
+        if (!reason && error?.code === 2) reason = 'unavailable';
+        if (!reason && error?.code === 3) reason = 'timeout';
+        if (reason === 'denied') rememberLocationPermissionDenied();
+        appendLocationFallback(reason || 'unknown');
       } finally {
         locationRequestInFlight = false;
       }
