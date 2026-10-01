@@ -862,6 +862,7 @@ function naverRestaurantSearchQueries(messages, locationName = "", intentAnalysi
 }
 
 function naverWgs84Coordinate(value, type) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
   const raw = Number(value);
   if (!Number.isFinite(raw)) return null;
   const coordinate = Math.abs(raw) > 1000 ? raw / 10000000 : raw;
@@ -968,6 +969,7 @@ function sanitizeNaverPlace(item) {
   const phone = safeText(item?.telephone, 80);
   const longitude = naverWgs84Coordinate(mapX, "longitude");
   const latitude = naverWgs84Coordinate(mapY, "latitude");
+  const rawCategory = stripSearchMarkup(item?.category);
   return {
     id,
     name,
@@ -976,7 +978,8 @@ function sanitizeNaverPlace(item) {
     business_status: "unknown",
     provider: "naver",
     registered_data: {
-      category: stripSearchMarkup(item?.category) || null,
+      category: simplifiedRestaurantCategory(rawCategory) || null,
+      rawCategory: rawCategory || null,
       address: safeText(item?.address, 300) || null,
       roadAddress: safeText(item?.roadAddress, 300) || null,
       telephone: phone || null,
@@ -999,6 +1002,73 @@ function sanitizeNaverPlace(item) {
       ...(details.url ? { naver_place_url: { value: details.url, origin: "naver", checked_at: new Date().toISOString(), source_url: details.url, resolution_status: "confirmed" } } : {}),
     },
   };
+}
+
+const NON_RESTAURANT_CATEGORY_PATTERN = /애견|반려동물|동물카페|당구|스포츠|오락|게임|노래방|미용|헤어|네일|병원|의원|약국|학원|교육|편의점|마트|부동산|숙박|호텔|모텔|세탁|자동차|주유소|사진관|공방|종교|금융|은행|보험/;
+const CAFE_CATEGORY_PATTERN = /카페|커피|디저트|베이커리|제과|제빵|케이크|빙수|차\s*전문/;
+const RESTAURANT_CATEGORY_PATTERN = /음식점|한식|중식|중국|일식|일본|양식|분식|육류|고기|구이|국밥|찌개|전골|탕|국수|냉면|면요리|샐러드|포케|샌드위치|도시락|죽|치킨|피자|햄버거|버거|초밥|스시|생선회|횟집|해산물|아시아음식|베트남|태국|인도|멕시코|족발|보쌈|곱창|닭발|백반|뷔페|패밀리레스토랑/;
+
+function simplifiedRestaurantCategory(value) {
+  const category = stripSearchMarkup(value).replace(/\s+/g, " ").trim();
+  if (!category) return "";
+  const mappings = [
+    [/국밥/, "국밥"], [/냉면/, "냉면"], [/찌개|전골|탕/, "찌개·전골"],
+    [/육류|고기|구이|갈비|삼겹살/, "고깃집"], [/중식|중국/, "중식"],
+    [/일식|일본/, "일식"], [/한식/, "한식"], [/양식|이탈리아/, "양식"],
+    [/분식|떡볶이/, "분식"], [/초밥|스시/, "초밥"], [/생선회|횟집/, "회"],
+    [/국수|면요리|라멘|우동|쌀국수/, "면요리"], [/샐러드|포케/, "샐러드·포케"],
+    [/카페|커피/, "카페"], [/디저트|베이커리|제과|제빵|케이크|빙수/, "디저트"],
+    [/치킨/, "치킨"], [/피자/, "피자"], [/햄버거|버거/, "버거"],
+    [/아시아음식|베트남|태국|인도/, "아시아 음식"], [/음식점/, "음식점"],
+  ];
+  return mappings.find(([pattern]) => pattern.test(category))?.[1] || "";
+}
+
+function validRestaurantIdentity(place) {
+  const name = safeText(place?.name, 160);
+  const address = safeText(place?.address, 300);
+  if (!name || !address || name.length > 80 || address.length < 5) return false;
+  if (/[<>�\r\n\t]|https?:\/\//i.test(name)) return false;
+  if (!/[0-9A-Za-z가-힣]/.test(name)) return false;
+  if (!/(?:특별시|광역시|특별자치시|특별자치도|[가-힣]+도|[가-힣]+시|[가-힣]+구|[가-힣]+군|[가-힣]+동|[가-힣]+읍|[가-힣]+면|[가-힣]+로|[가-힣]+길)/.test(address)) return false;
+  return normalizeIdentityText(name) !== normalizeIdentityText(address);
+}
+
+function userRequestedCafe(messages, intentAnalysis) {
+  const text = `${userMessagesOnly(messages).slice(-8).join(" ")} ${safeText(intentAnalysis?.foodCategory, 120)}`;
+  return /카페|디저트|커피|베이커리|빵|케이크|빙수/.test(text);
+}
+
+function requestedCategoryMatches(place, messages, intentAnalysis) {
+  const requested = `${userMessagesOnly(messages).slice(-8).join(" ")} ${safeText(intentAnalysis?.foodCategory, 120)}`;
+  const searchable = `${place.name} ${place.registered_data?.rawCategory || place.registered_data?.category || ""}`;
+  const cuisineRules = [
+    [/한식/, /한식|국밥|찌개|전골|탕|백반|갈비|삼겹살|족발|보쌈/],
+    [/중식|중국/, /중식|중국|짜장|짬뽕|마라/],
+    [/일식|일본/, /일식|일본|초밥|스시|회|라멘|우동/],
+    [/양식/, /양식|이탈리아|파스타|피자|스테이크/],
+    [/분식/, /분식|떡볶이|김밥/],
+  ];
+  const cuisine = cuisineRules.find(([requestPattern]) => requestPattern.test(requested));
+  if (cuisine && !cuisine[1].test(searchable)) return false;
+  const explicitMenu = requested.match(/국밥|냉면|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|햄버거|버거|해산물|횟집/)?.[0];
+  if (!explicitMenu) return true;
+  const aliases = {
+    돈까스: /돈까스|돈가스/, 돈가스: /돈까스|돈가스/, 초밥: /초밥|스시/, 스시: /초밥|스시/,
+    햄버거: /햄버거|버거/, 버거: /햄버거|버거/, 해산물: /해산물|횟집|생선회/, 횟집: /해산물|횟집|생선회/,
+  };
+  return (aliases[explicitMenu] || new RegExp(explicitMenu)).test(searchable);
+}
+
+function validateRestaurantCandidate(place, { messages, intentAnalysis, source }) {
+  if (!validRestaurantIdentity(place)) return false;
+  const rawCategory = safeText(place.registered_data?.rawCategory || place.registered_data?.category, 200);
+  if (NON_RESTAURANT_CATEGORY_PATTERN.test(rawCategory)) return false;
+  if (source === "inchelin") return requestedCategoryMatches(place, messages, intentAnalysis);
+  const cafe = CAFE_CATEGORY_PATTERN.test(rawCategory);
+  if (cafe && !userRequestedCafe(messages, intentAnalysis)) return false;
+  if (!cafe && !RESTAURANT_CATEGORY_PATTERN.test(rawCategory)) return false;
+  return requestedCategoryMatches(place, messages, intentAnalysis);
 }
 
 function distinctiveAddressTokens(address) {
@@ -1096,7 +1166,11 @@ class NaverRestaurantProvider {
           "X-NCP-APIGW-API-KEY-ID": clientId,
           "X-NCP-APIGW-API-KEY": clientSecret,
         });
-        const places = (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean).slice(0, 5);
+        const places = (Array.isArray(data?.items) ? data.items : [])
+          .map(sanitizeNaverPlace)
+          .filter(Boolean)
+          .filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: this.source }))
+          .slice(0, 5);
         providerDebugLog(this.env, "search_completed", {
           provider: this.source,
           query: candidateQuery,
@@ -1275,6 +1349,8 @@ function factValue(place, key) {
 }
 
 function locationCoordinates(value) {
+  if (!value || value.latitude === null || value.latitude === undefined || value.latitude === ""
+    || value.longitude === null || value.longitude === undefined || value.longitude === "") return null;
   const latitude = Number(value?.latitude);
   const longitude = Number(value?.longitude);
   return Number.isFinite(latitude) && Number.isFinite(longitude)
@@ -1360,7 +1436,7 @@ function factualRecommendationReason(place, source, userText) {
   const category = safeText(place.registered_data?.category, 160);
   const distance = Number(place.distance_meters);
   if (Number.isFinite(distance)) {
-    const label = distance < 1000 ? `${Math.max(10, Math.round(distance / 10) * 10)}m` : `${(distance / 1000).toFixed(distance < 10000 ? 1 : 0)}km`;
+    const label = distance < 1000 ? `${Math.round(distance)}m` : `${(distance / 1000).toFixed(distance < 10000 ? 1 : 0)}km`;
     return `${label} 거리에서 찾은${category ? ` ${category}` : " 식당"}이에요.`;
   }
   if (/주차/.test(userText) && factValue(place, "parking") === true) return "주차 가능 정보가 확인된 곳이에요.";
@@ -1399,7 +1475,7 @@ function restaurantCard(place, source, userText = "") {
     id: place.id,
     name: restaurantName,
     restaurantName,
-    category: safeText(registered.category, 160) || null,
+    category: simplifiedRestaurantCategory(registered.rawCategory || registered.category) || null,
     address,
     roadAddress: safeText(registered.roadAddress || registered.road_address, 300) || null,
     phone: safeText(firstPresent(factValue(place, "phone"), registered.phone), 80),
@@ -1606,6 +1682,7 @@ async function handleChat(request, env) {
     } else {
       const excludedIds = new Set(recentRestaurants.map(restaurant => restaurant.id));
       if (signals.hasRestaurantResults) lookup.places = lookup.places.filter(place => !excludedIds.has(place.id));
+      lookup.places = lookup.places.filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: dataSource }));
     }
 
     if (lookup.configured && !lookup.places.length) {

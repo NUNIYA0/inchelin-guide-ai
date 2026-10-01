@@ -428,7 +428,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
   assert.ok(["김민준", "이서연", "박도윤"].includes(result.body.restaurants[0].recommendedBy));
   assert.equal(result.body.restaurants[0].imageUrl, "https://images.example/pyongyang-thumb.jpg");
-  assert.equal(result.body.restaurants[0].category, "한식>냉면");
+  assert.equal(result.body.restaurants[0].category, "냉면");
   assert.equal(result.body.restaurants[0].longitude, 127);
   assert.equal(result.body.restaurants[0].latitude, 37.5);
   assert.ok(result.body.restaurants[0].distanceMeters > 0);
@@ -436,6 +436,107 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.body.restaurants[0].naverPlaceId, "123");
   assert.equal(result.body.restaurants[0].naverPlaceUrl, "https://map.naver.com/p/entry/place/123");
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
+}
+
+{
+  const result = await runCase({
+    message: "신림역 6번 출구 근처에서 혼자 저녁 먹을 곳 추천해줘",
+    context: {
+      currentLocationName: "서울특별시 관악구 신림동",
+      currentLocation: { latitude: 37.4842, longitude: 126.9297 },
+    },
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [
+        {
+          title: "신림애견카페",
+          roadAddress: "서울특별시 관악구 신림로 10",
+          category: "생활,편의>애견카페",
+          link: "https://map.naver.com/p/entry/place/901",
+          mapx: "1269298000",
+          mapy: "374843000",
+        },
+        {
+          title: "신림당구클럽",
+          roadAddress: "서울특별시 관악구 신림로 11",
+          category: "스포츠,오락>당구장",
+          link: "https://map.naver.com/p/entry/place/902",
+          mapx: "1269299000",
+          mapy: "374844000",
+        },
+        {
+          title: "신림혼밥식당",
+          roadAddress: "서울특별시 관악구 신림로 12",
+          category: "음식점>한식",
+          link: "https://map.naver.com/p/entry/place/903",
+          mapx: "1269310000",
+          mapy: "374850000",
+        },
+        {
+          title: "깨진�<상호>",
+          roadAddress: "서울특별시 관악구 신림로 13",
+          category: "음식점>한식",
+          link: "https://map.naver.com/p/entry/place/904",
+          mapx: "1269320000",
+          mapy: "374851000",
+        },
+      ],
+    },
+  });
+  assert.deepEqual(result.body.restaurants.map(restaurant => restaurant.name), ["신림혼밥식당"]);
+  assert.equal(result.body.restaurants[0].category, "한식");
+  assert.ok(result.body.restaurants[0].distanceMeters > 0);
+  assert.notEqual(result.body.restaurants[0].distanceMeters, 10);
+}
+
+{
+  const result = await runCase({
+    message: "신림역 근처 저녁 맛집 추천해줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "신림커피",
+        roadAddress: "서울특별시 관악구 신림로 20",
+        category: "음식점>카페,디저트",
+        link: "https://map.naver.com/p/entry/place/905",
+      }],
+    },
+  });
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.body.meta.restaurantSearchStatus, "no_results");
+}
+
+{
+  const result = await runCase({
+    message: "신림역 근처 카페 추천해줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "신림커피",
+        roadAddress: "서울특별시 관악구 신림로 20",
+        category: "음식점>카페,디저트",
+        link: "https://map.naver.com/p/entry/place/905",
+      }],
+    },
+  });
+  assert.equal(result.body.restaurants[0].name, "신림커피");
+  assert.equal(result.body.restaurants[0].category, "카페");
+  assert.equal(result.body.restaurants[0].distanceMeters, null);
 }
 
 {
@@ -628,6 +729,7 @@ function semanticAnalysis(overrides = {}) {
       items: [{
         title: "강남국밥",
         roadAddress: "서울특별시 강남구 강남대로 1",
+        category: "음식점>한식>국밥",
         link: "https://map.naver.com/p/entry/place/111",
         mapx: "127111",
         mapy: "37111",
@@ -651,6 +753,7 @@ function semanticAnalysis(overrides = {}) {
       items: [{
         title: "강남점심식당",
         roadAddress: "서울특별시 강남구 강남대로 2",
+        category: "음식점>한식",
         link: "https://map.naver.com/p/entry/place/222",
         mapx: "127222",
         mapy: "37222",
