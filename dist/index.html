@@ -41,7 +41,7 @@
     }
     button, textarea { font: inherit; }
     button { color: inherit; }
-    .app { min-height: 100dvh; display: flex; }
+    .app { height: 100dvh; min-height: 0; display: flex; overflow: hidden; }
     .rail {
       position: relative;
       z-index: 30;
@@ -135,11 +135,13 @@
     .sidebar-login { width: 100%; height: 39px; margin-top: 12px; border: 0; border-radius: 9px; background: #000; color: white; font-weight: 700; cursor: pointer; }
     .main {
       min-width: 0;
-      min-height: 100dvh;
+      height: 100dvh;
+      min-height: 0;
       flex: 1;
       display: flex;
       flex-direction: column;
       position: relative;
+      overflow: hidden;
       transition: margin-left .28s cubic-bezier(.2,.8,.2,1);
     }
     .main.shift { margin-left: calc(var(--sidebar) - var(--rail)); }
@@ -173,6 +175,11 @@
       display: grid;
       place-items: center;
       padding: 12px 24px 94px;
+    }
+    .main.chat-mode .workspace {
+      place-items: stretch;
+      padding: 0 24px;
+      overflow: hidden;
     }
     .welcome { width: min(720px, 100%); transform: translateY(-3px); }
     h1 {
@@ -242,9 +249,9 @@
     }
     .suggestion:hover { color: #111; padding-left: 9px; }
     .suggestion span:last-child { color: #aaa; font-size: 17px; }
-    .chat-view { width: min(760px, 100%); height: 100%; display: none; flex-direction: column; }
+    .chat-view { width: min(760px, 100%); height: 100%; min-height: 0; display: none; flex-direction: column; overflow: hidden; margin: 0 auto; }
     .chat-view.active { display: flex; }
-    .messages { flex: 1; overflow: auto; padding: 22px 6px 28px; scrollbar-width: thin; }
+    .messages { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; padding: 22px 6px 28px; scrollbar-width: thin; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
     .message { max-width: 74%; margin: 0 0 24px; font-size: 13px; letter-spacing: -.01em; white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word; }
     .message.user { width: fit-content; margin-left: auto; border-radius: 20px 20px 5px 20px; background: #f1f1f1; padding: 12px 16px; font-size: 13px; font-weight: 500; line-height: 1.625; }
     .message.ai { width: 100%; max-width: 100%; display: grid; grid-template-columns: 36px minmax(0, 1fr); align-items: start; gap: 14px; color: #303030; font-size: 13px; font-weight: 400; line-height: 1.68; }
@@ -285,8 +292,8 @@
     .thinking-dots i:nth-child(2) { animation-delay: .15s; }
     .thinking-dots i:nth-child(3) { animation-delay: .3s; }
     .stop-icon { width: 12px; height: 12px; border-radius: 2px; background: currentColor; }
-    .disclaimer { color: #9a9a9a; text-align: center; font-size: 11px; padding: 8px 0 0; }
-    .chat-composer { flex: 0 0 auto; margin-bottom: 22px; min-height: 82px; border-radius: 21px; }
+    .disclaimer { flex: 0 0 auto; color: #9a9a9a; text-align: center; font-size: 11px; padding: 8px 0 12px; background: #fff; }
+    .chat-composer { position: relative; z-index: 2; flex: 0 0 auto; margin: 0; min-height: 82px; border-radius: 21px; background: #fff; }
     .chat-composer textarea { height: 33px; }
     .popover {
       position: absolute;
