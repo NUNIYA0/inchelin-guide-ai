@@ -352,9 +352,11 @@ function unavailableFactResponse(field, source = "inchelin") {
   );
 }
 
-function noSearchResultsResponse() {
+function noSearchResultsResponse(locationName = "") {
+  const location = mostSpecificSearchLocation(locationName);
+  const locationLine = location ? `**${location} 주변**은 확인했어요.\n\n` : "";
   return chatResponse(
-    "조건에 맞는 곳을 바로 찾지 못했어요.\n\n지역을 조금 넓히거나 메뉴 조건을 바꿔서 다시 찾아볼까요?",
+    `${locationLine}조건에 맞는 곳을 바로 찾지 못했어요.\n\n지역을 조금 넓히거나 메뉴 조건을 바꿔서 다시 찾아볼까요?`,
     ["주변 지역까지 보기", "조건 바꿔보기"],
     [],
     { restaurantSearchStatus: "no_results" }
@@ -813,7 +815,7 @@ function extractRestaurantSearchIntent(messages, intentAnalysis = null) {
       ...(Array.isArray(intentAnalysis.otherConditions) ? intentAnalysis.otherConditions : []),
     ]
       .map(item => safeText(item, 80))
-      .filter(Boolean)
+      .filter(item => item && !/^(?:주변|근처|인근|부근|가까운\s*(?:곳|데)?|현재\s*위치)$/.test(item))
     : [];
   if (semanticTerms.length) return [...new Set(semanticTerms)].join(" ");
   const userTexts = messages
@@ -845,6 +847,18 @@ function buildRestaurantSearchQuery(messages, locationName = "", intentAnalysis 
   const verifiedLocation = mostSpecificSearchLocation(explicitLocation || locationName);
   const intent = extractRestaurantSearchIntent(messages, intentAnalysis);
   return safeText(`${verifiedLocation} ${intent}`.replace(/\s+/g, " ").trim(), 200);
+}
+
+function naverRestaurantSearchQueries(messages, locationName = "", intentAnalysis = null) {
+  const primary = buildRestaurantSearchQuery(messages, locationName, intentAnalysis);
+  const explicitLocation = safeText(intentAnalysis?.location, 120) || explicitLocationFromMessages(messages);
+  const verifiedLocation = mostSpecificSearchLocation(explicitLocation || locationName);
+  const queries = [primary];
+  if (verifiedLocation) queries.push(`${verifiedLocation} 맛집`);
+  if (verifiedLocation.endsWith("역") && verifiedLocation.length > 1) {
+    queries.push(`${verifiedLocation.slice(0, -1)} 맛집`);
+  }
+  return [...new Set(queries.map(query => safeText(query.replace(/\s+/g, " ").trim(), 200)).filter(Boolean))].slice(0, 3);
 }
 
 function naverWgs84Coordinate(value, type) {
@@ -1059,7 +1073,8 @@ class NaverRestaurantProvider {
     const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/local");
     const clientId = safeText(this.env.NAVER_API_HUB_CLIENT_ID, 300);
     const clientSecret = safeText(this.env.NAVER_API_HUB_CLIENT_SECRET, 300);
-    const query = buildRestaurantSearchQuery(messages, locationName, intentAnalysis);
+    const queries = naverRestaurantSearchQueries(messages, locationName, intentAnalysis);
+    const query = queries[0] || "맛집";
     if (!endpoint || !clientId || !clientSecret) {
       providerDebugLog(this.env, "search_skipped", {
         provider: this.source,
@@ -1069,25 +1084,30 @@ class NaverRestaurantProvider {
       });
       return { configured: false, places: [], ambiguous: false, query, errorCode: "missing_credentials" };
     }
-    const url = new URL(endpoint);
-    url.searchParams.set("query", query);
-    url.searchParams.set("display", "5");
-    url.searchParams.set("start", "1");
-    url.searchParams.set("sort", "random");
-    providerDebugLog(this.env, "search_started", { provider: this.source, query });
     try {
-      const data = await getJsonWithTimeout(url.toString(), {
-        "X-NCP-APIGW-API-KEY-ID": clientId,
-        "X-NCP-APIGW-API-KEY": clientSecret,
-      });
-      const places = (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean).slice(0, 5);
-      providerDebugLog(this.env, "search_completed", {
-        provider: this.source,
-        query,
-        apiStatus: 200,
-        resultCount: places.length,
-      });
-      return { configured: true, places, ambiguous: false, query, apiStatus: 200 };
+      for (const candidateQuery of queries) {
+        const url = new URL(endpoint);
+        url.searchParams.set("query", candidateQuery);
+        url.searchParams.set("display", "5");
+        url.searchParams.set("start", "1");
+        url.searchParams.set("sort", "random");
+        providerDebugLog(this.env, "search_started", { provider: this.source, query: candidateQuery });
+        const data = await getJsonWithTimeout(url.toString(), {
+          "X-NCP-APIGW-API-KEY-ID": clientId,
+          "X-NCP-APIGW-API-KEY": clientSecret,
+        });
+        const places = (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean).slice(0, 5);
+        providerDebugLog(this.env, "search_completed", {
+          provider: this.source,
+          query: candidateQuery,
+          apiStatus: 200,
+          resultCount: places.length,
+        });
+        if (places.length) {
+          return { configured: true, places, ambiguous: false, query: candidateQuery, attemptedQueries: queries, apiStatus: 200 };
+        }
+      }
+      return { configured: true, places: [], ambiguous: false, query, attemptedQueries: queries, apiStatus: 200 };
     } catch (error) {
       const status = error instanceof UpstreamHttpError ? error.status : 0;
       const code = [401, 403].includes(status) ? "authentication_failed" : "api_request_failed";
@@ -1553,7 +1573,8 @@ async function handleChat(request, env) {
       || Boolean(currentLocationName && CURRENT_LOCATION_PATTERN.test(latestUserMessage));
   let groundedPlaces = [];
   const searchNow = semanticRouting
-    ? intentAnalysis.needsRestaurantSearch && (signals.hasLocation || intentAnalysis.intent === "restaurant_info")
+    ? (intentAnalysis.needsRestaurantSearch && (signals.hasLocation || intentAnalysis.intent === "restaurant_info"))
+      || (signals.latestIsLocationOnly && signals.hadMealIntent)
     : directVenueIntent || (
       signals.hasLocation && signals.hasMealIntent && (
         shouldSearchRestaurants(latestUserMessage, messages, requestedField)
@@ -1589,7 +1610,7 @@ async function handleChat(request, env) {
 
     if (lookup.configured && !lookup.places.length) {
       if (dataSource === "inchelin" && venueIntent) return json(unregisteredVenueResponse());
-      return json(noSearchResultsResponse());
+      return json(noSearchResultsResponse(signals.locationName));
     } else if (lookup.configured && lookup.ambiguous) {
       return json(ambiguousVenueResponse(lookup.places));
     } else if (lookup.configured) {

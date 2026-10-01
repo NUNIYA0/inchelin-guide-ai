@@ -497,6 +497,69 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
+    message: "신림역 주변",
+    history: [
+      { role: "user", content: "오늘 뭐 먹을지 같이 골라줘" },
+      { role: "assistant", content: "한 끼로 먹기 좋은 곳을 찾아볼게요. 어느 지역에서 찾을까요?" },
+    ],
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      INTENT_ANALYZER_DISABLED: "false",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    intentAnalysis: semanticAnalysis({
+      intent: "restaurant_recommendation",
+      location: "신림역 주변",
+      distancePreference: "주변",
+      needsRestaurantSearch: true,
+    }),
+    naverResponse: {
+      items: [{
+        title: "신림식당",
+        roadAddress: "서울특별시 관악구 신림로 1",
+        category: "한식",
+        link: "https://map.naver.com/p/entry/place/881",
+        mapx: "1269290000",
+        mapy: "374840000",
+      }],
+    },
+  });
+  const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "신림역 맛집");
+  assert.equal(result.body.restaurants[0].name, "신림식당");
+}
+
+{
+  const result = await runCase({
+    message: "신림역 주변",
+    history: [
+      { role: "user", content: "든든하게 먹을 곳 추천해줘" },
+      { role: "assistant", content: "어느 지역에서 찾을까요?" },
+    ],
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      INTENT_ANALYZER_DISABLED: "false",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    intentAnalysis: semanticAnalysis({
+      intent: "food_conversation",
+      location: "신림역 주변",
+      distancePreference: "주변",
+      needsRestaurantSearch: false,
+    }),
+    naverResponse: { items: [] },
+  });
+  assert.match(result.body.message, /신림역 주변은 확인했어요/);
+  assert.equal(result.body.meta.restaurantSearchStatus, "no_results");
+  assert.ok(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length >= 2);
+}
+
+{
+  const result = await runCase({
     message: "현재 위치 근처",
     history: [
       { role: "user", content: "든든한 한 끼 원해요" },
