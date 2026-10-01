@@ -1607,10 +1607,10 @@
         return '브라우저의 위치 권한이 꺼져 있어 현재 위치를 확인하지 못했어요.\n\n주소창의 위치 권한을 허용한 뒤 ‘내 주변에서 찾기’를 다시 눌러주세요. 지역명을 직접 입력해도 괜찮아요.';
       }
       if (reason === 'timeout') {
-        return '현재 위치를 확인하는 데 시간이 오래 걸렸어요.\n\n잠시 후 ‘내 주변에서 찾기’를 다시 눌러보거나 지역명을 직접 입력해 주세요.';
+        return '현재 위치를 두 번 확인했지만 응답이 늦어 시간 초과됐어요.\n\nPC나 휴대폰의 위치 서비스와 브라우저 위치 권한을 확인한 뒤 다시 시도하거나, 지역명을 직접 입력해 주세요.';
       }
       if (reason === 'unavailable') {
-        return '기기에서 현재 위치 정보를 가져오지 못했어요.\n\n위치 서비스가 켜져 있는지 확인하거나 지역명을 직접 입력해 주세요.';
+        return '기기에서 현재 위치 정보를 가져오지 못했어요.\n\nPC나 휴대폰의 위치 서비스가 켜져 있는지 확인한 뒤 다시 시도하거나, 지역명을 직접 입력해 주세요.';
       }
       if (reason === 'reverse-geocode') {
         return '현재 좌표는 확인했지만 지역명으로 변환하지 못했어요.\n\n잠시 후 다시 시도하거나 찾고 싶은 지역명을 직접 입력해 주세요.';
@@ -1618,7 +1618,10 @@
       return '현재 위치를 확인하지 못했어요.\n\n어느 지역에서 찾고 계세요? 지역명을 편하게 입력해 주세요.';
     }
     function appendLocationFallback(reason) {
-      appendMessage('assistant', locationFallbackMessage(reason));
+      const retryable = ['denied', 'timeout', 'unavailable', 'reverse-geocode'].includes(reason);
+      appendMessage('assistant', locationFallbackMessage(reason), {
+        quickReplies: retryable ? ['내 주변에서 찾기'] : []
+      });
     }
     async function geolocationPermissionState() {
       if (!navigator.permissions?.query) return '';
@@ -1629,14 +1632,28 @@
         return '';
       }
     }
-    function geolocationPosition() {
+    function geolocationPosition(options) {
       return new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: false,
-          timeout: 10000,
-          maximumAge: 300000
-        });
+        navigator.geolocation.getCurrentPosition(resolve, reject, options);
       });
+    }
+    async function geolocationPositionWithRetry(status) {
+      try {
+        return await geolocationPosition({
+          enableHighAccuracy: false,
+          timeout: 15000,
+          maximumAge: 600000
+        });
+      } catch (error) {
+        if (error?.code !== 2 && error?.code !== 3) throw error;
+        const label = status.querySelector('.ai-bubble > span:last-child');
+        if (label) label.textContent = '정밀 위치로 한 번 더 확인하고 있어요';
+        return geolocationPosition({
+          enableHighAccuracy: true,
+          timeout: 20000,
+          maximumAge: 0
+        });
+      }
     }
     async function requestCurrentLocation() {
       if (generating || locationRequestInFlight) return;
@@ -1666,7 +1683,7 @@
           throw deniedError;
         }
         if (permissionState === 'granted' || permissionState === 'prompt') clearLocationPermissionDenied();
-        const position = await geolocationPosition();
+        const position = await geolocationPositionWithRetry(status);
         status.querySelector('.ai-bubble > span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
         const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
           method: 'POST',
