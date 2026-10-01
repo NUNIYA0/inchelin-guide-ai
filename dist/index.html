@@ -1608,7 +1608,7 @@
         return '브라우저의 **위치 권한이 꺼져 있어** 현재 위치를 확인하지 못했어요.\n\n주소창의 위치 권한을 허용한 뒤 **내 주변에서 찾기**를 다시 눌러주세요. **지역명을 직접 입력**해도 괜찮아요.';
       }
       if (reason === 'timeout') {
-        return '현재 위치를 두 번 확인했지만 **응답이 늦어 시간 초과됐어요.**\n\nPC나 휴대폰의 위치 서비스와 브라우저 위치 권한을 확인한 뒤 **내 주변에서 찾기**를 다시 누르거나, **지역명을 직접 입력**해 주세요.';
+        return '브라우저의 위치 권한은 확인됐지만 **기기 좌표가 전달되지 않았어요.**\n\n앱 내 브라우저를 다시 열거나 Chrome·Edge에서 이 사이트를 열어 **내 주변에서 찾기**를 눌러보세요. **지역명을 직접 입력**해도 바로 찾을 수 있어요.';
       }
       if (reason === 'unavailable') {
         return '기기에서 **현재 위치 정보를 가져오지 못했어요.**\n\nPC나 휴대폰의 위치 서비스가 켜져 있는지 확인한 뒤 **내 주변에서 찾기**를 다시 누르거나, **지역명을 직접 입력**해 주세요.';
@@ -1639,21 +1639,30 @@
       });
     }
     async function geolocationPositionWithRetry(status) {
-      try {
-        return await geolocationPosition({
-          enableHighAccuracy: false,
-          timeout: 15000,
-          maximumAge: 600000
-        });
-      } catch (error) {
-        if (error?.code !== 2 && error?.code !== 3) throw error;
+      const cachedAttempt = geolocationPosition({
+        enableHighAccuracy: false,
+        timeout: 5000,
+        maximumAge: Infinity
+      });
+      const liveAttempt = geolocationPosition({
+        enableHighAccuracy: false,
+        timeout: 30000,
+        maximumAge: 0
+      });
+      const progressTimer = setTimeout(() => {
         const label = status.querySelector('.ai-bubble > span:last-child');
-        if (label) label.textContent = '정밀 위치로 한 번 더 확인하고 있어요';
-        return geolocationPosition({
-          enableHighAccuracy: true,
-          timeout: 20000,
-          maximumAge: 0
-        });
+        if (label) label.textContent = '기기에서 위치 좌표를 받아오고 있어요';
+      }, 1800);
+      try {
+        return await Promise.any([cachedAttempt, liveAttempt]);
+      } catch (aggregateError) {
+        const errors = Array.isArray(aggregateError?.errors) ? aggregateError.errors : [aggregateError];
+        const denied = errors.find(error => error?.code === 1);
+        const unavailable = errors.find(error => error?.code === 2);
+        const timeout = errors.find(error => error?.code === 3);
+        throw denied || unavailable || timeout || aggregateError;
+      } finally {
+        clearTimeout(progressTimer);
       }
     }
     async function requestCurrentLocation() {
@@ -1676,15 +1685,10 @@
       messagesEl.appendChild(status);
       chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' });
       try {
-        const permissionState = await geolocationPermissionState();
-        if (permissionState === 'denied') {
-          rememberLocationPermissionDenied();
-          const deniedError = new Error('Geolocation permission denied.');
-          deniedError.locationReason = 'denied';
-          throw deniedError;
-        }
-        if (permissionState === 'granted' || permissionState === 'prompt') clearLocationPermissionDenied();
+        // Start both coordinate requests immediately inside the user's click gesture.
+        // Some embedded browsers stop delivering a position when permission probing is awaited first.
         const position = await geolocationPositionWithRetry(status);
+        clearLocationPermissionDenied();
         status.querySelector('.ai-bubble > span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
         const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
           method: 'POST',
@@ -1719,6 +1723,8 @@
       } catch (error) {
         status.remove();
         let reason = String(error?.locationReason || '');
+        const permissionState = await geolocationPermissionState();
+        if (!reason && permissionState === 'denied') reason = 'denied';
         if (!reason && error?.code === 1) reason = 'denied';
         if (!reason && error?.code === 2) reason = 'unavailable';
         if (!reason && error?.code === 3) reason = 'timeout';
