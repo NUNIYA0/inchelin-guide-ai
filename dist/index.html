@@ -98,8 +98,8 @@
     }
     .sidebar.open { transform: translateX(0); }
     .sidebar-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
-    .sidebar-title { min-width: 0; display: flex; align-items: center; }
-    .sidebar-title img { width: min(195px, calc(var(--sidebar) - 78px)); height: 32px; object-fit: contain; object-position: left center; flex: 0 1 auto; }
+    .sidebar-title { min-width: 0; flex: 1; overflow: hidden; display: flex; align-items: center; margin-right: 12px; }
+    .sidebar-title img { display: block; width: 195px; max-width: 100%; height: auto; object-fit: contain; object-position: left center; flex: 0 1 auto; }
     .new-chat {
       width: 100%;
       border: 1px solid #dedede;
@@ -491,7 +491,7 @@
       .mobile-menu { width: 40px; height: 40px; border-radius: 10px; }
       .mobile-menu svg { width: 21px; height: 21px; stroke: #4c4c4c; }
       .mobile-brand { min-width: 0; display: flex; align-items: center; white-space: nowrap; }
-      .mobile-brand img { width: min(150px, 42vw); height: 27px; object-fit: contain; object-position: left center; flex: 0 1 auto; }
+      .mobile-brand img { display: block; width: min(150px, 42vw); max-width: 100%; height: auto; object-fit: contain; object-position: left center; flex: 0 1 auto; }
       .mobile-header .dots { width: 36px; height: 36px; }
       .mobile-start { height: 32px; padding: 0 13px; font-size: 12.5px; }
       .sidebar {
@@ -577,7 +577,7 @@
     </nav>
 
     <aside class="sidebar" id="sidebar" aria-hidden="true">
-      <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI" /></span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.6"/><path d="M15 4v16" stroke-width="1.6"/></svg></button></div>
+      <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.6"/><path d="M15 4v16" stroke-width="1.6"/></svg></button></div>
       <button class="new-chat" id="aboutSide"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /><span>Inchelin Guide AI 소개</span></button>
       <button class="new-chat" id="newChatSide"><img class="nav-icon" src="assets/intro-icon.png" alt="" /><span>새 채팅</span></button>
       <button class="new-chat" id="guideSide"><img class="nav-icon" src="assets/guide-icon.png" alt="" /><span>사용 설명서</span></button>
@@ -595,7 +595,7 @@
       <header class="mobile-header" aria-label="모바일 상단 메뉴">
         <div class="mobile-header-left">
           <button class="icon-btn mobile-menu" id="mobileSidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke-width="1.7" stroke-linecap="round" /></svg></button>
-          <span class="mobile-brand"><img src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI" /></span>
+          <span class="mobile-brand"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span>
         </div>
         <div class="mobile-header-actions">
           <button class="icon-btn dots more-trigger" id="mobileMoreButton" aria-label="더 보기" aria-expanded="false">···</button>
