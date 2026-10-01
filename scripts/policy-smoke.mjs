@@ -655,7 +655,7 @@ function semanticAnalysis(overrides = {}) {
     }),
     naverResponse: { items: [] },
   });
-  assert.match(result.body.message, /신림역 주변은 확인했어요/);
+  assert.match(result.body.message, /신림역 주변\*\*은 확인했어요/);
   assert.equal(result.body.meta.restaurantSearchStatus, "no_results");
   assert.ok(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length >= 2);
 }
@@ -738,7 +738,7 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   assert.equal(result.body.restaurants[0].name, "강남국밥");
-  assert.deepEqual(result.body.suggestions.slice(0, 2), ["다른 맛집", "지역 바꾸기"]);
+  assert.deepEqual(result.body.suggestions, []);
 }
 
 {
@@ -818,8 +818,8 @@ function semanticAnalysis(overrides = {}) {
       selectedRestaurantIds: [],
     },
   });
-  assert.equal(result.body.message, "점심 메뉴 같이 골라볼까요?");
-  assert.deepEqual(result.body.suggestions, ["가볍게", "든든하게", "매콤하게", "다른 메뉴"]);
+  assert.equal(result.body.message, "점심 메뉴 같이 골라볼까요? 가볍게, 든든하게, 매콤하게 중에서 어떤 느낌이 좋으세요?");
+  assert.deepEqual(result.body.suggestions, []);
   const openaiCall = result.calls.find(call => call.href.includes("api.openai.com"));
   assert.match(openaiCall.body.instructions, /고정된 질문 순서/);
   assert.match(openaiCall.body.instructions, /추가 질문 없이 즉시 검색 결과/);
