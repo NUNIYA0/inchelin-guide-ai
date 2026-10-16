@@ -1991,12 +1991,10 @@ async function handleChat(request, env) {
       input: messages,
       ...(webSearchEnabled ? {
         tools: [{
-          type: "web_search",
+          type: "web_search_preview",
           search_context_size: "medium",
-          filters: { allowed_domains: ["naver.com", "naver.me"] },
         }],
-        tool_choice: "required",
-        include: ["web_search_call.action.sources"],
+        tool_choice: { type: "web_search_preview" },
       } : {}),
       reasoning: { effort: "minimal" },
       text: {
@@ -2034,6 +2032,7 @@ async function handleChat(request, env) {
 
   if (!response.ok) {
     console.error("OpenAI request failed", response.status, response.headers.get("x-request-id") || "no-request-id");
+    if (webSearchEnabled) return json(linkedResearchUnavailableResponse(linkedPlaceResearch));
     return json({ error: "답변을 불러오지 못했어요. 잠시 후 다시 시도해 주세요." }, 502);
   }
 

@@ -93,11 +93,10 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["마르게리타"]);
   const webAnswerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
   assert.deepEqual(webAnswerCall.body.tools, [{
-    type: "web_search",
+    type: "web_search_preview",
     search_context_size: "medium",
-    filters: { allowed_domains: ["naver.com", "naver.me"] },
   }]);
-  assert.equal(webAnswerCall.body.tool_choice, "required");
+  assert.deepEqual(webAnswerCall.body.tool_choice, { type: "web_search_preview" });
 }
 
 {
