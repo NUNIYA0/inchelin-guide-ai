@@ -83,10 +83,21 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     linkRedirect: "https://map.naver.com/p/entry/place/99999",
     linkHtml: '<html><head><meta property="og:title" content="정보부족식당 : 네이버 지도"></head><body>매장 안내</body></html>',
+    aiResponse: {
+      message: "웹에서 매장 메뉴와 리뷰를 추가로 확인했어요.",
+      suggestions: ["마르게리타|검색된 메뉴와 리뷰에서 토마토·치즈 구성으로 확인됐어요"],
+      selectedRestaurantIds: [],
+    },
   });
-  assert.match(result.body.message, /근거가 부족/);
-  assert.deepEqual(result.body.suggestions, []);
-  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+  assert.match(result.body.message, /웹에서/);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["마르게리타"]);
+  const webAnswerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
+  assert.deepEqual(webAnswerCall.body.tools, [{
+    type: "web_search",
+    search_context_size: "medium",
+    filters: { allowed_domains: ["naver.com", "naver.me"] },
+  }]);
+  assert.equal(webAnswerCall.body.tool_choice, "required");
 }
 
 {

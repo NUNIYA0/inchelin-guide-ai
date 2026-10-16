@@ -49,6 +49,8 @@ suggestions는 필수 단계가 아니라 빠른 응답을 돕는 클릭형 카�
 
 사용자가 네이버 지도나 네이버 플레이스 링크와 함께 메뉴 추천을 요청하면 위치를 다시 묻거나 이전 추천 결과로 해석하지 마. 서버가 <linked_place_research>를 제공하면 링크에서 확인한 식당명·페이지 내용과 리뷰 검색 결과를 함께 비교해 메뉴를 추천해. 공식 페이지나 메뉴 설명을 우선하고, 부족할 때 리뷰에서 반복적으로 확인되는 메뉴와 재료 언급을 보조 근거로 사용해. 리뷰의 주관적인 맛 평가는 사실처럼 단정하지 마. 제외 재료가 알레르기나 안전과 관련되면 리뷰만으로 "들어가지 않는다"고 확정하지 말고 매장 확인이 필요하다고 알려줘. 확인된 메뉴 후보는 suggestions 카드로 제공하고, 각 카드의 이유에는 확인 근거와 불확실성을 짧게 반영해. 링크를 확인하지 못했거나 메뉴 근거가 없으면 메뉴를 만들어내지 말고 확인하지 못한 점을 분명히 설명해.
 
+네이버 링크 요청에 웹 검색 도구가 제공되면 반드시 사용해. 단축 링크 자체뿐 아니라 확인된 식당명, 지점명, 메뉴판, 방문자 리뷰를 추가로 검색하고 서로 일치하는 근거를 찾아. 검색 결과가 없다는 이유만으로 한식·중식 같은 일반 선택 흐름이나 위치 질문으로 돌아가지 마. 실제 검색에서 확인된 메뉴만 카드로 만들고, 검색하지 않은 일반 메뉴를 그 식당의 메뉴처럼 제안하지 마.
+
 실제 맛집을 최종 추천할 때만 selectedRestaurantIds에 <restaurant_grounding>의 restaurant_id를 최대 3개 넣어. 제공되지 않은 ID를 만들지 마. 검색 결과가 없거나 일반적인 메뉴 대화, 추가 조건 질문에는 selectedRestaurantIds를 비워. 식당 카드를 보여줄 때는 짧은 안내만 덧붙이고, 사용자가 카드 아래 입력창에서 "더 가까운 곳", "다른 메뉴", "두 번째는 주차돼?"처럼 자유롭게 이어갈 수 있게 해. 추천 카드 뒤에 다음 단계를 강제하는 suggestions는 기본적으로 만들지 마.
 
 "맛집 추천 기준이 뭐야?", "어떤 데이터로 추천해?" 같은 서비스 설명 질문에는 새 식당을 검색하거나 카드를 만들지 말고 추천 기준만 설명해. "왜 이 식당을 추천했어?", "두 번째 식당 추천 이유가 뭐야?" 같은 질문에는 <recent_restaurants>의 확인된 근거만 설명하고 selectedRestaurantIds는 비워. 새로운 추천 카드는 사용자가 실제로 식당 추천이나 탐색을 요청한 경우에만 보여줘.
@@ -1837,7 +1839,7 @@ async function handleChat(request, env) {
     ? await researchLinkedPlace(env, latestLinkedUrl || previousLinkedUrl)
     : null;
   if (asksAboutPreviousLink && linkedPlaceResearch) return json(linkedAccessStatusResponse(linkedPlaceResearch));
-  if (latestLinkedUrl && !linkedResearchHasMenuEvidence(linkedPlaceResearch)) {
+  if (latestLinkedUrl && linkedPlaceResearch?.status === "invalid") {
     return json(linkedResearchUnavailableResponse(linkedPlaceResearch));
   }
   if (!linkedPlaceResearch && messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
@@ -1976,6 +1978,7 @@ async function handleChat(request, env) {
       : "No active restaurant search location is available.",
   ].join("\n");
 
+  const webSearchEnabled = Boolean(linkedPlaceResearch);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -1986,6 +1989,15 @@ async function handleChat(request, env) {
       model: env.OPENAI_MODEL || "gpt-5-mini",
       instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
       input: messages,
+      ...(webSearchEnabled ? {
+        tools: [{
+          type: "web_search",
+          search_context_size: "medium",
+          filters: { allowed_domains: ["naver.com", "naver.me"] },
+        }],
+        tool_choice: "required",
+        include: ["web_search_call.action.sources"],
+      } : {}),
       reasoning: { effort: "minimal" },
       text: {
         verbosity: "low",
