@@ -113,6 +113,7 @@ const baseEnv = {
 function semanticAnalysis(overrides = {}) {
   return {
     intent: "food_conversation",
+    questionScope: "intermediate",
     requestedAction: "none",
     restaurantName: "",
     location: "",
@@ -1080,6 +1081,10 @@ function semanticAnalysis(overrides = {}) {
   });
   assert.notDeepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+  const answerCall = result.calls.find(call => call.href.includes("api.openai.com"));
+  assert.match(answerCall.body.instructions, /"questionScope":"intermediate"/);
+  assert.match(answerCall.body.instructions, /broad는 음식 종류 카드 한 단계/);
+  assert.match(answerCall.body.instructions, /narrow는 지역과 메뉴가 있거나 특정 식당/);
 }
 
 console.log("Inchelin data policy smoke tests passed.");
