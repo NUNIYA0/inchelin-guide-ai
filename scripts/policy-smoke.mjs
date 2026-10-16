@@ -304,7 +304,7 @@ function semanticAnalysis(overrides = {}) {
     expectedStatus: 200,
   });
   assert.match(result.body.message, /어느 지역에서 찾을까요/);
-  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["현재 위치 연결", "지역 직접 입력"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -385,7 +385,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.match(result.body.message, /어느 지역에서 찾을까요/);
-  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["현재 위치 연결", "지역 직접 입력"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -698,7 +698,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.match(result.body.message, /임의로 추정하지 않아요/);
-  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["현재 위치 연결", "지역 직접 입력"]);
   assert.equal(result.calls.length, 0);
 }
 
@@ -861,6 +861,30 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
+    message: "오늘 저녁 메뉴 추천해줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
+    intentAnalysis: semanticAnalysis({
+      intent: "recommendation_followup",
+      questionScope: "narrow",
+      requestedAction: "recommendation_reason",
+      referencesPreviousResults: true,
+    }),
+    aiResponse: {
+      message: "저녁에 잘 어울리는 메뉴로 골라봤어요.",
+      suggestions: [
+        "김치찌개|따뜻하고 든든한 저녁 메뉴예요",
+        "돈까스|바삭하고 포만감 있게 먹기 좋아요",
+      ],
+      selectedRestaurantIds: [],
+    },
+  });
+  assert.doesNotMatch(result.body.message, /추천한 식당이 없어요/);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["김치찌개", "돈까스"]);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 2);
+}
+
+{
+  const result = await runCase({
     message: "회사 사람들이랑 갈 만한 곳 좀 찾아봐",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
     intentAnalysis: semanticAnalysis({
@@ -871,7 +895,7 @@ function semanticAnalysis(overrides = {}) {
     }),
   });
   assert.match(result.body.message, /어느 지역에서 찾을까요/);
-  assert.deepEqual(result.body.suggestions, ["내 주변에서 찾기"]);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["현재 위치 연결", "지역 직접 입력"]);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
 }
 

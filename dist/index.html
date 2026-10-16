@@ -1574,8 +1574,8 @@
         bubble.appendChild(copy);
         if (message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
         const visibleQuickReplies = (message.quickReplies || []).filter(reply => {
-          if (/^(?:지역 정하기|지역 직접 입력|직접 입력)$/.test(reply)) return false;
-          if (isCurrentLocationIntent(reply) && !canUseCurrentLocation()) return false;
+          const card = quickReplyCard(reply);
+          if (isCurrentLocationIntent(card.title) && !canUseCurrentLocation()) return false;
           return true;
         });
         if (visibleQuickReplies.length) {
@@ -1603,7 +1603,14 @@
             arrow.setAttribute('aria-hidden', 'true');
             arrow.textContent = '›';
             button.appendChild(arrow);
-            button.addEventListener('click', () => routeQuestion(card.prompt));
+            button.addEventListener('click', () => {
+              const isCuisineCategory = /^(?:한식|중식|일식|양식|분식)$/.test(card.title);
+              if (card.description && !isCuisineCategory && !isCurrentLocationIntent(card.title) && !/^(?:지역 직접 입력|직접 입력|지역 정하기)$/.test(card.title)) {
+                chooseMenuCard(card.title);
+                return;
+              }
+              routeQuestion(card.prompt);
+            });
             replies.appendChild(button);
           });
           bubble.appendChild(replies);
@@ -1793,7 +1800,19 @@
       }
     }
     function isCurrentLocationIntent(value) {
-      return /^(?:현재\s*위치|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*에서\s*(?:찾기|찾아줘))?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾기|찾아줘|추천해줘|검색해줘))?)?$/.test(String(value || '').trim());
+      return /^(?:현재\s*위치(?:\s*연결)?|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*에서\s*(?:찾기|찾아줘))?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾기|찾아줘|추천해줘|검색해줘))?)?$/.test(String(value || '').trim());
+    }
+
+    function chooseMenuCard(menuName) {
+      if (generating) return;
+      showChatView();
+      appendMessage('user', menuName);
+      appendMessage('assistant', `**${menuName}**로 찾아볼게요.\n\n**어느 지역에서 찾을까요?**`, {
+        quickReplies: [
+          '현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요',
+          '지역 직접 입력|동네나 역 이름을 직접 입력해요'
+        ]
+      });
     }
     function showChatView() {
       if (!currentId) currentId = `chat-${Date.now()}`;

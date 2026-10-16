@@ -170,7 +170,7 @@ function asksForVenueSearch(text) {
 }
 
 const SERVICE_EXPLANATION_PATTERN = /(?:맛집\s*)?추천.{0,12}(?:기준|방식|원리|어떻게\s*(?:정|하|골라)|데이터)|어떤\s*데이터.{0,12}추천|추천은?.{0,8}어떻게\s*(?:정|하|골라)/;
-const RECOMMENDATION_REASON_PATTERN = /(?:왜|어째서).{0,18}(?:추천|골랐)|추천(?:한|했|된)?.{0,12}(?:이유|근거)|(?:이유|근거).{0,12}추천/;
+const RECOMMENDATION_REASON_PATTERN = /(?:왜|어째서).{0,18}(?:추천|골랐|고른)|(?:추천(?:한|했|된)?|골랐|고른).{0,12}(?:이유|근거|까닭)|(?:이유|근거|까닭).{0,12}(?:추천|골랐|고른)/;
 const BROAD_MEAL_QUESTION_PATTERN = /(?:오늘\s*)?(?:뭐\s*(?:먹지|먹을까|먹을지|먹어|먹으면)|메뉴\s*(?:골라|추천)|먹을\s*(?:것|거).{0,6}(?:골라|추천))/;
 const SPECIFIC_MEAL_DIRECTION_PATTERN = /아침|브런치|점심|저녁|야식|한식|중식|일식|양식|분식|카페|디저트|면|밥|고기|국물|찌개|국밥|냉면|파스타|피자|돈까스|초밥|매운|매콤|가볍|든든|따뜻|시원|산뜻|채식|비건/;
 
@@ -288,7 +288,10 @@ function locationContextMessage(messages) {
 function locationNeededResponse(messages = []) {
   return chatResponse(
     `${locationContextMessage(messages)}\n\n**어느 지역에서 찾을까요?** 지역명을 편하게 입력해 주세요.`,
-    ["내 주변에서 찾기"]
+    [
+      "현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요",
+      "지역 직접 입력|동네나 역 이름을 직접 입력해요",
+    ]
   );
 }
 
@@ -310,8 +313,11 @@ function shouldSearchRestaurants(text, messages, requestedField) {
 
 function needsBrowserLocationResponse() {
   return chatResponse(
-    "현재 위치는 제가 임의로 추정하지 않아요.\n\n위치 기능을 사용할 수 있으면 아래 **내 주변에서 찾기**로 확인할 수 있어요. 아니면 찾고 싶은 **지역명을 직접 입력**해 주세요.",
-    ["내 주변에서 찾기"]
+    "현재 위치는 제가 임의로 추정하지 않아요.\n\n아래에서 위치를 연결하거나 찾고 싶은 지역을 직접 입력해 주세요.",
+    [
+      "현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요",
+      "지역 직접 입력|동네나 역 이름을 직접 입력해요",
+    ]
   );
 }
 
@@ -1649,8 +1655,8 @@ async function handleChat(request, env) {
   if (!semanticRouting && SERVICE_EXPLANATION_PATTERN.test(latestUserMessage)) {
     return json(serviceExplanationResponse(dataSource));
   }
-  if ((semanticRouting && intentAnalysis.requestedAction === "recommendation_reason")
-    || (!semanticRouting && RECOMMENDATION_REASON_PATTERN.test(latestUserMessage))) {
+  if (RECOMMENDATION_REASON_PATTERN.test(latestUserMessage)
+    && (!semanticRouting || intentAnalysis.requestedAction === "recommendation_reason")) {
     return json(recommendationReasonResponse(latestUserMessage, recentRestaurants));
   }
   const requestedField = findUnavailableDatabaseField(latestUserMessage);
