@@ -478,6 +478,39 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
+    message: "강남이야",
+    history: [
+      { role: "user", content: "오늘 저녁 메뉴 추천해줘" },
+      { role: "assistant", content: "저녁 메뉴로 골라봤어요." },
+      { role: "user", content: "김치찌개" },
+      { role: "assistant", content: "어느 지역에서 찾을까요?" },
+    ],
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    naverResponse: {
+      items: [{
+        title: "시골밥상",
+        category: "음식점>한식",
+        address: "서울특별시 강남구 역삼동 1",
+        roadAddress: "서울특별시 강남구 테헤란로 1",
+        mapx: "1270276000",
+        mapy: "374979000",
+      }],
+    },
+  });
+  assert.equal(result.body.restaurants.length, 1);
+  assert.equal(result.body.restaurants[0].name, "시골밥상");
+  const localCall = result.calls.find(call => call.href.includes("/search/v1/local"));
+  assert.match(new URL(localCall.href).searchParams.get("query"), /강남/);
+  assert.match(new URL(localCall.href).searchParams.get("query"), /찌개/);
+}
+
+{
+  const result = await runCase({
     message: "신림역 6번 출구 근처에서 혼자 저녁 먹을 곳 추천해줘",
     context: {
       currentLocationName: "서울특별시 관악구 신림동",

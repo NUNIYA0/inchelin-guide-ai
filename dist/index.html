@@ -327,6 +327,9 @@
     .quick-reply-description { grid-column: 1; min-width: 0; color: #777; font-size: 12px; font-weight: 400; line-height: 1.45; overflow-wrap: break-word; word-break: keep-all; }
     .quick-reply-arrow { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #888; font-size: 18px; line-height: 1; }
     .quick-reply:disabled { opacity: .48; cursor: default; }
+    .quick-replies.quick-replies-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+    .quick-reply.quick-reply-action { width: auto; min-height: 42px; padding: 9px 14px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; box-shadow: none; }
+    .quick-reply.quick-reply-action .quick-reply-title { font-size: 13px; font-weight: 650; white-space: nowrap; }
     .message.status { color: #555; }
     .message.status .ai-bubble { display: flex; align-items: center; gap: 10px; padding: 0; }
     .message.error { color: #555; }
@@ -595,6 +598,8 @@
       .ai-avatar { width: 32px; height: 32px; margin: 0; }
       .quick-replies { grid-template-columns: 1fr; }
       .quick-reply { min-height: 74px; padding: 13px 14px; }
+      .quick-replies.quick-replies-actions { display: flex; }
+      .quick-reply.quick-reply-action { min-height: 40px; padding: 8px 12px; }
       .restaurant-card { flex-basis: min(84vw, 310px); }
       .restaurant-carousel-prev { left: 4px; }
       .restaurant-carousel-next { right: 4px; }
@@ -1581,28 +1586,33 @@
         if (visibleQuickReplies.length) {
           const replies = document.createElement('div');
           replies.className = 'quick-replies';
+          const isActionReply = reply => /^(?:현재 위치|내 주변|지역|다른 지역|위치)/.test(quickReplyCard(reply).title);
+          if (visibleQuickReplies.every(isActionReply)) replies.classList.add('quick-replies-actions');
           replies.setAttribute('aria-label', '빠른 답변');
           visibleQuickReplies.forEach(reply => {
             const card = quickReplyCard(reply);
+            const actionReply = isActionReply(reply);
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = 'quick-reply';
+            button.className = `quick-reply${actionReply ? ' quick-reply-action' : ''}`;
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
             title.textContent = card.title;
             button.appendChild(title);
-            if (card.description) {
+            if (card.description && !actionReply) {
               const description = document.createElement('span');
               description.className = 'quick-reply-description';
               description.textContent = card.description;
               button.appendChild(description);
             }
-            const arrow = document.createElement('span');
-            arrow.className = 'quick-reply-arrow';
-            arrow.setAttribute('aria-hidden', 'true');
-            arrow.textContent = '›';
-            button.appendChild(arrow);
+            if (!actionReply) {
+              const arrow = document.createElement('span');
+              arrow.className = 'quick-reply-arrow';
+              arrow.setAttribute('aria-hidden', 'true');
+              arrow.textContent = '›';
+              button.appendChild(arrow);
+            }
             button.addEventListener('click', () => {
               const isCuisineCategory = /^(?:한식|중식|일식|양식|분식)$/.test(card.title);
               if (card.description && !isCuisineCategory && !isCurrentLocationIntent(card.title) && !/^(?:지역 직접 입력|직접 입력|지역 정하기)$/.test(card.title)) {

@@ -1229,7 +1229,7 @@ function userRequestedCafe(messages, intentAnalysis) {
   return /카페|디저트|커피|베이커리|빵|케이크|빙수/.test(text);
 }
 
-function requestedCategoryMatches(place, messages, intentAnalysis) {
+function requestedCategoryMatches(place, messages, intentAnalysis, { strictMenu = true } = {}) {
   const requested = `${userMessagesOnly(messages).slice(-8).join(" ")} ${safeText(intentAnalysis?.foodCategory, 120)}`;
   const searchable = `${place.name} ${place.registered_data?.rawCategory || place.registered_data?.category || ""}`;
   const cuisineRules = [
@@ -1241,6 +1241,10 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
   ];
   const cuisine = cuisineRules.find(([requestPattern]) => requestPattern.test(requested));
   if (cuisine && !cuisine[1].test(searchable)) return false;
+  // NAVER local search does not return a menu list. Its ranked results already
+  // reflect the menu keyword, so rejecting a general "한식" category here can
+  // discard valid restaurants such as a 김치찌개 restaurant named 시골밥상.
+  if (!strictMenu) return true;
   const explicitMenu = requested.match(/국밥|냉면|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|햄버거|버거|해산물|횟집/)?.[0];
   if (!explicitMenu) return true;
   const aliases = {
@@ -1258,7 +1262,7 @@ function validateRestaurantCandidate(place, { messages, intentAnalysis, source }
   const cafe = CAFE_CATEGORY_PATTERN.test(rawCategory);
   if (cafe && !userRequestedCafe(messages, intentAnalysis)) return false;
   if (!cafe && !RESTAURANT_CATEGORY_PATTERN.test(rawCategory)) return false;
-  return requestedCategoryMatches(place, messages, intentAnalysis);
+  return requestedCategoryMatches(place, messages, intentAnalysis, { strictMenu: false });
 }
 
 function distinctiveAddressTokens(address) {
