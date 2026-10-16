@@ -1038,4 +1038,25 @@ function semanticAnalysis(overrides = {}) {
   assert.match(answerCall.body.instructions, /카드를 누르지 않고도 입력창에서 자연어/);
 }
 
+{
+  const result = await runCase({
+    message: "오늘 뭐 먹지?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: {
+      message: "가볍게 먹기 좋은 비빔국수와 든든한 불고기 덮밥 중 어떤 느낌이 더 좋으세요?",
+      suggestions: [
+        "비빔국수|새콤달콤하고 가볍게 먹기 좋아요",
+        "불고기 덮밥|든든하고 포만감 있는 한 끼예요",
+      ],
+      selectedRestaurantIds: [],
+    },
+  });
+  assert.deepEqual(result.body.suggestions, [
+    "비빔국수|새콤달콤하고 가볍게 먹기 좋아요",
+    "불고기 덮밥|든든하고 포만감 있는 한 끼예요",
+  ]);
+  assert.doesNotMatch(result.body.message, /비빔국수|불고기 덮밥/);
+  assert.match(result.body.message, /카드에서 선택하거나 다른 메뉴/);
+}
+
 console.log("Inchelin data policy smoke tests passed.");
