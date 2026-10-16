@@ -895,6 +895,48 @@ function linkedPlaceContext(research) {
   })}\n</linked_place_research>`;
 }
 
+async function searchLinkedPlaceOnWeb(env, research, userRequest) {
+  if (!env.OPENAI_API_KEY || !research || research.status !== "checked") return "";
+  const placeId = safeText(String(research.finalUrl || "").match(/\/(?:entry\/place|restaurant|place)\/(\d+)/)?.[1], 40);
+  const investigation = [
+    `사용자 요청: ${safeText(userRequest, 1200)}`,
+    `네이버 공유 링크: ${safeText(research.sourceUrl, 1000)}`,
+    `확인된 최종 URL: ${safeText(research.finalUrl, 1000)}`,
+    `네이버 장소 ID: ${placeId || "확인되지 않음"}`,
+    `페이지에서 추출한 매장명: ${safeText(research.restaurantName, 200) || "확인되지 않음"}`,
+    `페이지 요약: ${safeText(research.pageSummary, 2200) || "본문 정보 없음"}`,
+  ].join("\n");
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "gpt-5-search-api",
+        web_search_options: { search_context_size: "high" },
+        messages: [
+          {
+            role: "system",
+            content: "너는 한국 음식점 메뉴 조사원이다. 링크 페이지 본문이 비어 있어도 포기하지 말고 URL·장소 ID·매장명과 지점명을 각각 검색한 뒤, 매장명+메뉴판 및 매장명+리뷰 검색을 이어서 수행해라. 정확히 같은 지점의 공개 메뉴명, 메뉴 설명, 재료 언급을 찾아라. 사용자 제외 조건이 일반 취향이면 확인 가능한 후보와 불확실성을 함께 정리하고, 알레르기 등 안전 조건이면 매장 확인 필요를 명시해라. 찾은 출처 링크를 결과에 남기고 추측한 메뉴는 넣지 마라.",
+          },
+          { role: "user", content: investigation },
+        ],
+      }),
+    });
+    if (!response.ok) {
+      console.error("Linked web search failed", response.status, response.headers.get("x-request-id") || "no-request-id");
+      return "";
+    }
+    const data = await response.json();
+    return safeText(data?.choices?.[0]?.message?.content, 12000);
+  } catch (error) {
+    console.error("Linked web search failed", error instanceof Error ? error.message : "unknown error");
+    return "";
+  }
+}
+
 function locationNameFromReverseGeocode(data) {
   const results = Array.isArray(data?.results) ? data.results : [];
   const preferred = results.find(result => result?.name === "admcode")
@@ -1851,6 +1893,9 @@ async function handleChat(request, env) {
   if (latestLinkedUrl && linkedPlaceResearch?.status === "invalid") {
     return json(linkedResearchUnavailableResponse(linkedPlaceResearch));
   }
+  const linkedWebResearch = latestLinkedUrl && linkedPlaceResearch?.status === "checked"
+    ? await searchLinkedPlaceOnWeb(env, linkedPlaceResearch, latestUserMessage)
+    : "";
   if (!linkedPlaceResearch && messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
     return json(broadMealCategoryResponse());
   }
@@ -1987,7 +2032,7 @@ async function handleChat(request, env) {
       : "No active restaurant search location is available.",
   ].join("\n");
 
-  const webSearchEnabled = Boolean(linkedPlaceResearch);
+  const webSearchEnabled = Boolean(linkedPlaceResearch && !linkedWebResearch);
   const response = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: {
@@ -1996,7 +2041,7 @@ async function handleChat(request, env) {
     },
     body: JSON.stringify({
       model: env.OPENAI_MODEL || "gpt-5-mini",
-      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
+      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${linkedWebResearch ? `\n\n<linked_web_research>\n${linkedWebResearch}\n</linked_web_research>\n위 웹 조사 결과를 우선 근거로 사용해 사용자의 질문에 지금 바로 답해. 조사 결과에 메뉴명이 있으면 추가 검색 여부를 되묻지 말고 카드로 제시해. 결과에 포함된 출처 링크는 답변에 1~3개 유지해.` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
       input: messages,
       ...(webSearchEnabled ? {
         tools: [{

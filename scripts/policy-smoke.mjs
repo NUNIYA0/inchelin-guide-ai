@@ -10,7 +10,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, aiResponse, intentAnalysis, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, webResearchResponse = "웹 검색에서 동일 매장의 메뉴판과 리뷰를 확인했습니다.", aiResponse, intentAnalysis, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -26,6 +26,9 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     if (href.includes("/search/v1/blog")) return Response.json(blogResponse || { items: [] });
     if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(naverResponse, { status: naverStatus });
     if (href.includes("openapi.naver.com/v1/search/image")) return Response.json(imageResponse || { items: [] });
+    if (href.endsWith("/v1/chat/completions")) {
+      return Response.json({ choices: [{ message: { content: webResearchResponse } }] });
+    }
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
       if (body.text?.format?.name === "inchelin_intent_analysis") {
@@ -92,16 +95,14 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   });
   assert.match(result.body.message, /웹에서/);
   assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["마르게리타"]);
-  const webAnswerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
-  assert.deepEqual(webAnswerCall.body.tools, [{
-    type: "web_search",
-    search_context_size: "high",
-    external_web_access: true,
-  }]);
-  assert.equal(webAnswerCall.body.tool_choice, "required");
-  assert.equal(webAnswerCall.body.reasoning.effort, "low");
-  assert.match(webAnswerCall.body.instructions, /원본 단축 URL과 최종 네이버 지도 URL 또는 장소 ID/);
-  assert.match(webAnswerCall.body.instructions, /공개 메뉴와 리뷰에서 메뉴명을 확인했다면/);
+  const searchCall = result.calls.find(call => call.href.endsWith("/v1/chat/completions"));
+  assert.equal(searchCall.body.model, "gpt-5-search-api");
+  assert.deepEqual(searchCall.body.web_search_options, { search_context_size: "high" });
+  assert.match(searchCall.body.messages[0].content, /URL·장소 ID·매장명과 지점명을 각각 검색/);
+  const webAnswerCall = result.calls.filter(call => call.href.endsWith("/v1/responses")).at(-1);
+  assert.equal(webAnswerCall.body.tools, undefined);
+  assert.match(webAnswerCall.body.instructions, /linked_web_research/);
+  assert.match(webAnswerCall.body.instructions, /추가 검색 여부를 되묻지 말고 카드로 제시/);
 }
 
 {
