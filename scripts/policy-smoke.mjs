@@ -77,6 +77,35 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
 }
 
 {
+  const result = await runCase({
+    message: "https://naver.me/no-menu 이 가게에서 해산물 빼고 추천해줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    linkRedirect: "https://map.naver.com/p/entry/place/99999",
+    linkHtml: '<html><head><meta property="og:title" content="정보부족식당 : 네이버 지도"></head><body>매장 안내</body></html>',
+  });
+  assert.match(result.body.message, /근거가 부족/);
+  assert.deepEqual(result.body.suggestions, []);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "링크 접속이 안 되는 거야?",
+    history: [
+      { role: "user", content: "https://naver.me/no-menu 이 가게 메뉴 추천해줘" },
+      { role: "assistant", content: "매장 페이지는 확인했지만 메뉴 근거가 부족해요." },
+    ],
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    linkRedirect: "https://map.naver.com/p/entry/place/99999",
+    linkHtml: '<html><head><meta property="og:title" content="정보부족식당 : 네이버 지도"></head><body>매장 안내</body></html>',
+  });
+  assert.match(result.body.message, /링크와.*매장 페이지는 확인/);
+  assert.doesNotMatch(result.body.message, /어느 지역/);
+  assert.deepEqual(result.body.suggestions, []);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+}
+
+{
   const originalFetch = globalThis.fetch;
   globalThis.fetch = async url => {
     assert.match(String(url), /map-geocode\/v2\/geocode\?query=/);

@@ -845,6 +845,31 @@ async function researchLinkedPlace(env, text) {
   }
 }
 
+function linkedResearchHasMenuEvidence(research) {
+  if (!research || research.status !== "checked") return false;
+  if (research.imageAnalysis && !/메뉴 정보 확인 불가/.test(research.imageAnalysis)) return true;
+  const official = `${research.pageSummary || ""}`;
+  if (/(?:메뉴|대표\s*메뉴|피자|파스타|스테이크|국밥|찌개|냉면|돈까스|초밥|라멘|덮밥|탕|구이|샐러드|버거|치킨|\d{1,3},\d{3}\s*원)/.test(official)) return true;
+  return research.reviews.some(review => /(?:메뉴|먹었|주문|피자|파스타|스테이크|국밥|찌개|냉면|돈까스|초밥|라멘|덮밥|탕|구이|샐러드|버거|치킨)/.test(`${review.title} ${review.excerpt}`));
+}
+
+function linkedResearchUnavailableResponse(research) {
+  if (!research || research.status !== "checked") {
+    return chatResponse("링크에 **접속하지 못했어요.**\n\n네이버 지도에서 공유 링크를 다시 복사해 보내주시면 한 번 더 확인해볼게요.");
+  }
+  const name = research.restaurantName ? ` **${research.restaurantName}**` : "";
+  return chatResponse(`링크와${name} 매장 페이지는 확인했어요.\n\n하지만 공개 페이지의 메뉴 정보·이미지와 검색 가능한 리뷰에서 **메뉴명과 재료를 확인할 근거가 부족해요.** 확인되지 않은 메뉴를 임의로 추천하지 않을게요.`);
+}
+
+function linkedAccessStatusResponse(research) {
+  if (!research || research.status !== "checked") return linkedResearchUnavailableResponse(research);
+  const name = research.restaurantName ? ` **${research.restaurantName}**` : " 해당 매장";
+  if (linkedResearchHasMenuEvidence(research)) {
+    return chatResponse(`네, 링크는 정상적으로 열렸고${name} 페이지도 확인했어요.\n\n페이지와 리뷰에서 확인되는 메뉴 정보만 기준으로 추천할 수 있어요.`);
+  }
+  return linkedResearchUnavailableResponse(research);
+}
+
 function linkedPlaceContext(research) {
   if (!research) return "";
   return `<linked_place_research>\n${JSON.stringify({
@@ -1797,7 +1822,18 @@ async function handleChat(request, env) {
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
-  const linkedPlaceResearch = await researchLinkedPlace(env, latestUserMessage);
+  const latestLinkedUrl = linkedNaverUrl(latestUserMessage);
+  const asksAboutPreviousLink = /(?:링크|주소).{0,12}(?:접속|확인|열|안\s*되|봤)|(?:접속|확인).{0,12}(?:링크|주소)/.test(latestUserMessage);
+  const previousLinkedUrl = asksAboutPreviousLink
+    ? [...messages].reverse().map(message => linkedNaverUrl(message.content)).find(Boolean) || ""
+    : "";
+  const linkedPlaceResearch = (latestLinkedUrl || previousLinkedUrl)
+    ? await researchLinkedPlace(env, latestLinkedUrl || previousLinkedUrl)
+    : null;
+  if (asksAboutPreviousLink && linkedPlaceResearch) return json(linkedAccessStatusResponse(linkedPlaceResearch));
+  if (latestLinkedUrl && !linkedResearchHasMenuEvidence(linkedPlaceResearch)) {
+    return json(linkedResearchUnavailableResponse(linkedPlaceResearch));
+  }
   if (!linkedPlaceResearch && messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
     return json(broadMealCategoryResponse());
   }
