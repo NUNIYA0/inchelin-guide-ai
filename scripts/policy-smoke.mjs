@@ -1033,6 +1033,9 @@ function semanticAnalysis(overrides = {}) {
   assert.match(answerCall.body.instructions, /내부적으로 육하원칙으로 점검/);
   assert.match(answerCall.body.instructions, /먼저 결론을 말하는 자연스러운 한국어 문장/);
   assert.match(answerCall.body.instructions, /가장 중요한 질문 하나/);
+  assert.match(answerCall.body.instructions, /클릭형 카드/);
+  assert.match(answerCall.body.instructions, /카드 제목\|한 문장의 짧은 추천 이유/);
+  assert.match(answerCall.body.instructions, /카드를 누르지 않고도 입력창에서 자연어/);
 }
 
 console.log("Inchelin data policy smoke tests passed.");
