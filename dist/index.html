@@ -1498,6 +1498,12 @@
           parking.textContent = restaurant.parking ? '주차 가능' : '주차 불가';
           badges.appendChild(parking);
         }
+        if (restaurant.dataSource === 'naver') {
+          const sourceBadge = document.createElement('span');
+          sourceBadge.className = 'restaurant-badge';
+          sourceBadge.textContent = '네이버 검색 기준';
+          badges.appendChild(sourceBadge);
+        }
         body.appendChild(head);
         if (restaurant.recommendedBy) body.appendChild(recommender);
         if (category.textContent) body.appendChild(category);

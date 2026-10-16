@@ -529,7 +529,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.body.restaurants[0].dataSource, "naver");
   assert.equal(result.body.restaurants[0].validationVersion, 2);
   assert.equal(result.body.restaurants[0].isRegisteredInInchelin, false);
-  assert.ok(["김민준", "이서연", "박도윤"].includes(result.body.restaurants[0].recommendedBy));
+  assert.equal(result.body.restaurants[0].recommendedBy, "");
   assert.equal(result.body.restaurants[0].imageUrl, "https://images.example/pyongyang-thumb.jpg");
   assert.equal(result.body.restaurants[0].category, "냉면");
   assert.equal(result.body.restaurants[0].longitude, 127);
@@ -569,6 +569,7 @@ function semanticAnalysis(overrides = {}) {
   });
   assert.equal(result.body.restaurants.length, 1);
   assert.equal(result.body.restaurants[0].name, "시골밥상");
+  assert.match(result.body.restaurants[0].naverPlaceUrl, /^https:\/\/map\.naver\.com\/p\/search\//);
   const localCall = result.calls.find(call => call.href.includes("/search/v1/local"));
   assert.match(new URL(localCall.href).searchParams.get("query"), /강남/);
   assert.match(new URL(localCall.href).searchParams.get("query"), /찌개/);
