@@ -1030,6 +1030,9 @@ function semanticAnalysis(overrides = {}) {
   const answerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
   assert.match(answerCall.body.instructions, /"position":1/);
   assert.match(answerCall.body.instructions, /310/);
+  assert.match(answerCall.body.instructions, /내부적으로 육하원칙으로 점검/);
+  assert.match(answerCall.body.instructions, /먼저 결론을 말하는 자연스러운 한국어 문장/);
+  assert.match(answerCall.body.instructions, /가장 중요한 질문 하나/);
 }
 
 console.log("Inchelin data policy smoke tests passed.");
