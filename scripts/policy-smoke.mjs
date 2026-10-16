@@ -414,6 +414,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
+  assert.match(result.body.message, /구체적인 메뉴를 좁히고.*가까운 식당/);
   assert.equal(result.calls.length, 0);
 }
 
