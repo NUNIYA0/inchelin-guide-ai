@@ -1794,7 +1794,7 @@ async function handleChat(request, env) {
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
   const linkedPlaceResearch = await researchLinkedPlace(env, latestUserMessage);
-  if (messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
+  if (!linkedPlaceResearch && messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
     return json(broadMealCategoryResponse());
   }
   if (LOCATION_CHANGE_PATTERN.test(latestUserMessage.trim())) return json(locationNeededResponse(messages));

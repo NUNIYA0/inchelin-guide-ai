@@ -46,7 +46,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
 
 {
   const result = await runCase({
-    message: "https://naver.me/test 여기 가게에서 해산물 안 들어간 피자 추천해줘",
+    message: "https://naver.me/test 해산물 빼고, 맛있는 메뉴 추천해줘",
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
