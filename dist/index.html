@@ -288,8 +288,15 @@
     .message-copy p { margin: 0; font-weight: 400; }
     .message-copy strong { color: #202020; font-weight: 600; }
     .message.user .message-copy strong { color: inherit; font-weight: 400; }
-    .restaurant-list { width: 100%; max-width: 100%; margin: 16px 0; display: grid; grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 12px; }
-    .restaurant-card { min-width: 0; height: 100%; overflow: hidden; display: flex; flex-direction: column; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
+    .restaurant-carousel { position: relative; width: 100%; max-width: 100%; margin: 16px 0; }
+    .restaurant-list { width: 100%; max-width: 100%; margin: 0; padding: 2px 2px 9px; display: flex; align-items: stretch; gap: 12px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
+    .restaurant-list::-webkit-scrollbar { display: none; }
+    .restaurant-card { min-width: 0; height: auto; flex: 0 0 calc((100% - 12px) / 2); overflow: hidden; display: flex; flex-direction: column; scroll-snap-align: start; scroll-snap-stop: always; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
+    .restaurant-carousel-nav { position: absolute; z-index: 3; top: 50%; width: 40px; height: 40px; border: 1px solid #dedede; border-radius: 50%; background: rgba(255,255,255,.96); color: #333; display: grid; place-items: center; font-family: inherit; font-size: 25px; line-height: 1; cursor: pointer; box-shadow: 0 5px 18px rgba(0,0,0,.12); transform: translateY(-50%); transition: opacity .18s ease, background .18s ease, transform .18s ease; }
+    .restaurant-carousel-nav:hover:not(:disabled) { background: #f7f7f7; transform: translateY(-50%) scale(1.04); }
+    .restaurant-carousel-nav:disabled { opacity: .22; cursor: default; }
+    .restaurant-carousel-prev { left: -10px; }
+    .restaurant-carousel-next { right: -10px; }
     .restaurant-media { position: relative; width: 100%; height: clamp(130px, 35vw, 150px); aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center; background: #f1f1f1; }
     .restaurant-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; background: #f3f3f3; }
     .restaurant-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: #8a8a8a; font-size: 12px; }
@@ -588,6 +595,10 @@
       .ai-avatar { width: 32px; height: 32px; margin: 0; }
       .quick-replies { grid-template-columns: 1fr; }
       .quick-reply { min-height: 74px; padding: 13px 14px; }
+      .restaurant-card { flex-basis: min(84vw, 310px); }
+      .restaurant-carousel-prev { left: 4px; }
+      .restaurant-carousel-next { right: 4px; }
+      .restaurant-carousel-nav { width: 38px; height: 38px; }
       .ai-bubble { padding: 0; border-radius: 0; }
       .restaurant-list { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 12px; }
       .restaurant-card-body { padding: 12px; }
@@ -1424,6 +1435,8 @@
       }
     }
     function renderRestaurantCards(restaurants) {
+      const carousel = document.createElement('div');
+      carousel.className = 'restaurant-carousel';
       const list = document.createElement('div');
       list.className = 'restaurant-list';
       list.setAttribute('aria-label', restaurants.some(restaurant => restaurant.dataSource === 'inchelin') ? '인슐랭가이드 등록 맛집' : '맛집 검색 결과');
@@ -1508,7 +1521,35 @@
         card.appendChild(body);
         list.appendChild(card);
       });
-      return list;
+      carousel.appendChild(list);
+      if (restaurants.length >= 3) {
+        const previous = document.createElement('button');
+        previous.type = 'button';
+        previous.className = 'restaurant-carousel-nav restaurant-carousel-prev';
+        previous.setAttribute('aria-label', '이전 맛집 카드');
+        previous.textContent = '‹';
+        const next = document.createElement('button');
+        next.type = 'button';
+        next.className = 'restaurant-carousel-nav restaurant-carousel-next';
+        next.setAttribute('aria-label', '다음 맛집 카드');
+        next.textContent = '›';
+        const cardStep = () => {
+          const card = list.querySelector('.restaurant-card');
+          return card ? card.getBoundingClientRect().width + 12 : list.clientWidth;
+        };
+        const updateNavigation = () => {
+          const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
+          previous.disabled = list.scrollLeft <= 4;
+          next.disabled = list.scrollLeft >= maxScroll - 4;
+        };
+        previous.addEventListener('click', () => list.scrollBy({ left: -cardStep(), behavior: 'smooth' }));
+        next.addEventListener('click', () => list.scrollBy({ left: cardStep(), behavior: 'smooth' }));
+        list.addEventListener('scroll', updateNavigation, { passive: true });
+        window.addEventListener('resize', updateNavigation, { passive: true });
+        carousel.append(previous, next);
+        requestAnimationFrame(updateNavigation);
+      }
+      return carousel;
     }
     function quickReplyCard(reply) {
       const raw = String(reply || '').trim();
