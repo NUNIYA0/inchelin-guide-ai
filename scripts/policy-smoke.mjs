@@ -9,7 +9,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, aiResponse, intentAnalysis, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, aiResponse, intentAnalysis, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -17,6 +17,11 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     calls.push({ href, headers: new Headers(options.headers), body: options.body ? JSON.parse(options.body) : null });
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
+    if (href.startsWith("https://naver.me/") && linkRedirect) return new Response(null, { status: 302, headers: { location: linkRedirect } });
+    if ((href.includes("map.naver.com/") || href.includes("place.naver.com/")) && linkHtml !== undefined) {
+      return new Response(linkHtml, { status: 200, headers: { "content-type": "text/html" } });
+    }
+    if (href.includes("/search/v1/blog")) return Response.json(blogResponse || { items: [] });
     if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(naverResponse, { status: naverStatus });
     if (href.includes("openapi.naver.com/v1/search/image")) return Response.json(imageResponse || { items: [] });
     if (href.includes("api.openai.com")) {
@@ -37,6 +42,38 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   } finally {
     globalThis.fetch = originalFetch;
   }
+}
+
+{
+  const result = await runCase({
+    message: "https://naver.me/test 여기 가게에서 해산물 안 들어간 피자 추천해줘",
+    env: {
+      OPENAI_API_KEY: "test-key",
+      RESTAURANT_DATA_SOURCE: "naver",
+      NAVER_API_HUB_CLIENT_ID: "naver-id",
+      NAVER_API_HUB_CLIENT_SECRET: "naver-secret",
+    },
+    linkRedirect: "https://map.naver.com/p/entry/place/12345",
+    linkHtml: '<html><head><meta property="og:title" content="테스트피자 : 네이버 지도"></head><body>메뉴 마르게리타 토마토 모차렐라 고르곤졸라 치즈</body></html>',
+    blogResponse: {
+      items: [
+        { title: "테스트피자 방문 후기", description: "마르게리타는 토마토와 치즈가 들어간 메뉴였어요.", bloggername: "방문자", link: "https://blog.naver.com/review/1" },
+      ],
+    },
+    aiResponse: {
+      message: "링크의 식당과 메뉴 정보를 확인했어요. 해산물 제외 조건에 맞는 후보예요.",
+      suggestions: ["마르게리타|공식 메뉴 설명과 리뷰에서 토마토·치즈 구성으로 확인됐어요"],
+      selectedRestaurantIds: [],
+    },
+  });
+  assert.match(result.body.message, /링크의 식당/);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["마르게리타"]);
+  assert.equal(result.calls.filter(call => call.href.startsWith("https://naver.me/")).length, 1);
+  assert.equal(result.calls.filter(call => call.href.includes("/search/v1/blog")).length, 1);
+  assert.equal(result.calls.filter(call => call.href.includes("/search/v1/local")).length, 0);
+  const answerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
+  assert.match(answerCall.body.instructions, /linked_place_research/);
+  assert.match(answerCall.body.instructions, /테스트피자/);
 }
 
 {

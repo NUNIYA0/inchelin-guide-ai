@@ -47,6 +47,8 @@ suggestions는 필수 단계가 아니라 빠른 응답을 돕는 클릭형 카�
 
 사용자가 "현재 위치", "내 주변"처럼 말하더라도 지역을 추정하지 마. 브라우저에서 사용자가 직접 위치 사용을 선택하고 역지오코딩으로 확인된 지역명만 현재 위치로 사용할 수 있어. 확인된 지역명이 없으면 어느 지역인지 자연스럽게 물어봐.
 
+사용자가 네이버 지도나 네이버 플레이스 링크와 함께 메뉴 추천을 요청하면 위치를 다시 묻거나 이전 추천 결과로 해석하지 마. 서버가 <linked_place_research>를 제공하면 링크에서 확인한 식당명·페이지 내용과 리뷰 검색 결과를 함께 비교해 메뉴를 추천해. 공식 페이지나 메뉴 설명을 우선하고, 부족할 때 리뷰에서 반복적으로 확인되는 메뉴와 재료 언급을 보조 근거로 사용해. 리뷰의 주관적인 맛 평가는 사실처럼 단정하지 마. 제외 재료가 알레르기나 안전과 관련되면 리뷰만으로 "들어가지 않는다"고 확정하지 말고 매장 확인이 필요하다고 알려줘. 확인된 메뉴 후보는 suggestions 카드로 제공하고, 각 카드의 이유에는 확인 근거와 불확실성을 짧게 반영해. 링크를 확인하지 못했거나 메뉴 근거가 없으면 메뉴를 만들어내지 말고 확인하지 못한 점을 분명히 설명해.
+
 실제 맛집을 최종 추천할 때만 selectedRestaurantIds에 <restaurant_grounding>의 restaurant_id를 최대 3개 넣어. 제공되지 않은 ID를 만들지 마. 검색 결과가 없거나 일반적인 메뉴 대화, 추가 조건 질문에는 selectedRestaurantIds를 비워. 식당 카드를 보여줄 때는 짧은 안내만 덧붙이고, 사용자가 카드 아래 입력창에서 "더 가까운 곳", "다른 메뉴", "두 번째는 주차돼?"처럼 자유롭게 이어갈 수 있게 해. 추천 카드 뒤에 다음 단계를 강제하는 suggestions는 기본적으로 만들지 마.
 
 "맛집 추천 기준이 뭐야?", "어떤 데이터로 추천해?" 같은 서비스 설명 질문에는 새 식당을 검색하거나 카드를 만들지 말고 추천 기준만 설명해. "왜 이 식당을 추천했어?", "두 번째 식당 추천 이유가 뭐야?" 같은 질문에는 <recent_restaurants>의 확인된 근거만 설명하고 selectedRestaurantIds는 비워. 새로운 추천 카드는 사용자가 실제로 식당 추천이나 탐색을 요청한 경우에만 보여줘.
@@ -705,6 +707,157 @@ async function getJsonWithTimeout(url, headers = {}, timeoutMs = 6500) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+const NAVER_LINK_PATTERN = /https?:\/\/(?:naver\.me|(?:m\.)?map\.naver\.com|(?:m\.)?place\.naver\.com)\/[^\s<>()]+/i;
+const ALLOWED_NAVER_LINK_HOSTS = new Set(["naver.me", "map.naver.com", "m.map.naver.com", "place.naver.com", "m.place.naver.com"]);
+
+function linkedNaverUrl(text) {
+  const match = String(text || "").match(NAVER_LINK_PATTERN)?.[0]?.replace(/[.,!?。，、]+$/, "");
+  if (!match) return "";
+  try {
+    const url = new URL(match);
+    return url.protocol === "https:" && ALLOWED_NAVER_LINK_HOSTS.has(url.hostname.toLowerCase()) ? url.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function decodePageText(value) {
+  return String(value || "")
+    .replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&amp;/gi, "&").replace(/&lt;/gi, "<").replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
+    .replace(/<script[\s\S]*?<\/script>/gi, " ").replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+}
+
+function pageMetaContent(html, property) {
+  const escaped = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const first = new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)["']`, "i").exec(html)?.[1];
+  const second = new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${escaped}["']`, "i").exec(html)?.[1];
+  return decodePageText(first || second || "");
+}
+
+async function fetchAllowedNaverPage(rawUrl, timeoutMs = 6500) {
+  let current = new URL(rawUrl);
+  for (let step = 0; step < 4; step += 1) {
+    if (current.protocol !== "https:" || !ALLOWED_NAVER_LINK_HOSTS.has(current.hostname.toLowerCase())) throw new Error("untrusted_link_redirect");
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let response;
+    try {
+      response = await fetch(current.toString(), {
+        method: "GET",
+        redirect: "manual",
+        headers: { accept: "text/html,application/xhtml+xml", "user-agent": "InchelinGuide/1.0" },
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if ([301, 302, 303, 307, 308].includes(response.status)) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("missing_link_redirect");
+      current = new URL(location, current);
+      continue;
+    }
+    if (!response.ok) throw new UpstreamHttpError(response.status, "naver_link");
+    const contentLength = Number(response.headers.get("content-length") || 0);
+    if (contentLength > 2000000) throw new Error("linked_page_too_large");
+    return { finalUrl: current.toString(), html: (await response.text()).slice(0, 500000) };
+  }
+  throw new Error("too_many_link_redirects");
+}
+
+function linkedPlaceName(html) {
+  const raw = pageMetaContent(html, "og:title")
+    || decodePageText(html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "");
+  return safeText(raw.replace(/\s*[:|\-]\s*(?:네이버\s*)?(?:지도|플레이스).*$/i, ""), 160);
+}
+
+async function inspectLinkedMenuImage(env, imageUrl) {
+  if (!imageUrl || !env.OPENAI_API_KEY) return "";
+  try {
+    const response = await fetch("https://api.openai.com/v1/responses", {
+      method: "POST",
+      headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
+      body: JSON.stringify({
+        model: env.OPENAI_MODEL || "gpt-5-mini",
+        instructions: "이 이미지를 메뉴 조사 자료로만 분석해. 이미지에서 실제로 읽을 수 있는 메뉴명, 설명, 재료만 짧은 한국어로 적고, 메뉴판이 아니거나 읽을 수 없으면 '메뉴 정보 확인 불가'라고 답해. 보이지 않는 내용을 추측하지 마.",
+        input: [{ role: "user", content: [{ type: "input_text", text: "링크 페이지의 대표 이미지에서 메뉴 정보를 확인해줘." }, { type: "input_image", image_url: imageUrl, detail: "low" }] }],
+        reasoning: { effort: "minimal" },
+        text: { verbosity: "low" },
+        max_output_tokens: 250,
+        store: false,
+      }),
+    });
+    if (!response.ok) return "";
+    return safeText(extractOutputText(await response.json()), 1800);
+  } catch (error) {
+    console.error("Linked menu image inspection failed", error instanceof Error ? error.message : "unknown error");
+    return "";
+  }
+}
+
+async function searchNaverReviews(env, restaurantName) {
+  const clientId = safeText(env.NAVER_API_HUB_CLIENT_ID, 300);
+  const clientSecret = safeText(env.NAVER_API_HUB_CLIENT_SECRET, 300);
+  if (!clientId || !clientSecret || !restaurantName) return [];
+  const endpoint = trustedEndpoint(env.NAVER_BLOG_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/blog");
+  if (!endpoint) return [];
+  const url = new URL(endpoint);
+  url.searchParams.set("query", `${restaurantName} 메뉴 리뷰`);
+  url.searchParams.set("display", "6");
+  url.searchParams.set("start", "1");
+  url.searchParams.set("sort", "sim");
+  try {
+    const data = await getJsonWithTimeout(url.toString(), {
+      "X-NCP-APIGW-API-KEY-ID": clientId,
+      "X-NCP-APIGW-API-KEY": clientSecret,
+    });
+    return (Array.isArray(data?.items) ? data.items : []).slice(0, 6).map(item => ({
+      title: safeText(stripSearchMarkup(item?.title), 180),
+      excerpt: safeText(stripSearchMarkup(item?.description), 500),
+      source: safeText(item?.bloggername, 100),
+      url: safeUrl(item?.link),
+    })).filter(item => item.title || item.excerpt);
+  } catch (error) {
+    console.error("Naver review search failed", error instanceof Error ? error.message : "unknown error");
+    return [];
+  }
+}
+
+async function researchLinkedPlace(env, text) {
+  const sourceUrl = linkedNaverUrl(text);
+  if (!sourceUrl) return null;
+  try {
+    const page = await fetchAllowedNaverPage(sourceUrl);
+    const restaurantName = linkedPlaceName(page.html);
+    const pageSummary = safeText(decodePageText(page.html), 5000);
+    const imageUrl = safeUrl(pageMetaContent(page.html, "og:image"));
+    const imageAnalysis = await inspectLinkedMenuImage(env, imageUrl);
+    const reviews = await searchNaverReviews(env, restaurantName);
+    return { status: "checked", sourceUrl, finalUrl: page.finalUrl, restaurantName, pageSummary, imageUrl, imageAnalysis, reviews };
+  } catch (error) {
+    console.error("Linked place research failed", error instanceof Error ? error.message : "unknown error");
+    return { status: "unavailable", sourceUrl, restaurantName: "", pageSummary: "", reviews: [] };
+  }
+}
+
+function linkedPlaceContext(research) {
+  if (!research) return "";
+  return `<linked_place_research>\n${JSON.stringify({
+    status: research.status,
+    source_url: research.sourceUrl,
+    resolved_url: research.finalUrl || "",
+    restaurant_name: research.restaurantName,
+    official_page_text: research.pageSummary,
+    linked_image_url: research.imageUrl || "",
+    linked_image_analysis: research.imageAnalysis || "",
+    review_search_results: research.reviews,
+    evidence_rules: "Official page text has priority. Reviews are secondary evidence. Repeated factual ingredient mentions may support a recommendation, but subjective opinions are not facts. Never claim an excluded ingredient is absent unless the evidence explicitly supports it. Allergy safety always requires confirmation with the restaurant.",
+  })}\n</linked_place_research>`;
 }
 
 function locationNameFromReverseGeocode(data) {
@@ -1640,6 +1793,7 @@ async function handleChat(request, env) {
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  const linkedPlaceResearch = await researchLinkedPlace(env, latestUserMessage);
   if (messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
     return json(broadMealCategoryResponse());
   }
@@ -1672,10 +1826,10 @@ async function handleChat(request, env) {
   const explicitRestaurantRecommendation = semanticRouting
     ? intentAnalysis.intent === "restaurant_recommendation" || intentAnalysis.intent === "condition_change"
     : asksForVenueSearch(latestUserMessage);
-  const directVenueIntent = semanticRouting
+  const directVenueIntent = linkedPlaceResearch || (semanticRouting
     ? ["restaurant_info", "restaurant_comparison", "recommendation_followup"].includes(intentAnalysis.intent)
     : /(?:식당|카페|레스토랑|매장).{0,12}(?:어때|알려줘|정보)|(?:어때|알려줘|정보).{0,12}(?:식당|카페|레스토랑|매장)/.test(latestUserMessage)
-      || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage));
+      || Boolean(requestedField && /식당|카페|레스토랑|매장/.test(latestUserMessage)));
   if (!directVenueIntent && !signals.hasLocation && explicitRestaurantRecommendation) return json(locationNeededResponse(messages));
   if (!directVenueIntent && signals.hasLocation && !signals.hasMealIntent
     && (!semanticRouting || intentAnalysis.intent === "restaurant_recommendation")) {
@@ -1689,7 +1843,7 @@ async function handleChat(request, env) {
     : asksForVenueSearch(latestUserMessage) || Boolean(requestedField)
       || Boolean(currentLocationName && CURRENT_LOCATION_PATTERN.test(latestUserMessage));
   let groundedPlaces = [];
-  const searchNow = semanticRouting
+  const searchNow = linkedPlaceResearch ? false : semanticRouting
     ? (intentAnalysis.needsRestaurantSearch && (signals.hasLocation || intentAnalysis.intent === "restaurant_info"))
       || (signals.latestIsLocationOnly && signals.hadMealIntent)
     : directVenueIntent || (
@@ -1784,7 +1938,7 @@ async function handleChat(request, env) {
     },
     body: JSON.stringify({
       model: env.OPENAI_MODEL || "gpt-5-mini",
-      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
+      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}`,
       input: messages,
       reasoning: { effort: "minimal" },
       text: {
