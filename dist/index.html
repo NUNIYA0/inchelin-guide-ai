@@ -978,7 +978,9 @@
           if (match) placeId = match[1];
         } catch (_) {}
       }
-      return placeId ? { placeId, url: `https://map.naver.com/p/entry/place/${placeId}` } : { placeId: '', url: '' };
+      return placeId
+        ? { placeId, url: `https://map.naver.com/p/entry/place/${placeId}` }
+        : { placeId: '', url: candidate };
     }
     function normalizeRestaurant(restaurant) {
       if (!restaurant) return null;

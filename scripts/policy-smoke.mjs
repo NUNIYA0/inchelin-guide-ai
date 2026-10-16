@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import worker from "../build/dist/server/index.js";
 
 function request(message, history = [], context = {}) {
@@ -1231,5 +1232,12 @@ function semanticAnalysis(overrides = {}) {
   assert.match(answerCall.body.instructions, /broad는 음식 종류 카드 한 단계/);
   assert.match(answerCall.body.instructions, /narrow는 지역과 메뉴가 있거나 특정 식당/);
 }
+
+const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+assert.match(
+  indexHtml,
+  /: \{ placeId: '', url: candidate \};/,
+  "frontend must preserve a validated Naver Map search URL when no numeric place ID exists"
+);
 
 console.log("Inchelin data policy smoke tests passed.");
