@@ -94,10 +94,14 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["마르게리타"]);
   const webAnswerCall = result.calls.filter(call => call.href.includes("api.openai.com")).at(-1);
   assert.deepEqual(webAnswerCall.body.tools, [{
-    type: "web_search_preview",
-    search_context_size: "medium",
+    type: "web_search",
+    search_context_size: "high",
+    external_web_access: true,
   }]);
-  assert.deepEqual(webAnswerCall.body.tool_choice, { type: "web_search_preview" });
+  assert.equal(webAnswerCall.body.tool_choice, "required");
+  assert.equal(webAnswerCall.body.reasoning.effort, "low");
+  assert.match(webAnswerCall.body.instructions, /원본 단축 URL과 최종 네이버 지도 URL 또는 장소 ID/);
+  assert.match(webAnswerCall.body.instructions, /공개 메뉴와 리뷰에서 메뉴명을 확인했다면/);
 }
 
 {
