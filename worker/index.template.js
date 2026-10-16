@@ -13,7 +13,7 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 서버가 <conversation_analysis>를 제공하면, 그 안의 intent와 누적 조건은 전체 대화 의미를 분석한 내부 상태야. 이를 사용해 답변하되 사용자에게 내부 필드명이나 분류 과정을 노출하지 마. service_explanation에는 질문한 기능을 직접 설명하고, restaurant_comparison·recommendation_followup·restaurant_info에는 새 추천을 만들지 말고 직전 결과와 확인된 정보만 답해. condition_change에는 기존 조건을 유지하면서 사용자가 바꾼 조건만 반영해.
 
-"지금 가볍게 먹기 좋은 메뉴 있을까?", "가볍게 먹을 메뉴 추천해줘", "따뜻한 거 뭐가 좋을까?", "점심 메뉴 추천해줘" 같은 질문에는 바로 메뉴를 추천해. "오늘 뭐 먹지?"처럼 넓은 질문에도 먼저 몇 가지 현실적인 메뉴 방향을 제시하고 마지막에 취향을 좁히는 질문 하나만 해. 이런 질문에 "메뉴 추천과 맛집 추천 중 선택해 주세요"처럼 기능이나 모드를 고르게 하지 마. 반대로 "강남역 근처 맛집 추천해줘"처럼 실제 식당과 지역 의도가 명확하면 추가 선택 없이 바로 검색해.
+"지금 가볍게 먹기 좋은 메뉴 있을까?", "가볍게 먹을 메뉴 추천해줘", "따뜻한 거 뭐가 좋을까?", "점심 메뉴 추천해줘"처럼 취향이나 상황이 들어간 질문에는 바로 구체적인 메뉴 카드를 추천해. 반면 "오늘 뭐 먹지?", "뭐 먹을까?", "메뉴 골라줘"처럼 음식 종류와 취향이 전혀 없는 첫 질문에는 구체적인 메뉴를 섞지 말고 반드시 한식, 중식, 일식, 양식의 4개 음식 종류 카드를 먼저 보여줘. 각 카드는 '한식|따뜻하고 든든한 밥과 국물 메뉴', '중식|면과 볶음 요리처럼 풍미 있는 메뉴', '일식|깔끔한 덮밥과 면 요리', '양식|파스타와 고기 요리처럼 기분 전환되는 메뉴' 형식을 기본으로 해. 사용자가 음식 종류 카드를 선택하면 다음 답변에서 그 종류 안의 구체적인 메뉴 카드 2~4개를 제안해. 이런 질문에 "메뉴 추천과 맛집 추천 중 선택해 주세요"처럼 기능이나 모드를 고르게 하지 마. 반대로 "강남역 근처 맛집 추천해줘"처럼 실제 식당과 지역 의도가 명확하면 추가 선택 없이 바로 검색해.
 
 모든 응답은 가능한 범위의 유용한 답, 추천, 설명을 먼저 제공한 뒤에 대화를 이어가. 필요한 정보가 있을 때만 답변의 마지막에 질문 하나를 덧붙여. 질문만 있는 응답을 연속으로 보내거나, 사용자의 답을 받은 직후 또 다른 조건 질문만 던지지 마. 사용자가 방금 말한 내용을 반영한 실질적인 도움을 반드시 먼저 제공하고, 이미 추천할 수 있을 만큼 정보가 있으면 추가 질문 없이 바로 추천해.
 
@@ -27,7 +27,7 @@ const SYSTEM_PROMPT = `Formatting re-enabled
 
 사용자가 가볍게 말하면 답변도 가볍고 친근하게 해. "안녕", "배고파", "뭐 먹지" 같은 말에는 1~2문장의 자연스러운 대화로 답해. 보고서, 업무 분석, 체크리스트, 메뉴판, 검색 필터 같은 딱딱한 형식은 사용하지 마. "추천 4가지", "선택지는 다음과 같아요", "상황을 모르면" 같은 안내 문구로 시작하지 마. 한국어 중심의 편안한 대화체로 답하고, 사용자의 말투와 흐름에 맞춰. 기본 톤에서는 "당겨요?", "땡겨요?" 같은 과도한 구어체를 사용하지 말고 "오늘 뭐 드시고 싶으세요?", "어떤 쪽이 더 좋으세요?"를 우선해. 고유명사가 아닌데 중국어나 일본어 문자를 섞지 마.
 
-답변은 눈으로 빠르게 읽을 수 있게 짧게 작성해. 짧은 맥락 연결 뒤에 사용자의 질문에 대한 실제 답을 주고, 꼭 필요한 경우에만 마지막에 질문 하나를 덧붙여. 질문은 빈 줄을 넣어 별도 문단으로 마지막에 배치해. 메뉴 후보가 여러 개라면 이름과 짧은 이유를 본문에서 자연스럽게 설명하되, 같은 내용을 suggestions로 다시 반복하지 마.
+답변은 눈으로 빠르게 읽을 수 있게 짧게 작성해. 짧은 맥락 연결 뒤에 사용자의 질문에 대한 실제 답을 주고, 꼭 필요한 경우에만 마지막에 질문 하나를 덧붙여. 질문은 빈 줄을 넣어 별도 문단으로 마지막에 배치해. 메뉴 또는 음식 종류 후보가 여러 개라면 이름과 이유는 suggestions 카드에만 넣고 본문에서 반복하지 마.
 
 답변을 만들기 전에는 질문과 대화 맥락을 내부적으로 육하원칙으로 점검해. 누가(인원·동행자), 언제(날짜·시간·영업 여부), 어디서(지역·현재 위치·거리), 무엇을(음식·메뉴·가격), 어떻게(예약·주차·접근 방법), 왜(추천 이유·조건 일치점)를 확인하되, 질문과 관련 있고 근거가 있는 항목만 답변에 사용해. 육하원칙의 항목명, 체크 과정, 내부 분석을 사용자에게 노출하거나 모든 항목을 억지로 채우지 마. 답변은 보고서나 목록이 아니라 먼저 결론을 말하는 자연스러운 한국어 문장으로 작성하고, 실제 식당 정보는 확인된 근거와 확인 시점 안에서만 설명해. 중요한 정보가 하나 부족해도 가능한 도움을 먼저 제공한 뒤, 결과가 크게 달라질 때만 마지막에 가장 중요한 질문 하나를 덧붙여.
 
@@ -169,6 +169,25 @@ function asksForVenueSearch(text) {
 
 const SERVICE_EXPLANATION_PATTERN = /(?:맛집\s*)?추천.{0,12}(?:기준|방식|원리|어떻게\s*(?:정|하|골라)|데이터)|어떤\s*데이터.{0,12}추천|추천은?.{0,8}어떻게\s*(?:정|하|골라)/;
 const RECOMMENDATION_REASON_PATTERN = /(?:왜|어째서).{0,18}(?:추천|골랐)|추천(?:한|했|된)?.{0,12}(?:이유|근거)|(?:이유|근거).{0,12}추천/;
+const BROAD_MEAL_QUESTION_PATTERN = /(?:오늘\s*)?(?:뭐\s*(?:먹지|먹을까|먹을지|먹어|먹으면)|메뉴\s*(?:골라|추천)|먹을\s*(?:것|거).{0,6}(?:골라|추천))/;
+const SPECIFIC_MEAL_DIRECTION_PATTERN = /아침|브런치|점심|저녁|야식|한식|중식|일식|양식|분식|카페|디저트|면|밥|고기|국물|찌개|국밥|냉면|파스타|피자|돈까스|초밥|매운|매콤|가볍|든든|따뜻|시원|산뜻|채식|비건/;
+
+function isBroadMealQuestion(text) {
+  const normalized = sanitizeKoreanText(text).replace(/\s+/g, " ");
+  return BROAD_MEAL_QUESTION_PATTERN.test(normalized) && !SPECIFIC_MEAL_DIRECTION_PATTERN.test(normalized);
+}
+
+function broadMealCategoryResponse() {
+  return chatResponse(
+    "오늘 먹을 음식 종류부터 가볍게 골라볼게요.\n\n카드를 선택하거나 원하는 느낌을 편하게 말씀해 주세요.",
+    [
+      "한식|따뜻하고 든든한 밥과 국물 메뉴",
+      "중식|면과 볶음 요리처럼 풍미 있는 메뉴",
+      "일식|깔끔한 덮밥과 면 요리",
+      "양식|파스타와 고기 요리처럼 기분 전환되는 메뉴",
+    ]
+  );
+}
 
 function serviceExplanationResponse(source) {
   const sourceLine = source === "inchelin"
@@ -1601,6 +1620,9 @@ async function handleChat(request, env) {
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  if (messages.filter(message => message.role === "user").length === 1 && isBroadMealQuestion(latestUserMessage)) {
+    return json(broadMealCategoryResponse());
+  }
   if (LOCATION_CHANGE_PATTERN.test(latestUserMessage.trim())) return json(locationNeededResponse(messages));
   if (CURRENT_LOCATION_PATTERN.test(latestUserMessage) && !currentLocationName
     && !locationMatches(latestUserMessage.replace(CURRENT_LOCATION_PATTERN, "")).length) {

@@ -354,11 +354,10 @@ function semanticAnalysis(overrides = {}) {
   const result = await runCase({
     message: "오늘 뭐 먹지?",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
-    aiResponse: { message: "오늘은 **김치찌개**, **쌀국수**, **덮밥**처럼 방향이 다른 메뉴부터 떠올려볼 수 있어요.\n\n따뜻한 음식이 더 끌려요?", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.match(result.body.message, /김치찌개/);
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
   assert.doesNotMatch(result.body.message, /메뉴 추천.*맛집 추천/);
-  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+  assert.equal(result.calls.length, 0);
 }
 
 {
@@ -1040,7 +1039,7 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "오늘 뭐 먹지?",
+    message: "오늘 가볍게 뭐 먹지?",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     aiResponse: {
       message: "가볍게 먹기 좋은 비빔국수와 든든한 불고기 덮밥 중 어떤 느낌이 더 좋으세요?",
@@ -1057,6 +1056,30 @@ function semanticAnalysis(overrides = {}) {
   ]);
   assert.doesNotMatch(result.body.message, /비빔국수|불고기 덮밥/);
   assert.match(result.body.message, /카드에서 선택하거나 다른 메뉴/);
+}
+
+{
+  const result = await runCase({
+    message: "오늘 뭐 먹을지 같이 골라줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+  });
+  assert.deepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
+  assert.doesNotMatch(result.body.message, /한식|중식|일식|양식/);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "오늘 따뜻한 국물 뭐 먹지?",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    aiResponse: {
+      message: "따뜻한 국물 메뉴로 골라봤어요.",
+      suggestions: ["순두부찌개|부드럽고 얼큰하게 속을 채워요"],
+      selectedRestaurantIds: [],
+    },
+  });
+  assert.notDeepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
 }
 
 console.log("Inchelin data policy smoke tests passed.");
