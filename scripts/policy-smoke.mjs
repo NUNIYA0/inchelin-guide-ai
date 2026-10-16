@@ -18,6 +18,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     if (href.includes("db.example")) return Response.json(dbResponse);
     if (href.includes("enrich.example")) return Response.json(enrichmentResponse);
     if (href.startsWith("https://naver.me/") && linkRedirect) return new Response(null, { status: 302, headers: { location: linkRedirect } });
+    if (href.startsWith("https://naver.me/") && linkHtml !== undefined) return new Response(linkHtml, { status: 200, headers: { "content-type": "text/html" } });
     if ((href.includes("map.naver.com/") || href.includes("place.naver.com/")) && linkHtml !== undefined) {
       return new Response(linkHtml, { status: 200, headers: { "content-type": "text/html" } });
     }
@@ -84,6 +85,18 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     linkHtml: '<html><head><meta property="og:title" content="정보부족식당 : 네이버 지도"></head><body>매장 안내</body></html>',
   });
   assert.match(result.body.message, /근거가 부족/);
+  assert.deepEqual(result.body.suggestions, []);
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+}
+
+{
+  const result = await runCase({
+    message: "https://naver.me/deleted 해당 링크 메뉴에서 해산물 없는 피자 알려줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    linkHtml: '<html><head><title>페이지를 찾을 수 없습니다.</title></head><body>페이지의 주소가 변경 혹은 삭제되어 요청하신 페이지를 찾을 수 없습니다.</body></html>',
+  });
+  assert.match(result.body.message, /페이지를 찾을 수 없는 링크/);
+  assert.match(result.body.message, /만료·삭제/);
   assert.deepEqual(result.body.suggestions, []);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }

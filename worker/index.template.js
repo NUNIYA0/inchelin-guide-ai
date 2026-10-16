@@ -835,6 +835,9 @@ async function researchLinkedPlace(env, text) {
     const page = await fetchAllowedNaverPage(sourceUrl);
     const restaurantName = linkedPlaceName(page.html);
     const pageSummary = safeText(decodePageText(page.html), 5000);
+    if (/페이지를\s*찾을\s*수\s*없습니다|주소가\s*(?:변경|삭제)|잘못\s*입력/.test(`${restaurantName} ${pageSummary}`)) {
+      return { status: "invalid", sourceUrl, finalUrl: page.finalUrl, restaurantName: "", pageSummary, imageUrl: "", imageAnalysis: "", reviews: [] };
+    }
     const imageUrl = safeUrl(pageMetaContent(page.html, "og:image"));
     const imageAnalysis = await inspectLinkedMenuImage(env, imageUrl);
     const reviews = await searchNaverReviews(env, restaurantName);
@@ -854,6 +857,9 @@ function linkedResearchHasMenuEvidence(research) {
 }
 
 function linkedResearchUnavailableResponse(research) {
+  if (research?.status === "invalid") {
+    return chatResponse("네이버에서 **페이지를 찾을 수 없는 링크**로 확인됐어요.\n\n공유 링크가 만료·삭제됐거나 주소가 잘못 복사됐을 수 있어요. 네이버 지도에서 매장을 다시 연 뒤 새 공유 링크를 보내주세요.");
+  }
   if (!research || research.status !== "checked") {
     return chatResponse("링크에 **접속하지 못했어요.**\n\n네이버 지도에서 공유 링크를 다시 복사해 보내주시면 한 번 더 확인해볼게요.");
   }
