@@ -957,7 +957,10 @@
       const restaurants = role === 'assistant' && Array.isArray(message?.restaurants)
         ? message.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3)
         : [];
-      return { role, content, quickReplies, restaurants };
+      const meta = role === 'assistant' && message?.meta && typeof message.meta === 'object'
+        ? message.meta
+        : null;
+      return { role, content, quickReplies, restaurants, meta };
     }
     function safeHttpUrl(value, naverOnly = false) {
       try {
@@ -1182,6 +1185,7 @@
       const latestQuestion = [...nextMessages].reverse().find(message => message.role === 'user')?.content || '';
       const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
       const latestRestaurantMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.restaurants?.length);
+      const latestStateMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.meta?.responseModeState);
       const recentRestaurants = (latestRestaurantMessage?.restaurants || []).slice(0, 3).map(restaurant => ({
         id: restaurant.id,
         name: restaurant.name,
@@ -1211,7 +1215,8 @@
             longitude: currentLocationCoords.longitude
           } : null,
           hasRestaurantResults: recentRestaurants.length > 0,
-          recentRestaurants
+          recentRestaurants,
+          responseModeState: latestStateMessage?.meta?.responseModeState || null
         }
       };
     }
@@ -1238,7 +1243,8 @@
         ? [...new Set(suggestions.map(item => String(item).trim()).filter(Boolean))].slice(0, 6)
         : [];
       const restaurants = Array.isArray(data?.restaurants) ? data.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3) : [];
-      return { content, quickReplies, restaurants };
+      const meta = data?.meta && typeof data.meta === 'object' ? data.meta : null;
+      return { content, quickReplies, restaurants, meta };
     }
     setInterval(() => refreshTimeSuggestions(), 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeSuggestions(); });
@@ -1641,8 +1647,8 @@
       if (follow) requestAnimationFrame(() => chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' }));
       return item;
     }
-    function appendMessage(role, content, { save = true, quickReplies = [], restaurants = [] } = {}) {
-      const message = normalizeMessage({ role, content, quickReplies, restaurants });
+    function appendMessage(role, content, { save = true, quickReplies = [], restaurants = [], meta = null } = {}) {
+      const message = normalizeMessage({ role, content, quickReplies, restaurants, meta });
       if (!message) return null;
       const shouldFollow = isNearConversationBottom();
       chatMessages = [...chatMessages, message];
@@ -1806,7 +1812,7 @@
         const answer = await requestAssistant(request, controller.signal);
         if (controller.signal.aborted) return;
         status.remove();
-        appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants });
+        appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants, meta: answer.meta });
       } catch (error) {
         status.remove();
         if (error?.name !== 'AbortError') showRequestError(request);
@@ -1823,14 +1829,7 @@
 
     function chooseMenuCard(menuName) {
       if (generating) return;
-      showChatView();
-      appendMessage('user', menuName);
-      appendMessage('assistant', `**${menuName}**로 찾아볼게요.\n\n**어느 지역에서 찾을까요?**`, {
-        quickReplies: [
-          '현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요',
-          '지역 직접 입력|동네나 역 이름을 직접 입력해요'
-        ]
-      });
+      routeQuestion(menuName);
     }
     function showChatView() {
       if (!currentId) currentId = `chat-${Date.now()}`;

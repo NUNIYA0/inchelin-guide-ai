@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "items": [
+    { "id": "about.service", "sub_intent": "about", "examples": ["인슐랭가이드가 뭐야?", "너 누구야?", "뭐 할 수 있어?"], "answer": { "default": "인슐랭가이드 AI는 식사 상황과 취향을 이해해 메뉴 선택부터 실제 음식점 탐색까지 이어주는 대화형 AI 맛집 가이드예요." } },
+    { "id": "about.origin", "sub_intent": "about", "examples": ["인슐랭가이드 이름 뜻이 뭐야?"], "answer": { "default": "인슐랭 가이드는 보험(Insurance)과 미슐랭 가이드(Michelin Guide)를 더한 이름이에요." } },
+    { "id": "about.creator", "sub_intent": "about", "examples": ["누가 만들었어?", "만든 곳이 어디야?"], "answer": null },
+    { "id": "about.ai", "sub_intent": "about", "examples": ["AI야?", "사람이 답해?"], "answer": { "default": "AI가 대화를 이해하고, 확인 가능한 맛집 검색 정보와 서비스 규칙을 바탕으로 답해요." } },
+
+    { "id": "how_to.delete_one", "sub_intent": "how_to", "examples": ["대화 삭제는 어떻게 해?", "채팅 하나 지우고 싶어"], "answer": { "default": "왼쪽 최근 대화에서 해당 대화 옆의 점 세 개 버튼을 누른 뒤 ‘삭제’를 선택하면 돼요." } },
+    { "id": "how_to.delete_all", "sub_intent": "how_to", "examples": ["대화를 전부 삭제하려면?", "전체 채팅 삭제"], "answer": null },
+    { "id": "how_to.share_create", "sub_intent": "how_to", "examples": ["공유 링크는 어떻게 만들어?", "대화 공유 방법"], "answer": { "default": "대화 화면 위쪽의 ‘공유하기’를 누르고 ‘공유 링크 만들기’를 선택한 다음 링크를 복사하면 돼요." } },
+    { "id": "how_to.share_view", "sub_intent": "how_to", "examples": ["공유 링크를 열면 뭐가 보여?", "공유하면 위치도 보여?"], "answer": { "default": "공유 링크에는 대화 내용이 표시되고, 위치 좌표와 로그인 정보는 포함되지 않아요." } },
+    { "id": "how_to.share_cancel", "sub_intent": "how_to", "examples": ["공유를 취소할 수 있어?", "공유 링크 없애는 법"], "answer": null },
+    { "id": "how_to.history", "sub_intent": "how_to", "examples": ["지난 대화는 어디서 봐?", "이전 채팅 다시 보기"], "answer": { "default": "왼쪽의 ‘최근 대화’ 목록에서 저장된 대화를 다시 열 수 있어요." } },
+    { "id": "how_to.new_chat", "sub_intent": "how_to", "examples": ["새 대화는 어떻게 시작해?", "처음부터 다시 대화하고 싶어"], "answer": { "default": "왼쪽의 ‘새 채팅’ 버튼을 누르면 새 대화를 시작할 수 있어요." } },
+    { "id": "how_to.location", "sub_intent": "how_to", "examples": ["위치 버튼은 어떻게 써?", "현재 위치 연결 방법"], "answer": { "default": "대화에 표시되는 ‘현재 위치 연결’ 또는 ‘내 주변에서 찾기’를 누르고 브라우저의 위치 권한을 허용하면 돼요. 지역명을 직접 입력해도 됩니다." } },
+    { "id": "how_to.login", "sub_intent": "how_to", "examples": ["로그인은 어떻게 해?", "회원가입 방법"], "answer": { "default": "화면의 ‘시작하기’ 또는 사이드바의 ‘로그인 · 회원가입’을 눌러 계정 화면을 열 수 있어요." } },
+    { "id": "how_to.logout", "sub_intent": "how_to", "examples": ["로그아웃은 어떻게 해?"], "answer": { "default": "계정 · 프로필 화면에서 ‘로그아웃’을 누르면 돼요." } },
+
+    { "id": "policy.price", "sub_intent": "policy", "examples": ["무료야?", "요금이 있어?"], "answer": { "default": "현재 화면에는 결제 정보 없이 이용하는 Free 플랜과 월 결제 Pro 플랜이 안내되어 있어요." } },
+    { "id": "policy.login_required", "sub_intent": "policy", "examples": ["로그인해야 돼?", "가입 없이 쓸 수 있어?"], "answer": { "default": "현재는 로그인하지 않아도 대화를 시작할 수 있어요. 로그인 기능은 계정과 플랜을 확인하는 데 사용됩니다." } },
+    { "id": "policy.history_storage", "sub_intent": "policy", "examples": ["대화 기록 저장돼?", "채팅은 어디에 저장돼?"], "answer": { "default": "대화 기록은 현재 사용하는 브라우저의 로컬 저장소에 자동 저장돼요." } },
+    { "id": "policy.history_retention", "sub_intent": "policy", "examples": ["대화는 얼마나 보관돼?", "채팅 보관 기간"], "answer": null },
+    { "id": "policy.location_reason", "sub_intent": "policy", "examples": ["위치 정보는 왜 필요해?", "왜 위치를 써?"], "answer": { "default": "현재 위치를 연결하면 가까운 음식점을 찾고 좌표가 확인된 후보의 거리를 계산하는 데 사용해요." } },
+    { "id": "policy.location_storage", "sub_intent": "policy", "examples": ["위치 정보도 저장돼?", "좌표를 보관해?"], "answer": { "default": "연결한 지역명과 좌표는 해당 브라우저의 대화 기록에 저장될 수 있어요. 공유 링크에는 위치 좌표가 포함되지 않습니다." } },
+    { "id": "policy.location_denied", "sub_intent": "policy", "examples": ["위치 허용 안 하면 못 써?", "위치 권한이 없어도 돼?"], "answer": { "default": "위치 권한을 허용하지 않아도 사용할 수 있어요. 찾고 싶은 동네나 역 이름을 직접 입력하면 됩니다." } },
+    { "id": "policy.mobile", "sub_intent": "policy", "examples": ["모바일에서도 돼?", "휴대폰 지원해?"], "answer": { "default": "모바일 화면에 맞춘 메뉴와 채팅 화면을 지원해요. 현재 위치 기능은 브라우저와 기기의 위치 권한이 필요합니다." } },
+    { "id": "policy.share_scope", "sub_intent": "policy", "examples": ["공유 링크는 누가 볼 수 있어?", "공유 링크 공개 범위"], "answer": { "default": "공유 링크를 받은 사람은 링크에 포함된 대화 내용을 볼 수 있어요. 위치 좌표와 로그인 정보는 제외됩니다." } },
+
+    { "id": "data_basis.criteria", "sub_intent": "data_basis", "examples": ["추천은 어떤 기준으로 해?", "맛집 추천하는 기준이 뭐야?", "어떻게 식당을 골라?", "어떤 원칙으로 가게를 골라 보여줘?"], "answer": { "default": "지역, 음식 종류, 식사 상황과 확인 가능한 영업 정보를 기준으로 후보를 골라요. 위치를 직접 연결해 좌표가 있으면 가까운 순으로 보여주고, 글로 지역만 입력한 경우에는 거리순이라고 안내하지 않아요." } },
+    { "id": "data_basis.registered_only", "sub_intent": "data_basis", "examples": ["등록 안 된 식당도 나와?", "인슐랭가이드에 등록된 곳만 추천해?"], "answer": { "naver": "지금은 네이버 검색으로 확인된 식당 중에서 조건에 맞는 곳을 보여드려요. 인슐랭가이드 등록 식당 중심으로 바꾸는 작업을 진행 중이에요.", "inchelin": "인슐랭가이드에 등록된 식당만 추천해요. 영업 정보는 네이버 등으로 보완해서 확인해요." } },
+    { "id": "data_basis.verification", "sub_intent": "data_basis", "examples": ["식당 정보는 어떻게 검증해?", "정보가 정확해?"], "answer": { "default": "검색 결과의 상호명·주소·음식점 분류를 확인하고 비음식점과 폐업으로 확인된 후보를 제외해요. 확인되지 않은 주차·영업시간·분위기 정보는 만들지 않습니다." } },
+    { "id": "data_basis.card_count", "sub_intent": "data_basis", "examples": ["추천 카드는 왜 3개야?", "왜 세 곳만 보여줘?"], "answer": { "default": "한 번에 비교하기 쉽도록 검증을 통과한 후보 중 최대 3곳을 보여줘요. 조건을 바꾸거나 다른 곳을 요청하면 이전에 본 곳을 제외하고 다시 찾습니다." } },
+    { "id": "data_basis.distance", "sub_intent": "data_basis", "examples": ["거리는 어떻게 계산해?", "거리순 추천이야?"], "answer": { "default": "기기의 위치 좌표가 있을 때만 음식점 좌표와의 직선거리를 계산해 표시하고 가까운 순으로 보여줘요. 지역명을 글로 입력한 경우에는 임의 거리를 만들지 않습니다." } },
+    { "id": "data_basis.hours", "sub_intent": "data_basis", "examples": ["영업시간은 정확해?", "지금 영업 중인지 믿어도 돼?"], "answer": { "default": "확인 가능한 최신 검색 정보만 표시하지만 실제 영업시간은 바뀔 수 있어 방문 전에 매장에 다시 확인하는 것이 좋아요." } },
+    { "id": "data_basis.closure", "sub_intent": "data_basis", "examples": ["폐업한 곳도 나올 수 있어?", "문 닫은 식당은 제외돼?"], "answer": { "default": "폐업으로 확인된 식당은 추천 후보에서 제외해요. 다만 외부 정보 반영이 늦을 수 있어 방문 전 최신 상태를 확인하는 것이 좋아요." } },
+    { "id": "data_basis.source", "sub_intent": "data_basis", "examples": ["식당 데이터는 어디서 가져와?", "데이터 출처가 뭐야?"], "answer": { "naver": "현재는 네이버 지역 검색과 공개 웹 정보로 확인 가능한 식당을 사용해요.", "inchelin": "인슐랭가이드 등록 식당을 기준으로 하고 외부 검색 정보는 최신 상태를 보완하는 데 사용해요." } },
+
+    { "id": "wine.preparing", "sub_intent": "wine", "examples": ["와인 추천해줘", "삼겹살에 어울리는 와인", "와인 특강도 있어?"], "answer": { "default": "와인 추천은 준비 중이에요." } }
+  ]
+}
