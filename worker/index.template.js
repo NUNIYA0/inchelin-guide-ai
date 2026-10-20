@@ -250,10 +250,31 @@ function userMessagesOnly(messages) {
 }
 
 function locationMatches(text) {
+  const explicit = [...String(text || "").matchAll(/(?:^|\s)([0-9A-Za-z가-힣·.-]+?)(?:에서|\s*(?:근처|주변))/g)]
+    .map(match => match[1]).filter(validRegionCandidate);
+  if (explicit.length) return explicit;
   const matcher = new RegExp(LOCATION_TOKEN_SOURCE, "g");
   return [...String(text || "").matchAll(matcher)]
     .map(match => match[0])
-    .filter(value => !LOCATION_FALSE_POSITIVE_PATTERN.test(value));
+    .filter(validRegionCandidate);
+}
+
+function validRegionCandidate(value) {
+  const region = String(value || "").trim();
+  return Boolean(region) && !LOCATION_FALSE_POSITIVE_PATTERN.test(region)
+    && !/^(?:쪽|지역|이곳|저곳|여기|주변|근처|곳|데|중|그중)$/.test(region)
+    && !/찾아|추천|알려|먹을|먹고|먹지|갈\s*만|처음|다시|초기화|어디|메뉴|식당|맛집|가게|그곳|거기|조건|정보|목록|결과|카드|대화|서비스|현재\s*위치/.test(region)
+    && region.match(FOOD_SEARCH_PATTERN)?.[0] !== region;
+}
+
+function bareRegionReply(text) {
+  const region = safeText(text, 120).replace(/(?:에서|근처|주변|쪽|이야|이요|예요|요)$/g, "").trim();
+  return /^[0-9A-Za-z가-힣·.-]{2,30}$/.test(region) && validRegionCandidate(region) ? region : "";
+}
+
+function hardResetOnly(text) {
+  return /처음부터|다\s*지우고|초기화/.test(text)
+    && !String(text).replace(/처음부터|다\s*지우고|초기화|다시|새로|시작|할게요?|할래요?|해\s*주세요|해\s*줘|하자|좋아요?|이제|[\s,.!?。]/g, "");
 }
 
 function explicitLocationFromMessages(messages) {
@@ -397,12 +418,11 @@ function unavailableFactResponse(field, source = "inchelin") {
   );
 }
 
-function noSearchResultsResponse(locationName = "") {
+function noSearchResultsResponse(locationName = "", food = "") {
   const location = mostSpecificSearchLocation(locationName);
-  const locationLine = location ? `**${location} 주변**은 확인했어요.\n\n` : "";
   return chatResponse(
-    `${locationLine}조건에 맞는 곳을 바로 찾지 못했어요.\n\n지역을 조금 넓히거나 메뉴 조건을 바꿔서 다시 찾아볼까요?`,
-    ["주변 지역까지 보기"],
+    `${location ? `${location}에서 ` : ""}${food ? `${food} ` : ""}조건에 맞는 곳을 찾지 못했어요.`,
+    ["지역 넓히기", "메뉴 바꾸기"],
     [],
     { restaurantSearchStatus: "no_results" }
   );
@@ -638,7 +658,7 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
   const hasPrev = state.lastCards.length > 0;
   const useCurrentLocation = /현재\s*위치|내\s*주변/.test(latest);
-  const region = useCurrentLocation ? "" : locationMatches(latest).at(-1) || (state.pendingQuestionSlot === "region" && latest.length <= 30 ? safeText(latest.replace(/(?:에서|근처|주변|쪽|이요|요)$/g, ""), 120) : "");
+  const region = useCurrentLocation ? "" : locationMatches(latest).at(-1) || (state.pendingQuestionSlot === "region" ? bareRegionReply(latest) : "");
   const food = latest.match(FOOD_SEARCH_PATTERN)?.[0] || "";
   const slotFood = /^(?:국물|고기)$/.test(food) ? "" : food;
   const service = /인슐랭|너\s*누구|AI\s*야|인공지능|뭐\s*할\s*수|누가\s*만들|사용법|대화.{0,8}삭제|채팅.{0,8}삭제|공유\s*링크|지난\s*대화|새\s*대화|로그인|로그아웃|어떻게\s*(?:써|사용|삭제|공유|로그인|로그아웃)|무료|요금|위치\s*정보|기록\s*저장|모바일|추천.{0,8}기준|어떤\s*원칙|원칙으로.{0,12}골라|데이터\s*출처|등록\s*(?:안\s*된|되지\s*않은|된)\s*식당|등록\s*식당\s*(?:기준|범위)|카드.{0,5}왜|와인/i.test(latest);
@@ -727,6 +747,8 @@ const RESPONSE_MODE_SCHEMA = {
 async function analyzeResponseModeIntent(env, messages, stateValue) {
   const state = normalizeResponseState(stateValue);
   const fallback = fallbackResponseModeAnalysis(messages, state);
+  const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  if (fallback.intent === "place_search" && locationMatches(latest).length && fallback.slots.menu) return fallback;
   if (state.pendingQuestionSlot === "region" && fallback.intent === "place_search" && fallback.sub_intent === "continuation") return fallback;
   if (fallback.intent === "condition_change" && fallback.sub_intent === "exclude_previous") return fallback;
   if (state.lastCards.length && fallback.intent === "followup" && fallback.reference.target_index) return fallback;
@@ -749,7 +771,10 @@ async function analyzeResponseModeIntent(env, messages, stateValue) {
         }),
       });
       if (!response.ok) throw new Error(`response_mode_analysis_${response.status}`);
-      return normalizeAnalysis(JSON.parse(extractOutputText(await response.json())));
+      const parsed = normalizeAnalysis(JSON.parse(extractOutputText(await response.json())));
+      if (parsed.slots.region && !validRegionCandidate(parsed.slots.region)) parsed.slots.region = null;
+      if (!parsed.slots.region && fallback.slots.region) parsed.slots.region = fallback.slots.region;
+      return parsed;
     } catch (error) {
       if (attempt === 1) console.error("Response mode analysis failed", error instanceof Error ? error.message : "unknown error");
     }
@@ -1351,7 +1376,7 @@ function stripSearchMarkup(value) {
     .trim();
 }
 
-const FOOD_SEARCH_PATTERN = /국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고기|국물/;
+const FOOD_SEARCH_PATTERN = /마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고기|국물/;
 
 function mostSpecificSearchLocation(value) {
   const parts = safeText(value, 240).split(/\s+/).filter(Boolean);
@@ -1613,7 +1638,7 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
   ];
   const cuisine = cuisineRules.find(([requestPattern]) => requestPattern.test(requested));
   if (cuisine && !cuisine[1].test(searchable)) return false;
-  const explicitMenu = requested.match(/국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|햄버거|버거|해산물|횟집|고기/)?.[0];
+  const explicitMenu = requested.match(/마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|햄버거|버거|해산물|횟집|고기/)?.[0];
   if (!explicitMenu) return true;
   const aliases = {
     삼겹살: /삼겹살|돼지|돈육|육류|고깃집|고기구이/, 고기: /삼겹살|돼지|소고기|한우|갈비|육류|고깃집|고기구이/,
@@ -2190,6 +2215,11 @@ async function handleChat(request, env) {
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  if (hardResetOnly(latestUserMessage)) {
+    return json(chatResponse("좋아요, 처음부터 다시 시작할게요. 오늘은 어떤 메뉴나 분위기가 끌리세요?", [], [], {
+      mode: "GENERAL", variant: "hard_reset", responseModeState: emptyResponseState(),
+    }));
+  }
   // Known service questions are resolved before link research and model routing.
   const serviceState = normalizeResponseState(context.responseModeState || { lastCards: recentRestaurants, shownPlaces: recentRestaurants });
   const serviceAnalysis = fallbackResponseModeAnalysis(messages, serviceState);
@@ -2236,7 +2266,7 @@ async function handleChat(request, env) {
       pendingQuestionSlot: /어느\s*지역|지역.{0,8}(?:찾|드실|말씀)/.test(previousAssistant) ? "region" : null,
     });
   }
-  if (!responseState.lastCards.length && recentRestaurants.length) {
+  if (!context.responseModeState && !responseState.lastCards.length && recentRestaurants.length) {
     responseState = normalizeResponseState({ ...responseState, lastCards: recentRestaurants, shownPlaces: recentRestaurants, shownPlaceIds: recentRestaurants.map(item => item.id) });
   }
   if (currentLocationName || currentLocation) {
@@ -2249,6 +2279,14 @@ async function handleChat(request, env) {
     return json(chatResponse("지역이나 메뉴 중 어떤 조건을 바꿀까요?", [], [], {
       mode: "D", responseModeState: responseState,
     }));
+  }
+  if (/^지역\s*넓히기$/.test(latestUserMessage.trim())) {
+    const nextState = { ...responseState, pendingQuestionSlot: "region" };
+    return json(chatResponse("어느 지역까지 넓혀볼까요?", [], [], { mode: "B", responseModeState: nextState }));
+  }
+  if (/^메뉴\s*바꾸기$/.test(latestUserMessage.trim())) {
+    const nextState = normalizeResponseState({ ...responseState, slots: { ...responseState.slots, menu: null, food_type: null }, lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null });
+    return json(modeAResponse({ intent: "menu_trouble", sub_intent: "open", slots: {}, flags: {} }, nextState));
   }
   if (/^가까운\s*순으로$/.test(latestUserMessage.trim())) {
     if (!currentLocation) return json(needsBrowserLocationResponse());
@@ -2312,8 +2350,7 @@ async function handleChat(request, env) {
       if (dataSource === "inchelin" && venueIntent) return json(unregisteredVenueResponse());
       const nextState = updateStateAfterResponse(responseState, decision, { noResults: true });
       if (decision.mode === "D") return json(chatResponse(EXHAUSTED_RESTAURANTS_MESSAGE, ["조건 바꾸기"], [], { responseModeState: nextState, mode: "D" }));
-      const response = noSearchResultsResponse(signals.locationName);
-      response.suggestions = response.suggestions.slice(0, 1);
+      const response = noSearchResultsResponse(signals.locationName, responseState.slots.menu || responseState.slots.food_type);
       response.meta = { ...(response.meta || {}), responseModeState: nextState, mode: decision.mode };
       return json(response);
     } else if (lookup.configured && lookup.ambiguous) {

@@ -815,7 +815,7 @@ function semanticAnalysis(overrides = {}) {
     }),
     naverResponse: { items: [] },
   });
-  assert.match(result.body.message, /신림역 주변\*\*은 확인했어요/);
+  assert.match(result.body.message, /신림역에서 조건에 맞는 곳을 찾지 못했어요/);
   assert.equal(result.body.meta.restaurantSearchStatus, "no_results");
   assert.ok(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length >= 2);
 }
@@ -1237,6 +1237,63 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
+// Unknown region names and request words must not contaminate region/menu slots.
+{
+  const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };
+  for (const message of ["울릉도에서 마라탕 먹을 곳 찾아줘", "울릉도 근처 마라탕 추천해줘", "울릉도 주변 마라탕 알려줘"]) {
+    const result = await runCase({ message, env, analyzerEnabled: true, naverResponse: { items: [] } });
+    assert.equal(result.body.meta.responseModeState.slots.region, "울릉도");
+    assert.equal(result.body.meta.responseModeState.slots.menu, "마라탕");
+    assert.equal(result.body.message, "울릉도에서 마라탕 조건에 맞는 곳을 찾지 못했어요.");
+    assert.deepEqual(result.body.suggestions, ["지역 넓히기", "메뉴 바꾸기"]);
+    assert.deepEqual(result.body.restaurants, []);
+    const searches = result.calls.filter(call => call.href.includes("/search/v1/local"));
+    assert.equal(searches.length, 1);
+    assert.equal(new URL(searches[0].href).searchParams.get("query"), "울릉도 마라탕");
+    assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+  }
+  const state = normalizeResponseState({ slots: { menu: "마라탕", region: "울릉도" }, pendingQuestionSlot: "region" });
+  for (const message of ["찾아줘", "추천해줘", "알려줘", "먹을 곳", "갈만한"]) {
+    const result = await runCase({ message, env, context: { responseModeState: { ...state, slots: { ...state.slots, region: null } } } });
+    assert.equal(result.body.meta.responseModeState.slots.region, null);
+    assert.equal(result.calls.length, 0);
+  }
+  const invalidModelRegion = await runCase({ message: "갈 만한 곳 알려줘", env, analyzerEnabled: true, context: { responseModeState: { ...state, slots: { ...state.slots, region: null } } }, modeIntentAnalysis: { intent: "place_search", confidence: 1, slots: { region: "찾아줘", menu: "마라탕" }, flags: {}, reference: {} } });
+  assert.equal(invalidModelRegion.body.meta.responseModeState.slots.region, null);
+  assert.equal(invalidModelRegion.body.meta.mode, "B");
+  const wider = await runCase({ message: "지역 넓히기", env, context: { responseModeState: state } });
+  assert.equal(wider.body.meta.responseModeState.slots.menu, "마라탕");
+  assert.equal(wider.body.meta.responseModeState.pendingQuestionSlot, "region");
+  const menuChange = await runCase({ message: "메뉴 바꾸기", env, context: { responseModeState: state } });
+  assert.equal(menuChange.body.meta.responseModeState.slots.region, "울릉도");
+  assert.equal(menuChange.body.meta.mode, "A");
+  assert.equal(menuChange.body.suggestions.length, 3);
+}
+
+{
+  const previous = normalizeResponseState({ slots: { region: "역삼", menu: "삼겹살", food_type: "한식", companion: "가족", meal_time: "저녁", use_current_location: true, parking: true, other: ["조용"] }, lastCards: [{ id: "old", name: "이전식당" }], shownPlaceIds: ["old"], shownPlaces: [{ id: "old", name: "이전식당" }], focus: "old", pendingQuestionSlot: "region" });
+  for (const message of ["처음부터 다시 할게", "처음부터 다시 시작할래", "초기화해줘"]) {
+    const result = await runCase({ message, analyzerEnabled: true, env: {}, context: { responseModeState: previous, recentRestaurants: previous.lastCards, currentLocationName: "역삼", currentLocation: { latitude: 37.5, longitude: 127 } } });
+    assert.equal(result.body.message, "좋아요, 처음부터 다시 시작할게요. 오늘은 어떤 메뉴나 분위기가 끌리세요?");
+    assert.equal(result.body.meta.variant, "hard_reset");
+    assert.equal(result.body.meta.mode, "GENERAL");
+    assert.deepEqual(result.body.meta.responseModeState, normalizeResponseState({}));
+    assert.deepEqual(result.body.suggestions, []);
+    assert.deepEqual(result.body.restaurants, []);
+    assert.doesNotMatch(result.body.message, /지역|위치/);
+    assert.equal(result.calls.length, 0);
+    const after = await runCase({ message: "삼겹살 먹고 싶어", env: { OPENAI_API_KEY: "test-key" }, context: { responseModeState: result.body.meta.responseModeState, recentRestaurants: previous.lastCards } });
+    assert.equal(after.body.meta.mode, "B");
+    assert.equal(after.body.meta.responseModeState.slots.region, null);
+    assert.deepEqual(after.body.meta.responseModeState.lastCards, [], "old cards must not rehydrate after a reset");
+  }
+  const soft = await runCase({ message: "이번엔 점심 뭐 먹지?", env: { OPENAI_API_KEY: "test-key" }, context: { responseModeState: previous } });
+  assert.equal(soft.body.meta.mode, "A");
+  assert.equal(soft.body.suggestions.length, 3);
+  assert.equal(soft.body.meta.responseModeState.slots.region, "역삼");
+  assert.equal(soft.body.meta.responseModeState.slots.menu, null);
+}
+
 // Stateful reproduction: menu -> typed region -> alternate restaurants.
 {
   const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };
@@ -1544,6 +1601,23 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+{
+  const buildRequestSource = indexHtml.match(/    function buildAIRequest\(nextMessages\) \{[\s\S]*?\n    \}/)?.[0];
+  assert.ok(buildRequestSource);
+  const buildRequest = new Function("getLocalTimeState", "hasExplicitTimeCondition", "currentId", "currentLocationName", "currentLocationCoords", `${buildRequestSource}\nreturn buildAIRequest;`)(() => ({}), () => false, "test-session", "", null);
+  const clearedState = normalizeResponseState({});
+  const built = buildRequest([
+    { role: "assistant", content: "이전 식당", restaurants: [{ id: "old", name: "이전식당" }] },
+    { role: "user", content: "처음부터 다시 할게" },
+    { role: "assistant", content: "처음부터 시작할게요", meta: { variant: "hard_reset", responseModeState: clearedState } },
+    { role: "user", content: "삼겹살 먹고 싶어" },
+  ]);
+  assert.deepEqual(built.context.recentRestaurants, []);
+  assert.equal(built.context.hasRestaurantResults, false);
+  assert.equal(built.context.currentLocation, null);
+  assert.deepEqual(built.context.responseModeState, clearedState);
+  assert.match(indexHtml, /answer\.meta\?\.variant === 'hard_reset'[\s\S]*?currentLocationName = '';[\s\S]*?currentLocationCoords = null;/);
+}
 assert.match(indexHtml, /quick-replies-followup/);
 assert.match(indexHtml, /quick-reply-chip[^}]*min-height: 32px/);
 {

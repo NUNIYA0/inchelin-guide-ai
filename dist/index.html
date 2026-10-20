@@ -1189,7 +1189,8 @@
       const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
       const latestRestaurantMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.restaurants?.length);
       const latestStateMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.meta?.responseModeState);
-      const recentRestaurants = (latestRestaurantMessage?.restaurants || []).slice(0, 3).map(restaurant => ({
+      const activeCardIds = latestStateMessage?.meta?.responseModeState?.lastCards?.map(card => card.id);
+      const recentRestaurants = (latestRestaurantMessage?.restaurants || []).filter(restaurant => !activeCardIds || activeCardIds.includes(restaurant.id)).slice(0, 3).map(restaurant => ({
         id: restaurant.id,
         name: restaurant.name,
         address: restaurant.address,
@@ -1603,7 +1604,7 @@
         if (visibleQuickReplies.length) {
           const replies = document.createElement('div');
           replies.className = 'quick-replies';
-          const isFollowupChip = reply => Boolean(message.restaurants?.length) && /^(?:다른 곳도 보여줘|가까운 순으로|현재 위치 연결|조건 바꾸기)$/.test(quickReplyCard(reply).title);
+          const isFollowupChip = reply => Boolean(message.restaurants?.length || message.meta?.restaurantSearchStatus === 'no_results') && /^(?:다른 곳도 보여줘|가까운 순으로|현재 위치 연결|조건 바꾸기|지역 넓히기|메뉴 바꾸기)$/.test(quickReplyCard(reply).title);
           if (visibleQuickReplies.every(isFollowupChip)) replies.classList.add('quick-replies-followup');
           const isActionReply = reply => /^(?:현재 위치|내 주변|지역|다른 지역|위치)/.test(quickReplyCard(reply).title);
           if (visibleQuickReplies.every(isActionReply)) replies.classList.add('quick-replies-actions');
@@ -1817,6 +1818,10 @@
       try {
         const answer = await requestAssistant(request, controller.signal);
         if (controller.signal.aborted) return;
+        if (answer.meta?.variant === 'hard_reset') {
+          currentLocationName = '';
+          currentLocationCoords = null;
+        }
         status.remove();
         appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants, meta: answer.meta });
       } catch (error) {
