@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import worker from "../build/dist/server/index.js";
 import { koreanParticle, withParticle } from "../worker/korean.js";
-import { CATEGORY_MENUS, GAME_NOTICE, secureRandomInt, autoCandidates, spinWheel, makeLadder, resultMessage, categoryRequest, normalizeOptions } from "../dist/assets/meal-tools-v1.js";
+import { CATEGORY_MENUS, GAME_NOTICE, secureRandomInt, autoCandidates, spinWheel, makeLadder, resultMessage, categoryRequest, normalizeOptions, wheelLabel } from "../dist/assets/meal-tools-v2.js";
 import { testMealToolsUI } from "./meal-tools-smoke.mjs";
 import {
   applyAnalysisToState,
@@ -1657,6 +1657,45 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+// Plugin layout groups only the existing six entries, then the two existing games.
+{
+  const definitions = indexHtml.slice(indexHtml.indexOf("    const PLUGINS ="), indexHtml.indexOf("    const GUIDES ="));
+  const renderSource = indexHtml.match(/    function renderPlugins\(\) \{[\s\S]*?\n    \}/)?.[0];
+  assert.ok(renderSource);
+  const nodes = { '#pluginSearch': { value: '' }, '#pluginCount': {}, '#pluginGrid': {} };
+  const panel = new Function('$', 'pinned', `${definitions}\nlet activeFilter = 'all';\n${renderSource}\nreturn { plugins: PLUGINS, sections: PLUGIN_SECTIONS, render(filter, term = '') { activeFilter = filter; $('#pluginSearch').value = term; renderPlugins(); return $('#pluginGrid').innerHTML; } };`)(selector => nodes[selector], [1]);
+  assert.deepEqual(panel.plugins.map(p => p.name), ['메뉴 탐색', '상황별 추천', '지역별 찾기', '등록 맛집 비교', '맛집 검색 데이터', '최신 매장 정보']);
+  assert.deepEqual(panel.plugins.map(p => p.id), [1, 2, 3, 4, 5, 6], 'preserve existing pin identities');
+  assert.deepEqual(panel.sections.map(section => section.title), ['탐색', '추천·비교', '데이터', '재미']);
+  const html = panel.render('all');
+  const sections = [...html.matchAll(/data-plugin-section="([^"]+)"[\s\S]*?<\/section>/g)];
+  assert.deepEqual(sections.map(section => section[1]), ['explore', 'recommend', 'data', 'fun']);
+  for (const [index, names] of [['메뉴 탐색', '지역별 찾기'], ['상황별 추천', '등록 맛집 비교'], ['맛집 검색 데이터', '최신 매장 정보']].entries()) {
+    for (const name of names) assert.ok(sections[index][0].includes(name));
+    assert.equal((sections[index][0].match(/data-plugin="/g) || []).length, 2);
+  }
+  assert.ok(sections.at(-1)[0].includes('data-meal-tool="wheel"'));
+  assert.ok(sections.at(-1)[0].includes('data-meal-tool="ladder"'));
+  assert.equal((html.match(/data-plugin="/g) || []).length, 6);
+  assert.equal((html.match(/data-meal-tool="/g) || []).length, 2);
+  assert.equal(nodes['#pluginCount'].textContent, '8개 항목');
+  for (const type of ['explore', 'recommend', 'data', 'fun']) {
+    const filtered = panel.render(type);
+    assert.deepEqual([...filtered.matchAll(/data-plugin-section="([^"]+)"/g)].map(match => match[1]), [type]);
+  }
+  const searched = panel.render('all', '돌림판');
+  assert.ok(searched.includes('data-meal-tool="wheel"'));
+  assert.ok(!searched.includes('data-meal-tool="ladder"'));
+  assert.match(panel.render('all', '없는 항목'), /검색 결과가 없어요/);
+  const taskMenu = indexHtml.match(/<div class="task-menu" id="taskMenu"[\s\S]*?<\/div>/)?.[0];
+  assert.ok(taskMenu);
+  assert.equal((taskMenu.match(/<button/g) || []).length, 3);
+  for (const label of ['카테고리로 찾기', '사진 업로드', '플러그인']) assert.ok(taskMenu.includes(label));
+  assert.doesNotMatch(taskMenu, /돌림판|사다리게임/);
+  const filters = indexHtml.match(/id="pluginFilters"[\s\S]*?<\/div>/)?.[0];
+  assert.deepEqual([...filters.matchAll(/data-filter="([^"]+)"/g)].map(match => match[1]), ['all', 'explore', 'recommend', 'data', 'fun']);
+  assert.match(indexHtml, /onOpen: \(\) => \{ closeOverlay\('pluginOverlay'\)/);
+}
 // Browser-only menu tools: no network calls or external dependencies.
 {
   testMealToolsUI();
@@ -1705,12 +1744,14 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.throws(() => makeLadder(2, ["냉면", ""]));
   assert.equal(resultMessage("wheel", "냉면"), `돌림판 결과: 냉면\n${GAME_NOTICE}`);
   assert.equal(resultMessage("ladder", "국밥", 2), `사다리게임 결과: 2번 → 국밥\n${GAME_NOTICE}`);
-  for (const tool of ["category", "wheel", "ladder"]) assert.ok(indexHtml.includes(`data-meal-tool="${tool}"`));
-  const toolsScript = await readFile(new URL("../dist/assets/meal-tools-v1.js", import.meta.url), "utf8");
+  assert.ok(indexHtml.includes('data-meal-tool="category"'));
+  assert.equal(wheelLabel("아주긴크림파스타메뉴", 8), "아주긴…");
+  assert.equal(Array.from(wheelLabel("🍕🍜🍚🍖🍔", 8)).length, 4);
+  const toolsScript = await readFile(new URL("../dist/assets/meal-tools-v2.js", import.meta.url), "utf8");
   assert.doesNotMatch(toolsScript, /Math\.random|\bfetch\(/);
   assert.match(toolsScript, /prefers-reduced-motion: reduce/);
   assert.match(toolsScript, /if \(reduced\(\)\) \{ action\(\); return; \}/);
-  const asset = await worker.fetch(new Request("https://example.test/assets/meal-tools-v1.js"), {}, {});
+  const asset = await worker.fetch(new Request("https://example.test/assets/meal-tools-v2.js"), {}, {});
   assert.equal(asset.status, 200);
   assert.match(asset.headers.get("content-type"), /javascript/);
   const askSource = indexHtml.match(/    function ask\(question, \{ freshMenu = false \} = \{\}\) \{[\s\S]*?\n    \}/)?.[0];

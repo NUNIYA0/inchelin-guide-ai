@@ -386,7 +386,8 @@
     .meal-stage { overflow-x: auto; margin-top: 16px; }
     .meal-stage svg { width: 100%; display: block; }
     .meal-wheel-shell { position: relative; width: min(240px, 70vw); margin: 12px auto 20px; }
-    .meal-wheel { width: 100%; aspect-ratio: 1; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 0 0 1px #ddd; box-sizing: border-box; }
+    .meal-wheel { position: relative; width: 100%; aspect-ratio: 1; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 0 0 1px #ddd; box-sizing: border-box; }
+    .meal-wheel-label { position: absolute; width: 62px; text-align: center; white-space: nowrap; color: #202020; font-weight: 650; pointer-events: none; }
     .meal-wheel-pointer { position: absolute; left: 50%; top: -13px; transform: translateX(-50%); font-size: 26px; color: #222; }
     .meal-legend { border-left: 8px solid; padding: 3px 7px; font-size: 12px; overflow-wrap: anywhere; }
     .meal-result-title { font-size: 16px; font-weight: 700; margin: 18px 0 8px; overflow-wrap: anywhere; }
@@ -502,10 +503,13 @@
     .success-mark { width: 58px; height: 58px; margin: 4px auto 15px; display: grid; place-items: center; border-radius: 50%; background: #111; color: #fff; font-size: 26px; }
     #planView h2 { font-size: 24px; line-height: 1.5; font-weight: 600; }
     .plugin-head { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 18px; }
-    .plugin-filters { display: flex; gap: 8px; margin-bottom: 16px; }
+    .plugin-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
     .filter-btn { border: 1px solid #e1e1e1; background: #fff; border-radius: 999px; padding: 7px 12px; cursor: pointer; }
     .filter-btn.active { background: #111; color: white; border-color: #111; }
     .plugin-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 9px; }
+    .plugin-section + .plugin-section { margin-top: 22px; }
+    .plugin-section h3 { font-size: 14px; color: #555; margin: 0 0 10px; }
+    button.plugin-card { width: 100%; background: #fff; color: inherit; font: inherit; text-align: left; }
     .plugin-card { border: 1px solid #e7e7e7; border-radius: 14px; padding: 14px; display: grid; grid-template-columns: 38px 1fr auto; gap: 11px; align-items: center; cursor: pointer; }
     .plugin-card:hover { border-color: #bbb; background: #fcfcfc; }
     .plugin-icon { width: 38px; height: 38px; display: grid; place-items: center; border-radius: 11px; background: #f0f0f0; font-weight: 800; }
@@ -750,8 +754,6 @@
       </div>
       <div class="task-menu" id="taskMenu" role="menu">
         <button data-meal-tool="category" role="menuitem"><span aria-hidden="true">▦</span>카테고리로 찾기</button>
-        <button data-meal-tool="wheel" role="menuitem"><span aria-hidden="true">◉</span>돌림판</button>
-        <button data-meal-tool="ladder" role="menuitem"><span aria-hidden="true">☷</span>사다리게임</button>
         <button id="photoButton" role="menuitem"><span>▧</span>사진 업로드</button>
         <button id="pluginButton" role="menuitem"><span>✣</span>플러그인</button>
       </div>
@@ -805,7 +807,7 @@
     </div>
   </section></div>
 
-  <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">맛집 탐색에 필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">모든 유형</button><button class="filter-btn" data-filter="guide">탐색 기능</button><button class="filter-btn" data-filter="data">데이터 연결</button></div><div class="plugin-grid" id="pluginGrid"></div></section></div>
+  <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">맛집 탐색에 필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">전체</button><button class="filter-btn" data-filter="explore">탐색</button><button class="filter-btn" data-filter="recommend">추천·비교</button><button class="filter-btn" data-filter="data">데이터</button><button class="filter-btn" data-filter="fun">재미</button></div><div class="plugin-sections" id="pluginGrid"></div></section></div>
 
   <div class="overlay" id="releaseOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="releaseTitle"><button class="dialog-close" data-close="releaseOverlay" aria-label="닫기">×</button><div class="eyebrow">RELEASE NOTES</div><h2 id="releaseTitle">Inchelin Guide AI 업데이트</h2><p class="dialog-sub">서비스에 반영된 기능과 개선 내용을 확인하세요.</p><article class="release-card"><div class="release-meta"><span>v1.1.0</span><span>2026.09.29</span><span class="badge">최신</span></div><h3>채팅 경험과 도구 연결 개선</h3><ul><li>추천 질문을 입력창에 미리 채워 수정할 수 있습니다.</li><li>대화 저장·이름 변경·삭제를 지원합니다.</li><li>사진 업로드와 플러그인 선택 흐름을 추가했습니다.</li></ul></article><article class="release-card"><div class="release-meta"><span>v1.0.0</span><span>2026.09.28</span></div><h3>Inchelin Guide AI 기본 화면</h3></article></section></div>
 
@@ -828,13 +830,15 @@
     ];
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
-      ['메뉴 탐색', '먹고 싶은 메뉴를 자연스럽게 좁혀봅니다', 'guide', '메'],
-      ['상황별 추천', '동행자와 식사 상황에 맞춰 찾아봅니다', 'guide', '상'],
-      ['지역별 찾기', '원하는 지역의 등록 맛집을 탐색합니다', 'guide', '지'],
-      ['등록 맛집 비교', '확인 가능한 매장 정보를 함께 비교합니다', 'guide', '비'],
+      ['메뉴 탐색', '먹고 싶은 메뉴를 자연스럽게 좁혀봅니다', 'explore', '메'],
+      ['상황별 추천', '동행자와 식사 상황에 맞춰 찾아봅니다', 'recommend', '상'],
+      ['지역별 찾기', '원하는 지역의 등록 맛집을 탐색합니다', 'explore', '지'],
+      ['등록 맛집 비교', '확인 가능한 매장 정보를 함께 비교합니다', 'recommend', '비'],
       ['맛집 검색 데이터', '현재 연결된 공급자의 실제 검색 결과를 사용합니다', 'data', 'D'],
       ['최신 매장 정보', '등록 매장의 확인된 최신 정보를 보강합니다', 'data', '최']
     ].map((p, i) => ({ id: i + 1, name: p[0], desc: p[1], type: p[2], icon: p[3] }));
+    const PLUGIN_SECTIONS = [{ type: 'explore', title: '탐색' }, { type: 'recommend', title: '추천·비교' }, { type: 'data', title: '데이터' }, { type: 'fun', title: '재미' }];
+    const FUN_PLUGINS = [{ tool: 'wheel', name: '돌림판', desc: '후보를 돌려 오늘의 메뉴를 골라요', icon: '◉' }, { tool: 'ladder', name: '사다리게임', desc: '함께 먹을 메뉴를 재미로 정해요', icon: '☷' }];
     const GUIDES = [
       ['처음 이용하기', '추천 질문을 선택하면 일반 질문과 같은 방식으로 바로 대화를 시작합니다. 직접 입력한 질문도 전송 버튼으로 이어서 물어볼 수 있습니다.'],
       ['회원가입', '시작하기 또는 로그인 버튼을 눌러 계정 화면을 열 수 있습니다. 현재 데모에서는 가입 없이 계속하기도 가능합니다.'],
@@ -2076,8 +2080,14 @@
     function renderPlugins() {
       const term = $('#pluginSearch').value.trim().toLowerCase();
       const items = PLUGINS.filter(p => (activeFilter === 'all' || p.type === activeFilter) && `${p.name} ${p.desc}`.toLowerCase().includes(term));
-      $('#pluginCount').textContent = `${items.length}개의 플러그인`;
-      $('#pluginGrid').innerHTML = items.map(p => `<div class="plugin-card" data-plugin="${p.id}"><span class="plugin-icon">${p.icon}</span><span><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><button class="pin-btn ${pinned.includes(p.id) ? 'pinned' : ''}" data-pin="${p.id}" aria-label="${p.name} 고정">${pinned.includes(p.id) ? '★' : '☆'}</button></div>`).join('');
+      const games = FUN_PLUGINS.filter(p => (activeFilter === 'all' || activeFilter === 'fun') && `${p.name} ${p.desc}`.toLowerCase().includes(term));
+      $('#pluginCount').textContent = `${items.length + games.length}개 항목`;
+      $('#pluginGrid').innerHTML = PLUGIN_SECTIONS.map(section => {
+        const cards = section.type === 'fun'
+          ? games.map(p => `<button class="plugin-card" type="button" data-meal-tool="${p.tool}"><span class="plugin-icon" aria-hidden="true">${p.icon}</span><span><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><span aria-hidden="true">›</span></button>`).join('')
+          : items.filter(p => p.type === section.type).map(p => `<div class="plugin-card" data-plugin="${p.id}"><span class="plugin-icon">${p.icon}</span><span><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><button class="pin-btn ${pinned.includes(p.id) ? 'pinned' : ''}" data-pin="${p.id}" aria-label="${p.name} 고정">${pinned.includes(p.id) ? '★' : '☆'}</button></div>`).join('');
+        return cards ? `<section class="plugin-section" data-plugin-section="${section.type}" aria-labelledby="plugin-section-${section.type}"><h3 id="plugin-section-${section.type}">${section.title}</h3><div class="plugin-grid">${cards}</div></section>` : '';
+      }).join('') || '<p class="meal-muted">검색 결과가 없어요.</p>';
     }
 
     ['welcomeInput', 'chatInput'].forEach(id => {
@@ -2400,10 +2410,10 @@
     renderAuthNavigation();
     renderHistory();
     renderPlugins();
-    import('/assets/meal-tools-v1.js').then(({ mountMealTools }) => {
-      mountMealTools({ getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), source: 'naver' });
+    import('/assets/meal-tools-v2.js').then(({ mountMealTools }) => {
+      mountMealTools({ getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), onOpen: () => { closeOverlay('pluginOverlay'); return chatView.classList.contains('active') ? $('#chatForm .task-trigger') : $('#welcomeForm .task-trigger'); }, source: 'naver' });
     }).catch(() => {
-      qsa('[data-meal-tool]').forEach(button => button.addEventListener('click', () => showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.')));
+      document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });
     });
     if (!loadSharedConversationFromHash()) updateShareVisibility();
   })(

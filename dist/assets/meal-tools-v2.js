@@ -71,7 +71,13 @@ export function categoryRequest(menu) {
   return { message: `${menu} 먹고 싶어`, freshMenu: true };
 }
 
-export function mountMealTools({ getMessages, isBusy, onSend, source = 'naver' }) {
+export function wheelLabel(value, count) {
+  const letters = Array.from(String(value).trim());
+  const limit = count >= 6 ? 4 : 7;
+  return letters.length > limit ? `${letters.slice(0, limit - 1).join('')}…` : letters.join('');
+}
+
+export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => null, source = 'naver' }) {
   const el = (tag, text = '', className = '') => {
     const node = document.createElement(tag); node.textContent = text; node.className = className; return node;
   };
@@ -143,6 +149,17 @@ export function mountMealTools({ getMessages, isBusy, onSend, source = 'naver' }
     const choice = spinWheel(candidates.map(value => value.trim()));
     const wheel = el('div', '', 'meal-wheel'); wheel.setAttribute('aria-hidden', 'true');
     wheel.style.background = `conic-gradient(${candidates.map((_, index) => `${colors[index]} ${index * 100 / candidates.length}% ${(index + 1) * 100 / candidates.length}%`).join(',')})`;
+    candidates.forEach((value, index) => {
+      const angle = (index + 0.5) * 360 / candidates.length;
+      const radians = angle * Math.PI / 180;
+      const label = el('span', wheelLabel(value, candidates.length), 'meal-wheel-label');
+      label.title = value;
+      label.style.left = `${50 + Math.sin(radians) * 31}%`;
+      label.style.top = `${50 - Math.cos(radians) * 31}%`;
+      label.style.transform = `translate(-50%, -50%) rotate(${angle}deg)`;
+      label.style.fontSize = candidates.length >= 6 ? '11px' : '12px';
+      wheel.append(label);
+    });
     const shell = el('div', '', 'meal-wheel-shell'); shell.append(wheel, el('span', '▼', 'meal-wheel-pointer'));
     const legend = el('div', '', 'meal-chips');
     candidates.forEach((value, index) => { const label = el('span', `${index + 1}. ${value}`, 'meal-legend'); label.style.borderColor = colors[index]; legend.append(label); });
@@ -189,7 +206,7 @@ export function mountMealTools({ getMessages, isBusy, onSend, source = 'naver' }
   }
   function open(tool, trigger) {
     if (isBusy()) return;
-    cancel(); kind = tool; opener = document.querySelector('.task-trigger[aria-expanded="true"]') || trigger; selected = null;
+    cancel(); kind = tool; opener = onOpen(trigger) || document.querySelector('.task-trigger[aria-expanded="true"]') || trigger; selected = null;
     candidates = autoCandidates(getMessages());
     while (candidates.length < 2) candidates.push('');
     count = candidates.length;
@@ -220,6 +237,10 @@ export function mountMealTools({ getMessages, isBusy, onSend, source = 'naver' }
     document.querySelectorAll('.task-trigger').forEach(node => node.setAttribute('aria-expanded', 'false'));
     dialog.showModal();
   }
-  document.querySelectorAll('[data-meal-tool]').forEach(trigger => trigger.addEventListener('click', () => open(trigger.dataset.mealTool, trigger)));
+  // Plugin sections are re-rendered by filters/search; delegate to keep their tools working.
+  document.addEventListener('click', event => {
+    const trigger = event.target.closest('[data-meal-tool]');
+    if (trigger) open(trigger.dataset.mealTool, trigger);
+  });
   return { close: () => dialog.close() };
 }

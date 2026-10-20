@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict';
-import { mountMealTools, GAME_NOTICE } from '../dist/assets/meal-tools-v1.js';
+import { mountMealTools, GAME_NOTICE } from '../dist/assets/meal-tools-v2.js';
 
 // Minimal DOM fixture: tests local UI event handlers without a browser or API.
 export function testMealToolsUI() {
   const original = { document: globalThis.document, matchMedia: globalThis.matchMedia, setTimeout: globalThis.setTimeout, clearTimeout: globalThis.clearTimeout };
-  const animations = [], timers = new Map(), sent = [];
+  const animations = [], timers = new Map(), sent = [], documentListeners = {};
   let reduced = true, serial = 0;
   class Node {
     constructor(tag) { this.tag = tag; this.children = []; this.style = {}; this.attributes = {}; this.listeners = {}; this.dataset = {}; this.disabled = false; this.className = ''; this.value = ''; }
@@ -19,7 +19,8 @@ export function testMealToolsUI() {
     get classList() { return { remove() {}, add() {} }; }
     addEventListener(event, callback) { (this.listeners[event] ||= []).push(callback); }
     emit(event) { for (const callback of this.listeners[event] || []) callback({ target: this }); }
-    click() { if (!this.disabled) this.emit('click'); }
+    click() { if (!this.disabled) { this.emit('click'); for (const callback of documentListeners.click || []) callback({ target: this }); } }
+    closest(selector) { return selector === '[data-meal-tool]' && this.dataset.mealTool ? this : null; }
     focus() {}
     showModal() { this.open = true; }
     close() { this.open = false; this.emit('close'); }
@@ -35,7 +36,7 @@ export function testMealToolsUI() {
   const createElement = tag => { const node = new Node(tag); node.text = ''; return node; };
   const byText = (root, text) => root.querySelectorAll('button').find(node => node.textContent === text);
   try {
-    globalThis.document = { body, createElement, createElementNS(namespace, tag) { const node = createElement(tag); node.namespaceURI = namespace; return node; }, querySelectorAll(selector) { return selector === '[data-meal-tool]' ? triggers : [plus]; }, querySelector(selector) { return selector === '#taskMenu' ? taskMenu : plus; } };
+    globalThis.document = { body, createElement, createElementNS(namespace, tag) { const node = createElement(tag); node.namespaceURI = namespace; return node; }, addEventListener(event, callback) { (documentListeners[event] ||= []).push(callback); }, querySelectorAll(selector) { return selector === '[data-meal-tool]' ? triggers : [plus]; }, querySelector(selector) { return selector === '#taskMenu' ? taskMenu : plus; } };
     globalThis.matchMedia = () => ({ matches: reduced });
     globalThis.setTimeout = callback => { timers.set(++serial, callback); return serial; };
     globalThis.clearTimeout = id => timers.delete(id);
@@ -59,6 +60,9 @@ export function testMealToolsUI() {
     dialog.querySelectorAll('input').forEach((input, i) => { input.value = `메뉴${i}`; input.emit('input'); });
     byText(dialog, '돌림판 돌리기').click();
     assert.ok(dialog.textContent.includes('돌림판 결과:'));
+    const wedgeLabels = dialog.querySelectorAll('span').filter(node => node.className === 'meal-wheel-label');
+    assert.equal(wedgeLabels.length, 8);
+    assert.deepEqual(wedgeLabels.map(node => node.textContent), Array.from({ length: 8 }, (_, i) => `메뉴${i}`));
     assert.ok(dialog.textContent.includes(GAME_NOTICE));
     assert.equal(animations.length, 0);
     assert.equal(timers.size, 0, 'reduced motion must complete immediately');
@@ -80,6 +84,11 @@ export function testMealToolsUI() {
     assert.equal(timers.size, 1);
     dialog.close();
     assert.equal(timers.size, 0, 'closing a game must cancel delayed results');
+    const rerenderedGame = createElement('button'); rerenderedGame.dataset.mealTool = 'ladder';
+    rerenderedGame.click();
+    assert.equal(dialog.open, true, 'new game entries after filtering must keep working');
+    assert.ok(dialog.textContent.includes('사다리게임'));
+    dialog.close();
   } finally {
     for (const [name, value] of Object.entries(original)) { if (value === undefined) delete globalThis[name]; else globalThis[name] = value; }
   }
