@@ -13,7 +13,7 @@ import {
 } from "./response-modes.js";
 import { withParticle } from "./korean.js";
 import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
-import { STYLE_RULES, generateFriendly, groundedCardReason, safeCardReason } from "./conversation-copy.js";
+import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons } from "./conversation-copy.js";
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2416,6 +2416,10 @@ async function handleChat(request, env) {
   ].join("\n");
 
   const webSearchEnabled = Boolean(linkedPlaceResearch && !linkedWebResearch);
+  const reasonChoices = groundedPlaces.map(place => {
+    const card = restaurantCard(place, dataSource, latestUserMessage, signals.locationName);
+    return { id: card.id, options: cardReasonOptions(card, responseState.slots.companion).map(option => option.text) };
+  });
   const modeInstruction = decision.mode === "C"
     ? `응답 모드 C다. ${withParticle(signals.locationName ? `${signals.locationName} 지역` : "확인된 위치", "과/와")} 메뉴 요청을 turn_text.summary 한 문장으로 요약하고, 검증 후보 중 최대 3개 id만 selectedRestaurantIds로 골라라. turn_text.reason은 지역·메뉴 일치 근거 한 문장이다. 질문은 next_question 하나만 제안하고 분위기·예산은 질문하지 마라. 코드가 질문 이력과 횟수를 검증한다.`
     : decision.mode === "D"
@@ -2432,7 +2436,7 @@ async function handleChat(request, env) {
     },
     body: JSON.stringify({
       model: env.OPENAI_MODEL || "gpt-5-mini",
-      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${modeInstruction}\n\n요지·근거·질문 총 3문장 이내이며 직전 3턴과 같은 시작은 피한다. 서비스·비교·특정식당·바로 보여줘 요청은 질문하지 않는다.\n<turn_state>${JSON.stringify({ stage: responseState.stage, askedSlots: responseState.askedSlots, questionCount: responseState.questionCount, preferences: responseState.preferences })}</turn_state>\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${linkedWebResearch ? `\n\n<linked_web_research>\n${linkedWebResearch}\n</linked_web_research>\n위 웹 조사 결과를 우선 근거로 사용해 사용자의 질문에 지금 바로 답해. 조사 결과에 메뉴명이 있으면 추가 검색 여부를 되묻지 말고 카드로 제시해. 결과에 포함된 출처 링크는 답변에 1~3개 유지해.` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}` + '\n' + STYLE_RULES + '\n식당별 card_reasons를 쓴다. 각 문장에는 해당 상호를 넣고 실제 지역·음식 종류만 연결한다. 맛, 시설, 가격, 분위기는 추측하지 않는다. 예: 식당이름, 강남에서 삼겹살 드시고 싶을 때 살펴볼 곳이에요.' + (retry ? '\n금지어·격식체가 감지되어 한 번 다시 작성한다. 해요체로만 말한다.' : ''),
+      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${modeInstruction}\n\n요지·근거·질문 총 3문장 이내이며 직전 3턴과 같은 시작은 피한다. 서비스·비교·특정식당·바로 보여줘 요청은 질문하지 않는다.\n<turn_state>${JSON.stringify({ stage: responseState.stage, askedSlots: responseState.askedSlots, questionCount: responseState.questionCount, preferences: responseState.preferences })}</turn_state>\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${linkedWebResearch ? `\n\n<linked_web_research>\n${linkedWebResearch}\n</linked_web_research>\n위 웹 조사 결과를 우선 근거로 사용해 사용자의 질문에 지금 바로 답해. 조사 결과에 메뉴명이 있으면 추가 검색 여부를 되묻지 말고 카드로 제시해. 결과에 포함된 출처 링크는 답변에 1~3개 유지해.` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}` + '\n' + STYLE_RULES + '\ncard_reasons는 다음 fact_reason_options에서 해당 id에 허용된 문장을 그대로 고르거나 빈 문자열로 둔다. 옵션은 주소·상호·연결된 거리에서만 만든 것이다. 음식 종류 반복, 접근성·편리함·분위기·맛·웨이팅·주차 추측은 금지한다. 같은 응답에서 시작 구조·어미를 달리 고르며, 차별화할 근거가 없으면 이유를 만들지 않는다. 첫 안내 문장은 최근 사용자의 지역·메뉴·상황을 받아 새롭게 쓴다.\n<fact_reason_options>' + JSON.stringify(reasonChoices) + '</fact_reason_options>' + (retry ? '\n금지어·격식체가 감지되어 한 번 다시 작성한다. 해요체로만 말한다.' : ''),
       input: messages,
       ...(webSearchEnabled ? {
         tools: [{
@@ -2515,13 +2519,7 @@ async function handleChat(request, env) {
       return a - b;
     });
   }
-  const restaurants = orderedPlaces.slice(0, selectionLimit).map((place, index) => {
-    const card = restaurantCard(place, dataSource, latestUserMessage, signals.locationName);
-    const food = responseState.slots.menu || responseState.slots.food_type || '';
-    const draft = result.card_reasons?.find(item => item.id === card.id)?.reason;
-    card.recommendationReason = safeCardReason(draft, card, food, signals.locationName) ? draft : groundedCardReason(card, food, signals.locationName, index);
-    return card;
-  });
+  const restaurants = applyCardReasons(orderedPlaces.slice(0, selectionLimit).map(place => restaurantCard(place, dataSource, latestUserMessage, signals.locationName)), result.card_reasons, responseState.slots.companion);
   if (restaurants.length && ["C", "D"].includes(decision.mode)) {
     message = restaurantResultsMessage(responseState, restaurants.length, Boolean(currentLocation));
   }

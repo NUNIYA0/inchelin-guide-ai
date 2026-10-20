@@ -104,9 +104,9 @@ export function applyTurnPolicy(response, payload = {}) {
   const candidateText = value => {
     const valueText = text(value);
     if (!valueText || FORBIDDEN_COPY.test(valueText) || /[?？]|맛있|인기|평점|별점|최고|저렴|조용|주차|단체석|영업|분위기|예약|적합|도보|차량|좌석|앉기|편한|룸|모임.*많이/.test(valueText)) return null;
-    if (/\d/.test(valueText.replace(new RegExp(count + '곳', 'g'), ''))) return null;
+    if (/\d/.test(valueText.replace(new RegExp(count + '곳', 'g'), '').replace(state.slots.companion || '\u0000', ''))) return null;
     if ((valueText.match(/[.!。]/g) || []).length > 1 || /\d+곳/.test(valueText) && !valueText.includes(count + '곳')) return null;
-    if (response.meta.mode !== 'A' && !valueText.includes(food) && !valueText.includes(area)) return null;
+    if (response.meta.mode !== 'A' && !valueText.includes(food) && !valueText.includes(area) && !(state.slots.companion && valueText.includes(state.slots.companion))) return null;
     if (response.meta.mode === 'A') {
       const userWords = messages.filter(message => message.role === 'user').map(message => message.content).join(' ');
       if ((valueText.match(/쌀쌀|추운|더운|비가|눈이/g) || []).some(word => !userWords.includes(word))) return null;
@@ -114,9 +114,9 @@ export function applyTurnPolicy(response, payload = {}) {
     return valueText.replace(/[.!。]+$/, '');
   };
   const defaultStarts = count ? [
-    `${area} ${withParticle(food, '으로/로')} 먼저 식당 ${count}곳을 찾았어요`,
-    `${food} 드시고 싶으시군요, ${area}에서 ${count}곳 골라봤어요`,
-    `이번에는 ${area}에서 ${food} 먹을 곳 ${count}곳을 골라봤어요`,
+    `${area}에서 ${state.slots.companion ? state.slots.companion + ' 자리로 ' : ''}${food} 먹을 곳 ${count}곳을 골라봤어요`,
+    `${food} 드시고 싶으시군요, ${area}에서${state.slots.companion ? ' ' + state.slots.companion + ' 자리로' : ''} ${count}곳 골라봤어요`,
+    `이번에는 ${area}에서 ${state.slots.companion ? state.slots.companion + '으로 ' : ''}${food} 먹을 곳 ${count}곳을 살펴봤어요`,
     `${area}에서 함께 살펴볼 식당 ${count}곳이에요`,
   ] : response.meta.mode === 'A' ? [
     '오늘은 서로 다른 방향의 메뉴 세 가지로 좁혀봤어요', '이번 한 끼에 어울릴 서로 다른 방향을 골랐어요',

@@ -567,7 +567,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.body.restaurants[0].longitude, 127);
   assert.equal(result.body.restaurants[0].latitude, 37.5);
   assert.ok(result.body.restaurants[0].distanceMeters > 0);
-  assert.match(result.body.restaurants[0].recommendationReason, /직선거리 \d+(?:\.\d+)?[mk]/);
+  assert.match(result.body.restaurants[0].recommendationReason, /테헤란로|직선거리 \d+(?:\.\d+)?[mk]/);
   assert.equal(result.body.restaurants[0].naverPlaceId, "123");
   assert.equal(result.body.restaurants[0].naverPlaceUrl, "https://map.naver.com/p/entry/place/123");
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
@@ -1510,8 +1510,8 @@ assert.equal(withParticle("피자", "을/를"), "피자를");
   assert.equal(result.body.restaurants.length, 3);
   assert.equal(new Set(result.body.restaurants.map(card => card.recommendationReason)).size, 3);
   for (const card of result.body.restaurants) {
-    assert.match(card.recommendationReason, /강남에서/);
-    assert.ok(card.recommendationReason.includes(card.name));
+    assert.match(card.recommendationReason, /테헤란로|논현로|역삼로/);
+    assert.doesNotMatch(card.recommendationReason, /고깃집|먹을 곳|살펴볼 곳/);
     assert.ok(!card.recommendationReason.includes(card.address));
     assert.doesNotMatch(card.recommendationReason, /영업 여부는 확인되지 않았어요/);
     assert.doesNotMatch(card.recommendationReason, /거리|\d+(?:\.\d+)?\s*(?:m|km)\b|인기|평점|분위기|현재 영업 중/);
@@ -1712,7 +1712,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(first.body.meta.responseModeState.slots.parking, true);
   assert.match(first.body.meta.notice, /주차.*알 수 없어.*매장 확인/);
   assert.equal(first.body.restaurants.length, 3);
-  assert.match(first.body.message, /식당 3곳을 찾았어요/);
+  assert.match(first.body.message, /3곳을 골라봤어요/);
   assert.doesNotMatch(first.body.message, /5곳/);
   assert.deepEqual(validateRestaurantSelection(["c", "d", "e"], ["a", "b", "c", "d", "e"].map(id => ({ id })), [], 3), ["c", "d", "e"]);
   const selected = normalizeResponseState({ slots: { region: "강남역", menu: "삼겹살", companion: "회식", parking: null, other: [] } });
