@@ -1237,6 +1237,60 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
+// Multiple card references must take precedence over a single-card focus.
+{
+  const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };
+  const first = await runCase({ message: "강남역에서 냉면 먹을 곳 추천해줘", env, naverResponse: { items: [
+    { title: "강남평양냉면", category: "음식점>한식>냉면", roadAddress: "서울 강남구 강남대로 1", mapx: "1270000000", mapy: "375000000" },
+    { title: "강남함흥냉면", category: "음식점>한식>냉면", roadAddress: "서울 강남구 테헤란로 2", mapx: "1270001000", mapy: "375000100" },
+  ] } });
+  assert.equal(first.body.restaurants.length, 2);
+  const state = { ...first.body.meta.responseModeState, focus: first.body.restaurants[0].id };
+  for (const message of [
+    "첫 번째랑 두 번째 중에 어디가 나아?", "첫 번째랑 두 번째", "1번과 2번 중에 골라줘", "어디가 나아?", "둘 중 비교해줘",
+    "강남평양냉면이랑 강남함흥냉면 중에 어디가 좋아?",
+  ]) {
+    const result = await runCase({
+      message, env, analyzerEnabled: true,
+      history: [{ role: "user", content: "강남역에서 냉면 먹을 곳 추천해줘" }, { role: "assistant", content: first.body.message }],
+      context: { responseModeState: state, recentRestaurants: first.body.restaurants },
+      modeIntentAnalysis: { intent: "followup", sub_intent: "location", confidence: 1, slots: {}, reference: { target_index: 1 }, flags: {} },
+      aiResponse: { message: "첫 번째가 더 맛있고 평점도 높고 인기가 많아요.", suggestions: [], selectedRestaurantIds: [] },
+    });
+    assert.equal(result.body.meta.mode, "D");
+    assert.equal(result.body.meta.variant, "compare");
+    for (const card of first.body.restaurants) {
+      assert.ok(result.body.message.includes(card.name));
+      assert.ok(result.body.message.includes(`분류: ${card.category}`));
+      assert.ok(result.body.message.includes(`주소: ${card.address}`));
+    }
+    assert.match(result.body.message, /지금 확인되는 정보로는 우열을 가리기 어려워요/);
+    assert.doesNotMatch(result.body.message, /평점|맛있|인기|직선거리|영업 여부:/);
+    assert.deepEqual(result.body.restaurants, []);
+    assert.deepEqual(result.body.suggestions, []);
+    assert.equal(result.calls.length, 0, "compare must not analyze, generate, or search again");
+  }
+  const cards = [
+    { id: "one", name: "첫냉면집", category: "냉면", address: "서울 강남구 역삼동 1", businessStatus: "active", openingHours: "11:00-21:00", distanceMeters: 120 },
+    { id: "two", name: "둘째냉면집", category: "냉면", address: "서울 강남구 역삼동 2", businessStatus: "temporarily_closed", distanceMeters: 450 },
+    { id: "three", name: "세번째식당", category: "한식", address: "서울 강남구 역삼동 3", businessStatus: "unknown", distanceMeters: 900 },
+  ];
+  const context = { responseModeState: { lastCards: cards, focus: "three" }, currentLocation: { latitude: 37.5, longitude: 127 } };
+  const confirmed = await runCase({ message: "첫 번째랑 두 번째 중에 어디가 나아?", env, context });
+  assert.match(confirmed.body.message, /직선거리: 120m/);
+  assert.match(confirmed.body.message, /직선거리: 450m/);
+  assert.match(confirmed.body.message, /영업 여부: 영업 중으로 확인됨/);
+  assert.match(confirmed.body.message, /영업 여부: 임시 휴업으로 확인됨/);
+  assert.match(confirmed.body.message, /영업시간: 11:00-21:00/);
+  assert.doesNotMatch(confirmed.body.message, /세번째식당|900m/);
+  const noCoords = await runCase({ message: "첫 번째랑 두 번째 비교해줘", env, context: { responseModeState: context.responseModeState } });
+  assert.doesNotMatch(noCoords.body.message, /직선거리|120m|450m/);
+  const single = await runCase({ message: "첫 번째 식당 주소 알려줘", env, context });
+  assert.equal(single.body.meta.mode, "D");
+  assert.match(single.body.message, /첫냉면집/);
+  assert.doesNotMatch(single.body.message, /둘째냉면집|우열/);
+}
+
 // Unknown region names and request words must not contaminate region/menu slots.
 {
   const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };

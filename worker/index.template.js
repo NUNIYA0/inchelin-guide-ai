@@ -653,6 +653,18 @@ function ordinalReference(text) {
   return /처음|첫|1/.test(match[0]) ? 1 : /두|2/.test(match[0]) ? 2 : 3;
 }
 
+function comparisonIndexes(text, cards) {
+  const indexes = [...String(text || "").matchAll(/처음(?!부터)|첫\s*번째|1\s*번|두\s*번째|2\s*번|세\s*번째|3\s*번|마지막/g)]
+    .map(match => /마지막/.test(match[0]) ? cards.length : /처음|첫|1/.test(match[0]) ? 1 : /두|2/.test(match[0]) ? 2 : 3);
+  cards.forEach((card, index) => { if (card.name && text.includes(card.name)) indexes.push(index + 1); });
+  return [...new Set(indexes)];
+}
+
+function isComparisonRequest(text, cards) {
+  return comparisonIndexes(text, cards).length >= 2
+    || /비교|어디가\s*(?:더\s*)?(?:나아|나을|좋|낫)|제일\s*(?:가까|나아)|(?:랑|하고|와|과).{0,40}중(?:에|에서)?/.test(text);
+}
+
 function fallbackResponseModeAnalysis(messages, stateValue) {
   const state = normalizeResponseState(stateValue);
   const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
@@ -671,8 +683,8 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   else if (service || SERVICE_FAQ.items.some(item => item.examples.some(example => faqSimilarity(latest, example) === 1))) {
     intent = "service";
     sub = /와인/.test(latest) ? "wine" : /추천.{0,8}기준|원칙|데이터|등록|검증|카드|거리|영업|폐업/.test(latest) ? "data_basis" : /무료|요금|위치\s*정보|기록\s*저장|로그인해야|모바일|공개\s*범위/.test(latest) ? "policy" : /어떻게|삭제|공유|지난\s*대화|새\s*대화|로그인|로그아웃|위치\s*버튼/.test(latest) ? "how_to" : "about";
-  } else if (foodTalk) intent = "food_talk";
-  else if (hasPrev && /비교|어디가\s*더|제일\s*(?:가까|나아)/.test(latest)) intent = "compare";
+  } else if (hasPrev && isComparisonRequest(latest, state.lastCards)) intent = "compare";
+  else if (foodTalk) intent = "food_talk";
   else if (hasPrev && /다른\s*(?:곳|데)|별로|더\s*없|주차되는\s*곳|말고|바꿔|조용한\s*곳/.test(latest)) {
     intent = "condition_change";
     sub = /다른|별로|더\s*없/.test(latest) ? "exclude_previous" : /말고/.test(latest) ? "replace" : "add";
@@ -747,6 +759,7 @@ const RESPONSE_MODE_SCHEMA = {
 async function analyzeResponseModeIntent(env, messages, stateValue) {
   const state = normalizeResponseState(stateValue);
   const fallback = fallbackResponseModeAnalysis(messages, state);
+  if (fallback.intent === "compare") return fallback;
   const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
   if (fallback.intent === "place_search" && locationMatches(latest).length && fallback.slots.menu) return fallback;
   if (state.pendingQuestionSlot === "region" && fallback.intent === "place_search" && fallback.sub_intent === "continuation") return fallback;
@@ -898,19 +911,25 @@ function responseStateCardTarget(analysis, state) {
   return state.lastCards.length === 1 ? state.lastCards[0] : null;
 }
 
-function modeDFollowupResponse(analysis, state) {
+function modeDFollowupResponse(analysis, state, latest = "", hasCoordinates = false) {
   if (analysis.intent === "compare") {
-    const cards = state.lastCards.slice(0, 3);
+    const indexes = comparisonIndexes(latest, state.lastCards);
+    const targets = (indexes.length >= 2 ? indexes : state.lastCards.map((_, index) => index + 1)).slice(0, 3);
+    const cards = targets.map(position => ({ card: state.lastCards[position - 1], position })).filter(item => item.card);
     if (cards.length < 2) {
       const nextState = updateStateAfterResponse(state, { mode: "D", questionSlot: null, showCards: false }, {});
       return chatResponse("비교할 식당이 두 곳 이상 있어야 해요. 먼저 식당을 찾아드릴게요.", [], [], { responseModeState: nextState, mode: "D" });
     }
-    const lines = cards.map((card, index) => {
-      const facts = [card.category, card.distanceMeters !== null ? `${Math.round(card.distanceMeters)}m` : "", card.parking === true ? "주차 가능" : card.parking === false ? "주차 어려움" : "", card.openingHours].filter(Boolean);
-      return `${index + 1}번 **${card.name}**: ${facts.length ? facts.join(" · ") : "확인된 비교 정보가 부족해요"}`;
+    const lines = cards.map(({ card, position }) => {
+      const facts = [`분류: ${card.category || "확인 정보 없음"}`, `주소: ${card.address || "확인 정보 없음"}`];
+      if (hasCoordinates && card.distanceMeters !== null && Number.isFinite(card.distanceMeters)) facts.push(`직선거리: ${Math.round(card.distanceMeters)}m`);
+      const status = { active: "영업 중으로 확인됨", temporarily_closed: "임시 휴업으로 확인됨", permanently_closed: "폐업으로 확인됨" }[card.businessStatus];
+      if (status) facts.push(`영업 여부: ${status}`);
+      if (card.openingHours) facts.push(`영업시간: ${card.openingHours}`);
+      return `${position}번 **${card.name}**\n${facts.map(fact => `- ${fact}`).join("\n")}`;
     });
     const nextState = updateStateAfterResponse(state, { mode: "D", questionSlot: null, showCards: false }, {});
-    return chatResponse(`확인된 정보만 비교하면 이렇습니다.\n\n${lines.join("\n")}`, [], [], { responseModeState: nextState, mode: "D" });
+    return chatResponse(`확인된 정보만 비교하면 이렇습니다.\n\n${lines.join("\n\n")}\n\n지금 확인되는 정보로는 우열을 가리기 어려워요. 위치나 메뉴 취향을 알려주시면 더 좁혀드릴게요.`, [], [], { responseModeState: nextState, mode: "D", variant: "compare" });
   }
   const target = responseStateCardTarget(analysis, state);
   if (!target) {
@@ -2307,7 +2326,7 @@ async function handleChat(request, env) {
   if (!linkedPlaceResearch && decision.mode === "GENERAL") return json(generalModeResponse(analysis, responseState, dataSource, latestUserMessage));
   if (!linkedPlaceResearch && decision.mode === "A") return json(modeAResponse(analysis, responseState));
   if (!linkedPlaceResearch && decision.mode === "B") return json(modeBResponse(responseState));
-  if (!linkedPlaceResearch && decision.mode === "D" && !decision.needSearch) return json(modeDFollowupResponse(analysis, responseState));
+  if (!linkedPlaceResearch && decision.mode === "D" && !decision.needSearch) return json(modeDFollowupResponse(analysis, responseState, latestUserMessage, Boolean(currentLocation)));
 
   const intentAnalysis = providerIntentFromResponseMode(analysis, responseState, decision);
   const requestedField = findUnavailableDatabaseField(latestUserMessage);

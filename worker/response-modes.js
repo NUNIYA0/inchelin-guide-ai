@@ -43,6 +43,7 @@ intent는 menu_trouble, place_search, followup, condition_change, compare, speci
 음식명만 있고 식당·지역 신호가 없으면 menu_trouble이다. '삼겹살 추천해줘'는 menu_trouble/declare다. 지역+음식이 정해졌거나 맛집·식당·가게·~집·찾아줘가 있으면 place_search다. '강남역 근처에서 뭐 먹지'는 강한 식당 신호가 없으므로 menu_trouble이다.
 직전 식당 카드가 있을 때 다른 곳·별로야·더 없어는 condition_change/exclude_previous, 주차되는 곳은 add, A 후보 뒤 다른 메뉴는 menu_trouble/narrow다.
 '다른 곳'은 슬롯이나 new_topic을 변경하지 않는다. '처음 거기', '첫 번째 거기', '두 번째 거기', '세 번째 거기'는 직전 카드의 1/1/2/3번이며 기존 focus보다 우선한다.
+직전 카드 두 대상 이상을 언급하거나 '첫 번째랑 두 번째 중에 어디가 나아', '어디가 나아', '비교'라고 하면 compare다. 단일 followup이나 focus 해석보다 비교를 우선한다.
 service sub_intent는 about, how_to, policy, data_basis, wine 중 하나다. followup sub_intent는 hours, parking, phone, menu_info, location, other다.
 slots에는 이번 발화에서 새로 추출하거나 바꾼 값만 넣고 이전 값을 복사하지 않는다. reference는 카드 번호나 상호 참조다. flags.new_topic은 none/soft/hard다. 끼어든 service/general/food_talk/out_of_scope는 new_topic=none이다.
 confidence가 낮아도 가장 가능성 높은 분류를 내고 food_related를 정확히 표시한다.
@@ -103,6 +104,7 @@ export function normalizeResponseState(value = {}) {
     category: cleanString(card.category, 160) || "",
     phone: cleanString(card.phone, 80) || "",
     openingHours: cleanString(card.openingHours, 500) || "",
+    businessStatus: ["active", "temporarily_closed", "permanently_closed"].includes(card.businessStatus) ? card.businessStatus : null,
     parking: typeof card.parking === "boolean" ? card.parking : null,
     distanceMeters: card.distanceMeters !== null && card.distanceMeters !== undefined && card.distanceMeters !== "" && Number.isFinite(Number(card.distanceMeters)) ? Number(card.distanceMeters) : null,
     recommendationReason: cleanString(card.recommendationReason, 500) || "",
