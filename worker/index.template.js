@@ -2524,6 +2524,17 @@ export default {
     void ctx;
     const url = new URL(request.url);
 
+    // Public service copy only: use the same FAQ/provider selection, with no AI call.
+    if (url.pathname === "/api/service-faq/data-basis") {
+      if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
+      const source = createRestaurantProvider(env).source;
+      const answers = ["data_basis.registered_only", "data_basis.criteria"].map(id => {
+        const item = SERVICE_FAQ.items.find(entry => entry.id === id);
+        return item?.answer?.[source] || item?.answer?.default || SERVICE_FAQ.fallback_answer;
+      });
+      return json({ message: answers.join("\n\n"), source });
+    }
+
     if (url.pathname === "/api/chat") {
       if (request.method === "OPTIONS") return new Response(null, { status: 204 });
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);

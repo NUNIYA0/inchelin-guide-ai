@@ -4,6 +4,7 @@ import worker from "../build/dist/server/index.js";
 import { koreanParticle, withParticle } from "../worker/korean.js";
 import { CATEGORY_MENUS, GAME_NOTICE, secureRandomInt, autoCandidates, spinWheel, makeLadder, resultMessage, categoryRequest, normalizeOptions, wheelLabel } from "../dist/assets/meal-tools-v2.js";
 import { testMealToolsUI } from "./meal-tools-smoke.mjs";
+import { testPluginActionsUI } from "./plugin-actions-smoke.mjs";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -1657,36 +1658,35 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
-// Plugin layout groups only the existing six entries, then the two existing games.
+// Five working tools (retired latest-information entry removed), then the two games.
 {
   const definitions = indexHtml.slice(indexHtml.indexOf("    const PLUGINS ="), indexHtml.indexOf("    const GUIDES ="));
   const renderSource = indexHtml.match(/    function renderPlugins\(\) \{[\s\S]*?\n    \}/)?.[0];
   assert.ok(renderSource);
   const nodes = { '#pluginSearch': { value: '' }, '#pluginCount': {}, '#pluginGrid': {} };
   const panel = new Function('$', 'pinned', `${definitions}\nlet activeFilter = 'all';\n${renderSource}\nreturn { plugins: PLUGINS, sections: PLUGIN_SECTIONS, render(filter, term = '') { activeFilter = filter; $('#pluginSearch').value = term; renderPlugins(); return $('#pluginGrid').innerHTML; } };`)(selector => nodes[selector], [1]);
-  assert.deepEqual(panel.plugins.map(p => p.name), ['메뉴 탐색', '상황별 추천', '지역별 찾기', '등록 맛집 비교', '맛집 검색 데이터', '최신 매장 정보']);
-  assert.deepEqual(panel.plugins.map(p => p.id), [1, 2, 3, 4, 5, 6], 'preserve existing pin identities');
+  assert.deepEqual(panel.plugins.map(p => p.name), ['메뉴 탐색', '상황별 추천', '지역별 찾기', '등록 맛집 비교', '추천 기준·데이터 안내']);
+  assert.deepEqual(panel.plugins.map(p => p.id), [1, 2, 3, 4, 5], 'preserve surviving pin identities');
   assert.deepEqual(panel.sections.map(section => section.title), ['탐색', '추천·비교', '정보', '재미']);
   const html = panel.render('all');
   const sections = [...html.matchAll(/data-plugin-section="([^"]+)"[\s\S]*?<\/section>/g)];
   assert.deepEqual(sections.map(section => section[1]), ['explore', 'recommend', 'data', 'fun']);
-  for (const [index, names] of [['메뉴 탐색', '지역별 찾기'], ['상황별 추천', '등록 맛집 비교'], ['맛집 검색 데이터', '최신 매장 정보']].entries()) {
+  for (const [index, names] of [['메뉴 탐색', '지역별 찾기'], ['상황별 추천', '등록 맛집 비교'], ['추천 기준·데이터 안내']].entries()) {
     for (const name of names) assert.ok(sections[index][0].includes(name));
-    assert.equal((sections[index][0].match(/data-plugin="/g) || []).length, 2);
+    assert.equal((sections[index][0].match(/data-plugin="/g) || []).length, names.length);
   }
   assert.ok(sections.at(-1)[0].includes('data-meal-tool="wheel"'));
   assert.ok(sections.at(-1)[0].includes('data-meal-tool="ladder"'));
-  assert.equal((html.match(/data-plugin="/g) || []).length, 6);
+  assert.equal((html.match(/data-plugin="/g) || []).length, 5);
   assert.equal((html.match(/data-meal-tool="/g) || []).length, 2);
-  assert.equal(nodes['#pluginCount'].textContent, '8개 항목');
-  assert.equal((html.match(/class="plugin-text"/g) || []).length, 8, 'names and descriptions must share a vertical text block');
+  assert.equal(nodes['#pluginCount'].textContent, '7개 항목');
+  assert.equal((html.match(/class="plugin-text"/g) || []).length, 7, 'names and descriptions must share a vertical text block');
   for (const description of [
     '오늘 뭐 먹을지 후보를 좁혀드려요',
     '동네나 역 주변 맛집을 찾아드려요',
     '회식·데이트·혼밥 등 상황에 맞춰 골라드려요',
     '고른 식당들의 확인된 정보를 나란히 비교해요',
-    '지금 연결된 검색 결과를 기준으로 찾아요',
-    '확인된 최신 매장 정보를 함께 보여드려요',
+    '지금 연결된 검색 결과와 추천 기준을 알려드려요',
     '후보를 돌려 오늘의 메뉴를 정해요',
     '여러 명이 함께 메뉴를 정해요'
   ]) assert.ok(html.includes(description), description);
@@ -1708,7 +1708,95 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.match(filters, /data-filter="data">정보<\/button>/);
   assert.match(indexHtml, /onOpen: \(\) => \{ closeOverlay\('pluginOverlay'\)/);
 }
+{
+  await testPluginActionsUI();
+  const faq = JSON.parse(await readFile(new URL('../data/service-faq.json', import.meta.url), 'utf8'));
+  const response = await worker.fetch(new Request('https://example.test/api/service-faq/data-basis'), { RESTAURANT_DATA_SOURCE: 'naver' });
+  const body = await response.json();
+  assert.equal(body.message, ['data_basis.registered_only', 'data_basis.criteria'].map(id => faq.items.find(item => item.id === id).answer.naver).join('\n\n'));
+  assert.match(body.message, /전환 중/);
+  const denied = await worker.fetch(new Request('https://example.test/api/service-faq/data-basis', { method: 'POST' }), {});
+  assert.equal(denied.status, 405);
+  assert.match(indexHtml, /recentRestaurants: compareCards, hasRestaurantResults: true/);
+  assert.match(indexHtml, /lastCards: compareCards, focus: null/);
+  assert.match(indexHtml, /selectRegionOnly: true/);
+  assert.match(indexHtml, /if \(selectRegionOnly\) \{\s*selectPluginRegion\(locationName, true, false\)/);
+  assert.match(indexHtml, /button.addEventListener\('click', \(\) => runPlugin\(id, button\)\)/);
+  assert.match(indexHtml, /pluginActions\?\.togglePin/);
+  assert.doesNotMatch(indexHtml, /input.value = .*plugin.name.*기능으로/);
+}
 // Readability contract: CSS/layout checks, not a browser screenshot test.
+{
+  // Exercise the actual frontend slot transition functions, not a duplicate implementation.
+  const regionSource = indexHtml.match(/    function selectPluginRegion\([\s\S]*?\n    \}/)?.[0];
+  const situationSource = indexHtml.match(/    function selectPluginSituations\([\s\S]*?\n    \}/)?.[0];
+  assert.ok(regionSource && situationSource);
+  const initial = normalizeResponseState({ slots: { region: '강남역', menu: '삼겹살', companion: '회식', other: ['조용한', '단체석'] },
+    lastCards: [{ id: 'old', name: '이전 가게' }], focus: 'old' });
+  const replies = [], sent = [];
+  const transitions = new Function('pluginReply', 'ask', 'initial', `let state = initial, currentLocationName = '강남역', currentLocationCoords = { latitude: 37.5, longitude: 127 };
+    function pluginState() { return structuredClone(state); }
+    ${regionSource}
+    ${situationSource}
+    return {
+      region: selectPluginRegion, situations: selectPluginSituations,
+      setState(value) { state = value; }, location() { return currentLocationCoords; }
+    };`)((...args) => replies.push(args), message => sent.push(message), initial);
+  transitions.region('역삼');
+  assert.equal(transitions.location(), null);
+  let next = replies.at(-1)[3];
+  assert.equal(next.slots.region, '역삼');
+  assert.equal(next.slots.use_current_location, false);
+  assert.equal(next.slots.menu, null);
+  assert.equal(next.slots.food_type, null);
+  assert.deepEqual(next.lastCards, []);
+  assert.equal(next.focus, null);
+  assert.equal(next.pendingQuestionSlot, 'menu');
+  assert.equal(replies.at(-1)[0], '어떤 메뉴가 끌리세요?');
+  transitions.setState(next);
+  transitions.situations({ companion: '혼밥 · 데이트', parking: true, other: [] }, ['혼밥', '데이트', '주차 필요']);
+  next = replies.at(-1)[3];
+  assert.equal(next.slots.region, '역삼');
+  assert.equal(next.slots.parking, true);
+  assert.equal(next.slots.companion, '혼밥 · 데이트');
+  assert.deepEqual(next.slots.other, ['조용한'], 'replace situation tags without dropping other constraints');
+  assert.equal(sent.length, 0, 'ask for a menu before searching when menu is empty');
+  transitions.setState(initial);
+  transitions.situations({ companion: '회식', parking: true, other: ['단체석'] }, ['회식', '주차 필요', '단체석']);
+  assert.deepEqual(sent, ['선택한 조건으로 식당을 찾아줘']);
+  const result = await runCase({ message: '냉면 먹고 싶어', env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver', NAVER_API_HUB_CLIENT_ID: 'stub-id', NAVER_API_HUB_CLIENT_SECRET: 'stub-secret' },
+    context: { responseModeState: replies[1][3] }, naverResponse: { items: [] } });
+  assert.equal(result.body.meta.responseModeState.slots.region, '역삼');
+  assert.equal(result.body.meta.responseModeState.slots.parking, true);
+  assert.equal(result.body.meta.responseModeState.slots.menu, '냉면');
+  assert.equal(result.body.meta.responseModeState.slots.companion, '혼밥 · 데이트');
+  const script = await worker.fetch(new Request('https://example.test/assets/plugin-actions-v1.js'), {});
+  assert.equal(script.status, 200);
+  assert.match(script.headers.get('content-type'), /javascript/);
+  const pinSource = indexHtml.match(/    function renderPinnedPlugins\(\) \{[\s\S]*?\n    \}/)?.[0];
+  const definitions = indexHtml.slice(indexHtml.indexOf("    const PLUGINS ="), indexHtml.indexOf("    const GUIDES ="));
+  const shortcutNodes = [0, 1].map(() => ({ children: [], replaceChildren() { this.children = []; }, appendChild(button) { this.children.push(button); } }));
+  const executed = [];
+  const render = new Function('qsa', 'document', 'runPlugin', `${definitions}
+    let pinned = [1, 3, 5], isSharedConversation = false;
+    ${pinSource}
+    return { render: renderPinnedPlugins, clear() { pinned = []; }, share() { isSharedConversation = true; } };`)(
+    () => shortcutNodes,
+    { createElement: () => ({ addEventListener(event, action) { this[event] = action; } }) },
+    id => executed.push(id)
+  );
+  render.render();
+  for (const container of shortcutNodes) {
+    assert.deepEqual(container.children.map(button => button.textContent), ['메뉴 탐색', '지역별 찾기', '추천 기준·데이터 안내']);
+    assert.equal(container.hidden, false);
+    container.children[1].click();
+  }
+  assert.deepEqual(executed, [3, 3], 'both welcome/chat shortcuts execute the real plugin id');
+  render.share(); render.render();
+  assert.ok(shortcutNodes.every(node => node.hidden));
+  render.clear(); render.render();
+  assert.ok(shortcutNodes.every(node => node.hidden && !node.children.length));
+}
 {
   const css = indexHtml.match(/<style>([\s\S]*?)<\/style>/)[1];
   const rule = selector => {
@@ -1838,7 +1926,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   const asset = await worker.fetch(new Request("https://example.test/assets/meal-tools-v2.js"), {}, {});
   assert.equal(asset.status, 200);
   assert.match(asset.headers.get("content-type"), /javascript/);
-  const askSource = indexHtml.match(/    function ask\(question, \{ freshMenu = false \} = \{\}\) \{[\s\S]*?\n    \}/)?.[0];
+  const askSource = indexHtml.match(/    function ask\(question, \{ freshMenu = false, compareCards = null \} = \{\}\) \{[\s\S]*?\n    \}/)?.[0];
   assert.ok(askSource);
   const requests = [];
   const ask = new Function("showChatView", "appendMessage", "$", "resizeInput", "buildAIRequest", "generateAnswer", `let generating = false, chatMessages = [], lastAIRequest, currentLocationName = '역삼', currentLocationCoords = { latitude: 37.5, longitude: 127 };\n${askSource}\nreturn ask;`)(() => {}, () => {}, () => ({}), () => {}, () => ({ messages: [{ role: "user", content: "이전 지역 조건" }], context: { currentLocationName: "역삼", currentLocation: { latitude: 37.5, longitude: 127 }, responseModeState: { slots: { region: "역삼" } } } }), request => requests.push(request));
@@ -1847,6 +1935,17 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.deepEqual(requests[0].context.responseModeState.slots, {});
   assert.equal(requests[0].context.currentLocation, null);
   assert.equal(requests[0].context.hasRestaurantResults, false);
+  const selected = [{ id: 'a', name: '가게A' }, { id: 'c', name: '가게C' }];
+  ask('(가게A)랑 (가게C) 비교해줘', { compareCards: selected });
+  assert.deepEqual(requests[1].context.responseModeState.lastCards, selected);
+  assert.deepEqual(requests[1].context.recentRestaurants, selected);
+  assert.equal(requests[1].context.responseModeState.focus, null);
+  const compared = await runCase({ message: '(가게A)랑 (가게C) 비교해줘', env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver' },
+    context: { responseModeState: normalizeResponseState({ lastCards: selected }) } });
+  assert.equal(compared.body.meta.mode, 'D');
+  assert.match(compared.body.message, /가게A/);
+  assert.match(compared.body.message, /가게C/);
+  assert.equal(compared.calls.length, 0);
   const inlineScripts = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)];
   for (const [, script] of inlineScripts) assert.doesNotThrow(() => new Function(script));
 }
