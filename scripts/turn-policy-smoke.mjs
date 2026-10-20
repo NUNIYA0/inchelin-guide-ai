@@ -17,14 +17,15 @@ export async function testTurnPolicy(runCase) {
   }
   // 1. First ready turn: verified cards first, exactly one actionable question.
   const first = await runCase({ message: '강남역에서 삼겹살 먹을건데', env, naverResponse: places(),
-    aiResponse: { message: '검색 결과예요.', turn_text: { summary: '강남역 삼겹살로 먼저 식당 3곳을 골랐어요.', reason: '강남역과 삼겹살 분류가 일치하는 후보예요.' },
+    aiResponse: { message: '검색 결과예요.', turn_text: { summary: '강남역 삼겹살로 먼저 식당 3곳을 골랐어요.', reason: '' },
       next_question: { slot: 'companion', text: '어떤 분들과 함께 가세요?', chips: [] }, selectedRestaurantIds: ['not-verified'], suggestions: [] } });
   assert.equal(first.body.meta.analysis.stage, 'ready');
   assert.equal(first.body.meta.analysis.can_search, true);
   assert.equal(first.body.restaurants.length, 3);
   assert.ok(first.body.restaurants.every(card => card.id.startsWith('naver:')));
   assert.equal(questions(first.body), 1);
-  assert.equal(first.body.meta.turnPolicy.cardFirst, true);
+  assert.equal(first.body.meta.turnPolicy.cardFirst, false);
+  assert.ok(first.body.meta.turnPolicy.intro);
   assert.equal(first.body.meta.turnPolicy.next_question.slot, 'companion');
   assert.deepEqual(first.body.suggestions, ['혼자', '2~3명', '회식', '가족']);
   assert.deepEqual(first.body.suggestions, first.body.meta.turnPolicy.next_question.chips.map(chip => chip.label));
@@ -40,7 +41,8 @@ export async function testTurnPolicy(runCase) {
   assert.equal(refined.body.restaurants.length, 3);
   assert.ok(refined.calls.some(call => call.href.includes('/search/v1/local') && new URL(call.href).searchParams.get('query').includes('회식')));
   assert.equal(questions(refined.body), 0);
-  assert.match(refined.body.message, /회식 요청을 반영/);
+  assert.match(refined.body.message, /회식으로 가시는군요/);
+  assert.deepEqual(refined.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기', '비교하기']);
   boundedCopy(refined.body);
   // 3. Explicit fast path never adds a question, even when a slot could refine.
   for (const message of ['바로 보여줘', '그냥 추천해줘']) {

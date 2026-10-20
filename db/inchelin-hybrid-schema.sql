@@ -36,6 +36,7 @@ CREATE TABLE places (
   inchelin_place_id text NOT NULL UNIQUE,
   canonical_name text NOT NULL,
   canonical_address text NOT NULL,
+  image_url text, -- Optional registered DB imageUrl. No external/map photo collection.
   normalized_name text NOT NULL,
   normalized_address text NOT NULL,
   identity_key char(64) NOT NULL UNIQUE,

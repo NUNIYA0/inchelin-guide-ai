@@ -288,31 +288,29 @@
     .message-copy p { margin: 0; font-weight: 400; }
     .message-copy strong { color: #202020; font-weight: 600; }
     .message.user .message-copy strong { color: inherit; font-weight: 400; }
-    .restaurant-carousel { position: relative; width: 100%; max-width: 100%; margin: 16px 0; }
-    .restaurant-list { width: 100%; max-width: 100%; margin: 0; padding: 2px 2px 9px; display: flex; align-items: stretch; gap: 12px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x mandatory; scroll-behavior: smooth; scrollbar-width: none; overscroll-behavior-x: contain; -webkit-overflow-scrolling: touch; }
-    .restaurant-list::-webkit-scrollbar { display: none; }
-    .restaurant-card { min-width: 0; height: auto; flex: 0 0 calc((100% - 12px) / 2); overflow: hidden; display: flex; flex-direction: column; scroll-snap-align: start; scroll-snap-stop: always; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
-    .restaurant-carousel-nav { position: absolute; z-index: 3; top: 50%; width: 40px; height: 40px; border: 1px solid #dedede; border-radius: 50%; background: rgba(255,255,255,.96); color: #333; display: grid; place-items: center; font-family: inherit; font-size: 25px; line-height: 1; cursor: pointer; box-shadow: 0 5px 18px rgba(0,0,0,.12); transform: translateY(-50%); transition: opacity .18s ease, background .18s ease, transform .18s ease; }
-    .restaurant-carousel-nav:hover:not(:disabled) { background: #f7f7f7; transform: translateY(-50%) scale(1.04); }
-    .restaurant-carousel-nav:disabled { opacity: .22; cursor: default; }
-    .restaurant-carousel-prev { left: -10px; }
-    .restaurant-carousel-next { right: -10px; }
-    .restaurant-media { position: relative; width: 100%; height: clamp(130px, 35vw, 150px); aspect-ratio: 16 / 9; overflow: hidden; display: grid; place-items: center; background: #f1f1f1; }
-    .restaurant-image { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: cover; background: #f3f3f3; }
-    .restaurant-placeholder { display: flex; flex-direction: column; align-items: center; gap: 8px; color: #8a8a8a; font-size: 12px; }
-    .restaurant-placeholder img { width: 38px; height: 38px; border-radius: 50%; object-fit: cover; object-position: left center; opacity: .72; }
-    .restaurant-card-body { min-height: 0; flex: 1; display: flex; flex-direction: column; padding: 12px; }
-    .restaurant-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-    .restaurant-card h3 { margin: 0; color: #202020; font-size: 14px; font-weight: 600; line-height: 1.4; }
-    .restaurant-recommender { margin: 6px 0 0; color: #777; font-size: 12px; line-height: 1.45; }
-    .restaurant-category { margin: 7px 0 0; color: #555; font-size: 12px; font-weight: 500; line-height: 1.45; }
-    .restaurant-reason { margin: 8px 0 0; color: #333; font-size: 13px; line-height: 1.55; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .restaurant-badges { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 6px; }
-    .restaurant-badge { padding: 4px 8px; border-radius: 999px; background: #f2f2f2; color: #666; font-size: 11px; line-height: 1.3; }
-    .restaurant-badge.active { background: #eef7f0; color: #27723b; }
-    .restaurant-address { margin: 8px 0 14px; color: #8a8a8a; font-size: 12px; line-height: 1.5; word-break: keep-all; overflow-wrap: break-word; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-    .restaurant-detail-area { margin-top: auto; display: grid; gap: 8px; }
-    .restaurant-map-link { display: inline-flex; min-height: 38px; margin: 0; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; background: #fff; color: #333; font-family: inherit; font-size: 13px; font-weight: 500; text-decoration: none; cursor: pointer; }
+    .restaurant-group { width: 100%; margin: 16px 0; }
+    .restaurant-list { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+    .restaurant-card { min-width: 0; width: 100%; overflow: hidden; border: 1px solid #e4e4e4; border-radius: 16px; background: #fff; }
+    .restaurant-card-content { display: flex; align-items: flex-start; gap: 12px; padding: 16px 16px 0; }
+    .restaurant-card-body { min-width: 0; flex: 1; padding: 0; }
+    .restaurant-card-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+    .restaurant-card h3 { margin: 0; color: #111; font: 600 16px/1.4 system-ui, sans-serif; overflow-wrap: anywhere; }
+    .restaurant-category { padding: 3px 8px; border-radius: 999px; background: #f3f3f3; color: #555; font: 400 12px/1.5 system-ui, sans-serif; }
+    .restaurant-reason { margin: 8px 0 0; color: #333; font: 400 14px/1.5 system-ui, sans-serif; overflow-wrap: anywhere; }
+    .restaurant-address { margin: 6px 0 0; color: #666; font: 400 12px/1.5 system-ui, sans-serif; overflow-wrap: anywhere; }
+    .restaurant-media { flex: 0 0 64px; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; }
+    .restaurant-image { display: block; width: 100%; height: 100%; object-fit: cover; }
+    .restaurant-detail-area { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px 16px; }
+    .restaurant-map-link { display: inline-flex; min-height: 44px; margin: 0; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; background: #fff; color: #333; font: 500 14px/1.4 system-ui, sans-serif; text-decoration: none; cursor: pointer; }
+    .restaurant-map-link[aria-pressed="true"] { color: #fff; background: #222; }
+    .restaurant-source { margin: 8px 2px 0; color: #666; font: 400 12px/1.5 system-ui, sans-serif; }
+    .compare-tray-action { width: 100%; margin-top: 8px; }
+    .compare-tray-action[hidden] { display: none; }
+    .turn-question { margin: 12px 0 0; font-size: 14px; }
+    .quick-reply-reason { grid-column: 1; font-size: 14px; line-height: 1.5; color: #555; }
+    .quick-reply.menu-choice { min-height: 108px; border-color: #d6d6d6; }
+    .menu-choice .quick-reply-description { font-size: 14px; }
+    .menu-choice .quick-reply-arrow { grid-row: 1 / span 3; }
     .restaurant-map-link:hover { background: #f7f7f7; }
     .restaurant-map-link:disabled { color: #999; background: #f7f7f7; cursor: default; }
     .restaurant-detail-fallback { display: grid; gap: 8px; padding: 10px; border-radius: 10px; background: #f7f7f7; }
@@ -663,13 +661,9 @@
       .quick-reply { min-height: 74px; padding: 13px 14px; }
       .quick-replies.quick-replies-actions { display: flex; }
       .quick-reply.quick-reply-action { min-height: 40px; padding: 8px 12px; }
-      .restaurant-card { flex-basis: min(84vw, 310px); }
-      .restaurant-carousel-prev { left: 4px; }
-      .restaurant-carousel-next { right: 4px; }
-      .restaurant-carousel-nav { width: 38px; height: 38px; }
       .ai-bubble { padding: 0; border-radius: 0; }
       .restaurant-list { grid-template-columns: minmax(0, 1fr); grid-auto-rows: auto; gap: 12px; }
-      .restaurant-card-body { padding: 12px; }
+      .restaurant-card-content { padding: 14px 14px 0; }
       .chat-composer { position: sticky; z-index: 2; bottom: 0; margin: 0; min-height: 88px; border-radius: 22px; background: #fff; }
       .disclaimer { flex: 0 0 auto; background: #fff; padding: 7px 0 max(8px, env(safe-area-inset-bottom)); }
     }
@@ -691,13 +685,13 @@
     @media (min-width: 768px) {
       .restaurant-list { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 1fr; gap: 14px; }
       .restaurant-media { height: clamp(140px, 18vw, 160px); }
-      .restaurant-card-body { padding: 14px; }
+      .restaurant-card-body { padding: 0; }
       .restaurant-card h3 { font-size: clamp(14px, 1.4vw, 15px); }
     }
     @media (min-width: 1200px) {
       .restaurant-list { max-width: 720px; gap: 16px; }
       .restaurant-media { height: clamp(150px, 13vw, 170px); }
-      .restaurant-card-body { padding: 16px; }
+      .restaurant-card-body { padding: 0; }
       .restaurant-card h3 { font-size: 15px; }
     }
     @media (max-width: 360px) {
@@ -1521,128 +1515,62 @@
         showRestaurantDetailFallback(detailArea, restaurant, retry);
       }
     }
+    const comparisonTray = new Map();
     function renderRestaurantCards(restaurants) {
-      const carousel = document.createElement('div');
-      carousel.className = 'restaurant-carousel';
-      const list = document.createElement('div');
-      list.className = 'restaurant-list';
-      list.setAttribute('aria-label', restaurants.some(restaurant => restaurant.dataSource === 'inchelin') ? '인슐랭가이드 등록 맛집' : '맛집 검색 결과');
-      restaurants.forEach(restaurant => {
-        const card = document.createElement('article');
-        card.className = 'restaurant-card';
-        const media = document.createElement('div');
-        media.className = 'restaurant-media';
-        const placeholder = document.createElement('div');
-        placeholder.className = 'restaurant-placeholder';
-        placeholder.innerHTML = '<img src="assets/inchelin-guide-logo.png" alt=""><span>이미지 준비 중</span>';
-        media.appendChild(placeholder);
-        if (restaurant.imageUrl) {
-          const image = document.createElement('img');
-          image.className = 'restaurant-image';
-          image.src = restaurant.imageUrl;
-          image.alt = `${restaurant.name} 대표 이미지`;
-          image.loading = 'lazy';
-          image.referrerPolicy = 'no-referrer';
-          image.addEventListener('error', () => image.remove(), { once: true });
-          media.appendChild(image);
-        }
-        card.appendChild(media);
-        const body = document.createElement('div');
-        body.className = 'restaurant-card-body';
-        const head = document.createElement('div');
-        head.className = 'restaurant-card-head';
-        const title = document.createElement('h3');
-        title.textContent = restaurant.name;
-        head.appendChild(title);
-        const recommender = document.createElement('p');
-        recommender.className = 'restaurant-recommender';
-        recommender.textContent = restaurant.recommendedBy ? `${restaurant.recommendedBy} 님 추천` : '';
-        const address = document.createElement('p');
-        address.className = 'restaurant-address';
-        address.textContent = restaurant.roadAddress || restaurant.address;
-        const category = document.createElement('p');
-        category.className = 'restaurant-category';
-        category.textContent = [restaurant.category, restaurantDistanceLabel(restaurant.distanceMeters)].filter(Boolean).join(' · ');
-        const reason = document.createElement('p');
-        reason.className = 'restaurant-reason';
-        reason.textContent = restaurant.recommendationReason;
-        const badges = document.createElement('div');
-        badges.className = 'restaurant-badges';
-        if (restaurant.businessStatus && restaurant.businessStatus !== 'unknown') {
-          const status = document.createElement('span');
-          status.className = `restaurant-badge ${restaurant.businessStatus}`;
-          status.textContent = restaurantStatusLabel(restaurant.businessStatus);
-          badges.appendChild(status);
-        }
-        if (typeof restaurant.parking === 'boolean') {
-          const parking = document.createElement('span');
-          parking.className = 'restaurant-badge';
-          parking.textContent = restaurant.parking ? '주차 가능' : '주차 불가';
-          badges.appendChild(parking);
-        }
-        if (restaurant.dataSource === 'naver') {
-          const sourceBadge = document.createElement('span');
-          sourceBadge.className = 'restaurant-badge';
-          sourceBadge.textContent = '네이버 검색 기준';
-          badges.appendChild(sourceBadge);
+      const group = document.createElement('section'); group.className = 'restaurant-group';
+      const list = document.createElement('div'); list.className = 'restaurant-list';
+      list.setAttribute('aria-label', '맛집 목록');
+      const trayAction = document.createElement('button'); trayAction.type = 'button'; trayAction.className = 'restaurant-map-link compare-tray-action';
+      const updateTray = () => { trayAction.hidden = comparisonTray.size < 2; trayAction.textContent = '담은 식당 ' + comparisonTray.size + '곳 비교하기'; };
+      trayAction.addEventListener('click', () => {
+        const cards = [...comparisonTray.values()].slice(0, 3);
+        if (cards.length >= 2) ask(cards.map(card => card.name).join('랑 ') + ' 비교해줘', { compareCards: cards });
+      });
+      restaurants.slice(0, 3).forEach(restaurant => {
+        const card = document.createElement('article'); card.className = 'restaurant-card';
+        const content = document.createElement('div'); content.className = 'restaurant-card-content';
+        const body = document.createElement('div'); body.className = 'restaurant-card-body';
+        const head = document.createElement('div'); head.className = 'restaurant-card-head';
+        const title = document.createElement('h3'); title.textContent = restaurant.name; head.appendChild(title);
+        if (restaurant.category) {
+          const category = document.createElement('span'); category.className = 'restaurant-category'; category.textContent = restaurant.category; head.appendChild(category);
         }
         body.appendChild(head);
-        if (restaurant.recommendedBy) body.appendChild(recommender);
-        if (category.textContent) body.appendChild(category);
-        if (restaurant.recommendationReason) body.appendChild(reason);
-        if (badges.children.length) body.appendChild(badges);
-        body.appendChild(address);
-        const detailArea = document.createElement('div');
-        detailArea.className = 'restaurant-detail-area';
-        if (restaurant.naverPlaceUrl) {
-          const link = document.createElement('a');
-          link.className = 'restaurant-map-link';
-          link.href = restaurant.naverPlaceUrl;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          link.textContent = '상세보기';
-          detailArea.appendChild(link);
-        } else {
-          const detailButton = document.createElement('button');
-          detailButton.type = 'button';
-          detailButton.className = 'restaurant-map-link';
-          detailButton.textContent = '상세보기';
-          detailButton.addEventListener('click', () => resolveRestaurantDetail(restaurant, detailArea));
-          detailArea.appendChild(detailButton);
+        if (restaurant.recommendationReason) {
+          const reason = document.createElement('p'); reason.className = 'restaurant-reason'; reason.textContent = restaurant.recommendationReason; body.appendChild(reason);
         }
-        body.appendChild(detailArea);
-        card.appendChild(body);
-        list.appendChild(card);
+        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address; body.appendChild(address);
+        content.appendChild(body);
+        if (restaurant.imageUrl) {
+          const media = document.createElement('div'); media.className = 'restaurant-media';
+          const image = document.createElement('img'); image.className = 'restaurant-image'; image.src = restaurant.imageUrl;
+          image.alt = restaurant.name + ' 사진'; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
+          image.addEventListener('error', () => media.remove(), { once: true }); media.appendChild(image); content.appendChild(media);
+        }
+        card.appendChild(content);
+        const actions = document.createElement('div'); actions.className = 'restaurant-detail-area';
+        if (restaurant.naverPlaceUrl) {
+          const link = document.createElement('a'); link.className = 'restaurant-map-link'; link.href = restaurant.naverPlaceUrl;
+          link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '상세보기'; actions.appendChild(link);
+        } else {
+          const detail = document.createElement('button'); detail.type = 'button'; detail.className = 'restaurant-map-link'; detail.textContent = '상세보기';
+          detail.addEventListener('click', () => resolveRestaurantDetail(restaurant, actions)); actions.appendChild(detail);
+        }
+        const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-map-link';
+        const updateCompare = () => { const selected = comparisonTray.has(restaurant.id); compare.textContent = selected ? '✓ 비교에 담았어요' : '비교에 담기'; compare.setAttribute('aria-pressed', String(selected)); };
+        compare.addEventListener('click', () => {
+          if (comparisonTray.has(restaurant.id)) comparisonTray.delete(restaurant.id);
+          else if (comparisonTray.size < 3) comparisonTray.set(restaurant.id, restaurant);
+          else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
+          updateCompare(); updateTray();
+        });
+        updateCompare(); actions.appendChild(compare); card.appendChild(actions); list.appendChild(card);
       });
-      carousel.appendChild(list);
-      if (restaurants.length >= 3) {
-        const previous = document.createElement('button');
-        previous.type = 'button';
-        previous.className = 'restaurant-carousel-nav restaurant-carousel-prev';
-        previous.setAttribute('aria-label', '이전 맛집 카드');
-        previous.textContent = '‹';
-        const next = document.createElement('button');
-        next.type = 'button';
-        next.className = 'restaurant-carousel-nav restaurant-carousel-next';
-        next.setAttribute('aria-label', '다음 맛집 카드');
-        next.textContent = '›';
-        const cardStep = () => {
-          const card = list.querySelector('.restaurant-card');
-          return card ? card.getBoundingClientRect().width + 12 : list.clientWidth;
-        };
-        const updateNavigation = () => {
-          const maxScroll = Math.max(0, list.scrollWidth - list.clientWidth);
-          previous.disabled = list.scrollLeft <= 4;
-          next.disabled = list.scrollLeft >= maxScroll - 4;
-        };
-        previous.addEventListener('click', () => list.scrollBy({ left: -cardStep(), behavior: 'smooth' }));
-        next.addEventListener('click', () => list.scrollBy({ left: cardStep(), behavior: 'smooth' }));
-        list.addEventListener('scroll', updateNavigation, { passive: true });
-        window.addEventListener('resize', updateNavigation, { passive: true });
-        carousel.append(previous, next);
-        requestAnimationFrame(updateNavigation);
+      group.appendChild(list);
+      if (restaurants.some(restaurant => restaurant.dataSource === 'naver')) {
+        const source = document.createElement('p'); source.className = 'restaurant-source'; source.textContent = '네이버 검색 기준'; group.appendChild(source);
       }
-      return carousel;
+      updateTray(); group.appendChild(trayAction); return group;
     }
     function quickReplyCard(reply) {
       const raw = String(reply || '').trim();
@@ -1656,7 +1584,7 @@
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
       const copy = document.createElement('div');
       copy.className = 'message-copy';
-      appendLimitedMarkdown(copy, message.content);
+      appendLimitedMarkdown(copy, message.meta?.turnPolicy?.intro || message.content);
       if (message.role === 'assistant') {
         const avatar = document.createElement('img');
         avatar.className = 'ai-avatar';
@@ -1664,12 +1592,14 @@
         avatar.alt = 'Inchelin Guide AI';
         const bubble = document.createElement('div');
         bubble.className = 'ai-bubble';
+        bubble.appendChild(copy);
         if (message.meta?.notice) {
           const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; bubble.appendChild(notice);
         }
-        if (message.meta?.turnPolicy?.cardFirst && message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
-        bubble.appendChild(copy);
-        if (!message.meta?.turnPolicy?.cardFirst && message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
+        if (message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
+        if (message.meta?.turnPolicy?.questionText) {
+          const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
+        }
         const visibleQuickReplies = (message.quickReplies || []).filter(reply => {
           const card = quickReplyCard(reply);
           if (isCurrentLocationIntent(card.title) && !canUseCurrentLocation()) return false;
@@ -1685,6 +1615,8 @@
           replies.setAttribute('aria-label', '빠른 답변');
           visibleQuickReplies.forEach(reply => {
             const card = quickReplyCard(reply);
+            const menuChoice = message.meta?.menuCards?.find(choice => choice.name === card.title);
+            if (menuChoice) card.description = menuChoice.description;
             const actionReply = isActionReply(reply);
             const button = document.createElement('button');
             button.type = 'button';
@@ -1701,6 +1633,10 @@
               description.className = 'quick-reply-description';
               description.textContent = card.description;
               button.appendChild(description);
+            }
+            if (menuChoice) {
+              const reason = document.createElement('span'); reason.className = 'quick-reply-reason'; reason.textContent = menuChoice.reason; button.appendChild(reason);
+              button.classList.add('menu-choice');
             }
             if (!actionReply && !followupChip) {
               const arrow = document.createElement('span');
@@ -1721,6 +1657,14 @@
             replies.appendChild(button);
           });
           bubble.appendChild(replies);
+        }
+        if (message.meta?.turnPolicy?.actionChips?.length) {
+          const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup'; actions.setAttribute('aria-label', '이어서 할 일');
+          message.meta.turnPolicy.actionChips.forEach(label => {
+            const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label;
+            button.addEventListener('click', () => routeQuestion(label)); actions.appendChild(button);
+          });
+          bubble.appendChild(actions);
         }
         item.append(avatar, bubble);
       } else {
@@ -2089,6 +2033,12 @@
       }
     }
     function routeQuestion(question) {
+      if (question === '비교하기') {
+        const cards = [...comparisonTray.values()].slice(0, 3);
+        if (cards.length >= 2) ask(cards.map(card => card.name).join('랑 ') + ' 비교해줘', { compareCards: cards });
+        else runPlugin(4);
+        return;
+      }
       const value = String(question || '').trim();
       if (!value) return;
       if (value === '지역별 찾기') { runPlugin(3); return; }

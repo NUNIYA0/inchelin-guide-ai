@@ -48,6 +48,7 @@ for (const path of await walk(assetsRoot)) {
 const template = await readFile(join(root, "worker", "index.template.js"), "utf8");
 const responseModes = await readFile(join(root, "worker", "response-modes.js"), "utf8");
 const turnPolicy = await readFile(join(root, "worker", "turn-policy.js"), "utf8");
+const conversationCopy = await readFile(join(root, "worker", "conversation-copy.js"), "utf8");
 const korean = await readFile(join(root, "worker", "korean.js"), "utf8");
 const serviceFaq = JSON.parse(await readFile(join(root, "data", "service-faq.json"), "utf8"));
 const worker = template
@@ -60,11 +61,13 @@ await Promise.all([
   writeFile(join(outputRoot, "dist", "server", "index.js"), worker),
   writeFile(join(outputRoot, "dist", "server", "response-modes.js"), responseModes),
   writeFile(join(outputRoot, "dist", "server", "turn-policy.js"), turnPolicy),
+  writeFile(join(outputRoot, "dist", "server", "conversation-copy.js"), conversationCopy),
   writeFile(join(outputRoot, "dist", "server", "korean.js"), korean),
   writeFile(join(outputRoot, ".openai", "hosting.json"), hostingManifest),
   writeFile(join(hostingOutputRoot, "server", "index.js"), worker),
   writeFile(join(hostingOutputRoot, "server", "response-modes.js"), responseModes),
   writeFile(join(hostingOutputRoot, "server", "turn-policy.js"), turnPolicy),
+  writeFile(join(hostingOutputRoot, "server", "conversation-copy.js"), conversationCopy),
   writeFile(join(hostingOutputRoot, "server", "korean.js"), korean),
   writeFile(join(hostingOutputRoot, ".openai", "hosting.json"), hostingManifest),
 ]);
