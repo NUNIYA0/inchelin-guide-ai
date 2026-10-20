@@ -368,6 +368,28 @@
     .task-menu.open { display: block; animation: reveal .15s ease-out; }
     .task-menu button { display: flex; align-items: center; gap: 9px; width: 100%; border: 0; background: transparent; border-radius: 8px; padding: 10px; cursor: pointer; }
     .task-menu button:hover { background: #f4f4f4; }
+    .meal-tools-dialog { position: fixed; inset: 0; margin: auto; box-sizing: border-box; width: min(520px, calc(100vw - 24px)); max-height: calc(100dvh - 32px); overflow-y: auto; padding: 24px 18px; border: 1px solid #ddd; border-radius: 20px; color: #262626; background: #fff; }
+    .meal-tools-dialog::backdrop { background: rgba(0,0,0,.38); }
+    .meal-tools-dialog h2 { margin: 0 32px 14px 0; font-size: 20px; }
+    .meal-tools-dialog h3 { margin: 18px 0 10px; font-size: 15px; }
+    .meal-tools-dialog .primary-action { margin-top: 12px; min-height: 44px; width: 100%; }
+    .meal-muted { font-size: 12px; color: #737373; line-height: 1.65; margin: 10px 0; }
+    .meal-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .meal-chip { min-height: 44px; padding: 8px 13px; border: 1px solid #ddd; border-radius: 22px; background: #fff; font: inherit; font-size: 13px; color: inherit; cursor: pointer; }
+    .meal-chip[aria-pressed="true"] { background: #222; border-color: #222; color: white; }
+    .meal-chip:disabled { opacity: .4; cursor: default; }
+    .meal-tools-dialog :focus-visible { outline: 2px solid #4c7452; outline-offset: 3px; }
+    .meal-input-row { display: flex; align-items: center; gap: 8px; margin: 8px 0; }
+    .meal-input-row input { min-width: 0; flex: 1; padding: 11px 10px; min-height: 44px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 9px; font: inherit; font-size: 14px; }
+    .meal-input-row .meal-muted { white-space: nowrap; }
+    .meal-tools-dialog select { min-height: 44px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 8px; background: white; color: inherit; font: inherit; }
+    .meal-stage { overflow-x: auto; margin-top: 16px; }
+    .meal-stage svg { width: 100%; display: block; }
+    .meal-wheel-shell { position: relative; width: min(240px, 70vw); margin: 12px auto 20px; }
+    .meal-wheel { width: 100%; aspect-ratio: 1; border-radius: 50%; border: 5px solid #fff; box-shadow: 0 0 0 1px #ddd; box-sizing: border-box; }
+    .meal-wheel-pointer { position: absolute; left: 50%; top: -13px; transform: translateX(-50%); font-size: 26px; color: #222; }
+    .meal-legend { border-left: 8px solid; padding: 3px 7px; font-size: 12px; overflow-wrap: anywhere; }
+    .meal-result-title { font-size: 16px; font-weight: 700; margin: 18px 0 8px; overflow-wrap: anywhere; }
     .overlay { position: fixed; z-index: 100; inset: 0; display: none; align-items: center; justify-content: center; padding: 22px; background: rgba(0,0,0,.32); backdrop-filter: blur(2px); }
     .overlay.open { display: flex; }
     .dialog { position: relative; width: min(560px, 100%); max-height: min(780px, calc(100dvh - 44px)); overflow: auto; background: #fff; border-radius: 18px; box-shadow: 0 26px 80px rgba(0,0,0,.2); padding: 28px; }
@@ -727,6 +749,9 @@
         <button role="menuitem" id="releaseButton"><span class="menu-icon">◴</span>업데이트 소식</button>
       </div>
       <div class="task-menu" id="taskMenu" role="menu">
+        <button data-meal-tool="category" role="menuitem"><span aria-hidden="true">▦</span>카테고리로 찾기</button>
+        <button data-meal-tool="wheel" role="menuitem"><span aria-hidden="true">◉</span>돌림판</button>
+        <button data-meal-tool="ladder" role="menuitem"><span aria-hidden="true">☷</span>사다리게임</button>
         <button id="photoButton" role="menuitem"><span>▧</span>사진 업로드</button>
         <button id="pluginButton" role="menuitem"><span>✣</span>플러그인</button>
       </div>
@@ -2021,7 +2046,7 @@
       }
       ask(value);
     }
-    function ask(question) {
+    function ask(question, { freshMenu = false } = {}) {
       const value = question.trim();
       if (!value || generating) return;
       showChatView();
@@ -2031,6 +2056,11 @@
       resizeInput($('#welcomeInput'));
       resizeInput($('#chatInput'));
       lastAIRequest = buildAIRequest(chatMessages);
+      if (freshMenu) {
+        currentLocationName = '';
+        currentLocationCoords = null;
+        lastAIRequest = { ...lastAIRequest, messages: [{ role: 'user', content: value }], context: { ...lastAIRequest.context, currentLocationName: '', currentLocation: null, recentRestaurants: [], hasRestaurantResults: false, responseModeState: { slots: {}, lastCards: [], shownPlaces: [], shownPlaceIds: [] } } };
+      }
       generateAnswer(lastAIRequest);
     }
     function showGuide() {
@@ -2122,7 +2152,7 @@
     });
     qsa('.more-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const open = moreMenu.classList.toggle('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', String(open))); }));
     $('#releaseButton').addEventListener('click', () => openOverlay('releaseOverlay'));
-    qsa('.task-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const rect = button.getBoundingClientRect(); taskMenu.style.left = `${Math.max(10, rect.left)}px`; taskMenu.style.top = `${Math.max(10, rect.top - 102)}px`; const open = taskMenu.classList.toggle('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', String(open && b === button))); }));
+    qsa('.task-trigger').forEach(button => button.addEventListener('click', event => { event.stopPropagation(); const rect = button.getBoundingClientRect(); taskMenu.style.position = 'fixed'; const open = taskMenu.classList.toggle('open'); taskMenu.style.left = `${Math.max(10, Math.min(innerWidth - taskMenu.offsetWidth - 10, rect.left))}px`; taskMenu.style.top = `${Math.max(10, rect.top - taskMenu.offsetHeight - 8)}px`; qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', String(open && b === button))); }));
     $('#photoButton').addEventListener('click', () => { taskMenu.classList.remove('open'); $('#fileInput').click(); });
     $('#fileInput').addEventListener('change', event => { const file = event.target.files[0]; if (file) { const input = chatView.classList.contains('active') ? $('#chatInput') : $('#welcomeInput'); input.value = `[첨부: ${file.name}] ` + input.value; resizeInput(input); showToast('사진이 질문에 첨부되었습니다.'); } });
     $('#pluginButton').addEventListener('click', () => { renderPlugins(); openOverlay('pluginOverlay'); });
@@ -2370,6 +2400,11 @@
     renderAuthNavigation();
     renderHistory();
     renderPlugins();
+    import('/assets/meal-tools-v1.js').then(({ mountMealTools }) => {
+      mountMealTools({ getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), source: 'naver' });
+    }).catch(() => {
+      qsa('[data-meal-tool]').forEach(button => button.addEventListener('click', () => showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.')));
+    });
     if (!loadSharedConversationFromHash()) updateShareVisibility();
   })(
     selector => document.querySelector(selector),

@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import worker from "../build/dist/server/index.js";
 import { koreanParticle, withParticle } from "../worker/korean.js";
+import { CATEGORY_MENUS, GAME_NOTICE, secureRandomInt, autoCandidates, spinWheel, makeLadder, resultMessage, categoryRequest, normalizeOptions } from "../dist/assets/meal-tools-v1.js";
+import { testMealToolsUI } from "./meal-tools-smoke.mjs";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -1655,6 +1657,74 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+// Browser-only menu tools: no network calls or external dependencies.
+{
+  testMealToolsUI();
+  assert.deepEqual(CATEGORY_MENUS.map(item => item.name), ["한식", "중식", "일식", "양식", "분식", "고기·구이", "면", "국밥·찌개"]);
+  for (const menu of new Set(CATEGORY_MENUS.flatMap(item => item.menus))) {
+    const request = categoryRequest(menu);
+    assert.equal(request.freshMenu, true);
+    const result = await runCase({ message: request.message, env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" }, context: { responseModeState: { slots: {}, lastCards: [] } } });
+    assert.equal(result.body.meta.mode, "B", `${menu} must enter the existing region-question flow`);
+    assert.match(result.body.message, /어느 지역/);
+    assert.equal(result.calls.length, 0);
+  }
+  assert.throws(() => categoryRequest("지원하지 않는 메뉴"));
+  assert.deepEqual(autoCandidates([{ role: "assistant", meta: { mode: "A", responseModeState: { aCandidates: ["국밥", "냉면", "피자"] } } }]), ["국밥", "냉면", "피자"]);
+  assert.deepEqual(autoCandidates([{ role: "assistant", meta: { mode: "A", responseModeState: { aCandidates: ["국밥"] } } }, { role: "assistant", restaurants: [{ name: "첫식당" }, { name: "둘째식당" }] }]), ["첫식당", "둘째식당"]);
+  assert.deepEqual(autoCandidates([{ role: "assistant", restaurants: [{ name: "이전식당" }] }, { role: "assistant", meta: { variant: "hard_reset" } }]), []);
+  assert.equal(normalizeOptions(Array(10).fill("메뉴")).length, 8);
+  assert.deepEqual(normalizeOptions([" 냉면 ", "", "   ", "국밥"]), ["냉면", "국밥"]);
+  let calls = 0;
+  const value = secureRandomInt(3, { getRandomValues(array) { array[0] = calls++ === 0 ? 0xffffffff : 5; return array; } });
+  assert.equal(value, 2);
+  assert.equal(calls, 2, "random selection must reject modulo-biased samples");
+  assert.throws(() => secureRandomInt(0));
+  for (const count of [2, 8]) {
+    const options = Array.from({ length: count }, (_, index) => `메뉴${index}`);
+    assert.equal(spinWheel(options, () => 0).value, options[0]);
+    assert.equal(spinWheel(options, limit => limit - 1).value, options.at(-1));
+  }
+  assert.throws(() => spinWheel(["국밥"]));
+  assert.throws(() => spinWheel(Array(9).fill("국밥")));
+  assert.throws(() => spinWheel(["국밥", ""]));
+  for (let count = 2; count <= 8; count += 1) {
+    let step = count;
+    const menus = Array.from({ length: count }, (_, index) => `메뉴${index}`);
+    const ladder = makeLadder(count, menus, limit => step++ % limit);
+    assert.equal(new Set(ladder.paths.map(path => path.destination)).size, count, "ladder assignments must form a permutation");
+    for (const bridges of ladder.rows) assert.ok(bridges.every((column, i) => i === 0 || column - bridges[i - 1] > 1), "adjacent ladder bridges must not overlap");
+    for (const path of ladder.paths) {
+      assert.equal(path.menu, menus[path.destination]);
+      assert.equal(path.points.at(-1).column, path.destination);
+      assert.ok(path.points.every(point => point.column >= 0 && point.column < count));
+    }
+  }
+  assert.throws(() => makeLadder(1, ["냉면"]));
+  assert.throws(() => makeLadder(9, Array(9).fill("냉면")));
+  assert.throws(() => makeLadder(2, ["냉면", ""]));
+  assert.equal(resultMessage("wheel", "냉면"), `돌림판 결과: 냉면\n${GAME_NOTICE}`);
+  assert.equal(resultMessage("ladder", "국밥", 2), `사다리게임 결과: 2번 → 국밥\n${GAME_NOTICE}`);
+  for (const tool of ["category", "wheel", "ladder"]) assert.ok(indexHtml.includes(`data-meal-tool="${tool}"`));
+  const toolsScript = await readFile(new URL("../dist/assets/meal-tools-v1.js", import.meta.url), "utf8");
+  assert.doesNotMatch(toolsScript, /Math\.random|\bfetch\(/);
+  assert.match(toolsScript, /prefers-reduced-motion: reduce/);
+  assert.match(toolsScript, /if \(reduced\(\)\) \{ action\(\); return; \}/);
+  const asset = await worker.fetch(new Request("https://example.test/assets/meal-tools-v1.js"), {}, {});
+  assert.equal(asset.status, 200);
+  assert.match(asset.headers.get("content-type"), /javascript/);
+  const askSource = indexHtml.match(/    function ask\(question, \{ freshMenu = false \} = \{\}\) \{[\s\S]*?\n    \}/)?.[0];
+  assert.ok(askSource);
+  const requests = [];
+  const ask = new Function("showChatView", "appendMessage", "$", "resizeInput", "buildAIRequest", "generateAnswer", `let generating = false, chatMessages = [], lastAIRequest, currentLocationName = '역삼', currentLocationCoords = { latitude: 37.5, longitude: 127 };\n${askSource}\nreturn ask;`)(() => {}, () => {}, () => ({}), () => {}, () => ({ messages: [{ role: "user", content: "이전 지역 조건" }], context: { currentLocationName: "역삼", currentLocation: { latitude: 37.5, longitude: 127 }, responseModeState: { slots: { region: "역삼" } } } }), request => requests.push(request));
+  ask("마라탕 먹고 싶어", { freshMenu: true });
+  assert.deepEqual(requests[0].messages, [{ role: "user", content: "마라탕 먹고 싶어" }]);
+  assert.deepEqual(requests[0].context.responseModeState.slots, {});
+  assert.equal(requests[0].context.currentLocation, null);
+  assert.equal(requests[0].context.hasRestaurantResults, false);
+  const inlineScripts = [...indexHtml.matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  for (const [, script] of inlineScripts) assert.doesNotThrow(() => new Function(script));
+}
 {
   const buildRequestSource = indexHtml.match(/    function buildAIRequest\(nextMessages\) \{[\s\S]*?\n    \}/)?.[0];
   assert.ok(buildRequestSource);
