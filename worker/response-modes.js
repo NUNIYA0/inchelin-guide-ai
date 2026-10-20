@@ -2,10 +2,21 @@ export const INTENTS = [
   "menu_trouble", "place_search", "followup", "condition_change", "compare",
   "specific_place", "food_talk", "service", "general", "out_of_scope",
 ];
+export const TURN_ANALYSIS_FIELDS = {
+  stage: { type: "string", enum: ["exploring", "narrowing", "ready", "refining"] },
+  missing_slots: { type: "array", items: { type: "string", enum: ["menu", "region", "companion", "sub_menu", "sub_region"] } },
+  next_question: { anyOf: [{ type: "null" }, { type: "object", properties: {
+    slot: { type: "string", enum: ["menu", "region", "companion", "sub_menu", "sub_region"] },
+    text: { type: "string" },
+    chips: { type: "array", items: { type: "object", properties: { label: { type: "string" }, message: { type: "string" } }, required: ["label", "message"], additionalProperties: false } }
+  }, required: ["slot", "text", "chips"], additionalProperties: false }] },
+  can_search: { type: "boolean" },
+};
 
 export const INTENT_ANALYSIS_SCHEMA = {
   type: "object",
   properties: {
+    ...TURN_ANALYSIS_FIELDS,
     intent: { type: "string", enum: INTENTS },
     sub_intent: { type: ["string", "null"] },
     confidence: { type: "number" },
@@ -22,7 +33,7 @@ export const INTENT_ANALYSIS_SCHEMA = {
     change: { anyOf: [{ type: "null" }, { type: "object", properties: { slot: { type: ["string", "null"] }, action: { type: "string", enum: ["replace", "add", "exclude_previous"] } }, required: ["slot", "action"], additionalProperties: false }] },
     flags: { type: "object", properties: { answers_previous_question: { type: "boolean" }, new_topic: { type: "string", enum: ["none", "soft", "hard"] }, mentions_place_name: { type: "boolean" }, food_related: { type: "boolean" } }, required: ["answers_previous_question", "new_topic", "mentions_place_name", "food_related"], additionalProperties: false },
   },
-  required: ["intent", "sub_intent", "confidence", "slots", "reference", "change", "flags"],
+  required: ["intent", "sub_intent", "confidence", "slots", "reference", "change", "flags", ...Object.keys(TURN_ANALYSIS_FIELDS)],
   additionalProperties: false,
 };
 
@@ -36,6 +47,7 @@ export function buildIntentAnalysisInstructions(stateValue) {
     a_candidates: state.aCandidates,
     accumulated_slots: state.slots,
     no_results: state.noResults,
+    stage: state.stage, askedSlots: state.askedSlots, questionCount: state.questionCount, preferences: state.preferences,
   };
   return `너는 인슐랭가이드 AI의 1단계 의도 분석기다. 응답 문장을 만들지 말고 JSON만 출력한다.
 intent는 menu_trouble, place_search, followup, condition_change, compare, specific_place, food_talk, service, general, out_of_scope 중 하나다.
@@ -46,6 +58,10 @@ intent는 menu_trouble, place_search, followup, condition_change, compare, speci
 직전 카드 두 대상 이상을 언급하거나 '첫 번째랑 두 번째 중에 어디가 나아', '어디가 나아', '비교'라고 하면 compare다. 단일 followup이나 focus 해석보다 비교를 우선한다.
 service sub_intent는 about, how_to, policy, data_basis, wine 중 하나다. followup sub_intent는 hours, parking, phone, menu_info, location, other다.
 slots에는 이번 발화에서 새로 추출하거나 바꾼 값만 넣고 이전 값을 복사하지 않는다. reference는 카드 번호나 상호 참조다. flags.new_topic은 none/soft/hard다. 끼어든 service/general/food_talk/out_of_scope는 new_topic=none이다.
+stage는 exploring(메뉴·지역 탐색), narrowing(한 축 부족), ready(지역+메뉴 첫 검색), refining(기존 카드 조건 변경)이다.
+missing_slots는 지역·메뉴 등 실제 검색을 바꾸는 축만 적는다. next_question은 질문 하나(slot,text,chips{label,message}) 또는 null이다.
+can_search는 지역+메뉴가 있을 때 true다. 분위기·예산은 질문하지 않고 선호로 기록하며 검증되지 않았음을 안내한다.
+askedSlots는 다시 묻지 않는다. 바로 보여줘/그냥 추천해줘, 서비스/비교/특정식당 질문은 next_question=null이다.
 confidence가 낮아도 가장 가능성 높은 분류를 내고 food_related를 정확히 표시한다.
 <runtime_context>${JSON.stringify(context)}</runtime_context>`;
 }
@@ -75,6 +91,12 @@ export function emptyResponseState() {
     aCandidates: [],
     aProposed: [],
     noResults: false,
+    stage: "exploring",
+    askedSlots: [],
+    preferences: { companion: null, budget: null, vibe: null },
+    questionCount: 0,
+    refinementQuestionCount: 0,
+    previousOpenings: [],
   };
 }
 
@@ -126,6 +148,12 @@ export function normalizeResponseState(value = {}) {
     aCandidates: Array.isArray(value.aCandidates || value.a_candidates) ? (value.aCandidates || value.a_candidates).map(String).filter(Boolean).slice(0, 12) : [],
     aProposed: Array.isArray(value.aProposed || value.a_proposed) ? [...new Set((value.aProposed || value.a_proposed).map(String).filter(Boolean))].slice(0, 80) : [],
     noResults: value.noResults === true || value.no_results === true,
+    stage: ["exploring", "narrowing", "ready", "refining"].includes(value.stage) ? value.stage : "exploring",
+    askedSlots: Array.isArray(value.askedSlots) ? [...new Set(value.askedSlots)].filter(slot => ["menu", "region", "companion", "sub_menu", "sub_region"].includes(slot)) : [],
+    preferences: Object.fromEntries(["companion", "budget", "vibe"].map(key => [key, cleanString(value.preferences?.[key])])),
+    questionCount: Math.min(3, Math.max(0, Math.trunc(Number(value.questionCount) || 0))),
+    refinementQuestionCount: Math.min(2, Math.max(0, Math.trunc(Number(value.refinementQuestionCount) || 0))),
+    previousOpenings: Array.isArray(value.previousOpenings) ? value.previousOpenings.map(item => cleanString(item, 60)).filter(Boolean).slice(-3) : [],
   };
 }
 
@@ -136,6 +164,13 @@ export function normalizeAnalysis(value = {}) {
   const flags = value.flags && typeof value.flags === "object" ? value.flags : {};
   return {
     intent,
+    stage: ["exploring", "narrowing", "ready", "refining"].includes(value.stage) ? value.stage : "exploring",
+    missing_slots: Array.isArray(value.missing_slots) ? value.missing_slots.filter(slot => ["menu", "region", "companion", "sub_menu", "sub_region"].includes(slot)) : [],
+    next_question: value.next_question && ["menu", "region", "companion", "sub_menu", "sub_region"].includes(value.next_question.slot) ? {
+      slot: value.next_question.slot, text: cleanString(value.next_question.text, 120) || "",
+      chips: Array.isArray(value.next_question.chips) ? value.next_question.chips.slice(0, 8).map(item => ({ label: cleanString(item?.label, 40) || "", message: cleanString(item?.message, 160) || "" })) : [],
+    } : null,
+    can_search: value.can_search === true,
     sub_intent: cleanString(value.sub_intent, 80),
     confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : 1,
     slots: cleanSlots(value.slots),
@@ -176,6 +211,9 @@ export function applyAnalysisToState(stateValue, analysisValue) {
     return normalizeResponseState(stateValue);
   }
   let state = resetSlots(stateValue, analysis.flags.new_topic);
+  if (analysis.intent === "menu_trouble" && analysis.sub_intent === "narrow" && analysis.change?.slot === "menu") {
+    state = { ...state, slots: { ...state.slots, menu: null, food_type: null }, lastCards: [], focus: null };
+  }
   const delta = analysis.slots;
   const slots = { ...state.slots };
   for (const key of ["region", "food_type", "menu", "companion", "meal_time"]) {
@@ -218,7 +256,7 @@ export function decideMode(analysisValue, stateValue) {
     return { ...base, mode: "A", intent };
   }
   if (intent === "place_search") {
-    if (!hasFood && (state.pendingQuestionSlot === "menu" || analysis.sub_intent === "choose_menu")) return { ...base, mode: "B", questionSlot: "menu", intent };
+    if (!hasFood && (hasRegion || state.pendingQuestionSlot === "menu" || analysis.sub_intent === "choose_menu")) return { ...base, mode: "B", questionSlot: "menu", intent };
     if (hasRegion) return { ...base, mode: "C", showCards: true, needSearch: true, intent };
     return { ...base, mode: "B", questionSlot: "region", intent };
   }
