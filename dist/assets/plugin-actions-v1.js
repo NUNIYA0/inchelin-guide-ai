@@ -1,4 +1,4 @@
-import { createBottomSheet } from './bottom-sheet-v1.js';
+import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
 // These tools collect messages/slots only. Response modes stay in the existing pipeline.
 export const PLUGIN_IDS = [1, 2, 3, 4, 5];
 // Naver local search supports these region queries; availability still depends on the menu.
@@ -23,6 +23,14 @@ export function situationSlots(values) {
     other: selected.filter(value => ['접대·비즈니스', '단체석'].includes(value))
   };
 }
+export function situationRequest(values) {
+  const phrases = {
+    '혼밥': '혼자 먹기 좋은 곳', '회식': '회식하기 좋은 곳', '데이트': '데이트하기 좋은 곳',
+    '가족 모임': '가족 모임하기 좋은 곳', '접대·비즈니스': '접대·비즈니스에 맞는 곳',
+    '주차 필요': '주차 필요한 곳', '단체석': '단체석이 필요한 곳'
+  };
+  return SITUATIONS.filter(value => values.includes(value)).map(value => phrases[value]).join(', ') + '으로 찾아줘';
+}
 export function latestCards(messages) {
   const state = [...messages].reverse().find(message => message.role === 'assistant' && message.meta?.responseModeState)?.meta.responseModeState;
   if (state) return (state.lastCards || []).slice(0, 3);
@@ -36,8 +44,8 @@ export function selectedComparison(cards, indexes) {
 export function validRegion(value) {
   return typeof value === 'string' && /^[가-힣a-zA-Z0-9·.\s-]{2,40}$/.test(value.trim()) && !/찾아줘|추천해줘|알려줘|먹을 곳|갈만한/.test(value);
 }
-export function mountPluginActions({ getMessages, getSlots, send, reply, setRegion, setSituations, locate, faq, isBusy, onOpen, storage, onPins, source = 'naver' }) {
-  let pins = readPins(storage), opener, waiting = false;
+export function mountPluginActions({ getMessages, getSlots, send, reply, setRegion, setSituations, locate, isBusy, onOpen, storage, onPins, source = 'naver' }) {
+  let pins = readPins(storage), opener;
   const el = (tag, text = '', className = '') => {
     const node = document.createElement(tag); node.textContent = text; node.className = className; return node;
   };
@@ -51,7 +59,7 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     sheetUI.open(title);
     return sheetUI.body;
   }
-  const blocked = () => waiting || isBusy();
+  const blocked = () => isBusy();
   function finishRegion(value) {
     if (blocked()) return;
     if (!validRegion(value)) return;
@@ -73,7 +81,7 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     input.addEventListener('input', () => { selectedRegion = input.value.trim(); find.disabled = !validRegion(selectedRegion); });
     const location = button('현재 위치 연결', () => { if (blocked()) return; dialog.close(); locate(); }); location.className = 'primary-action';
     manual.append(input);
-    view.append(location, button('지역 직접 입력', () => input.focus()), manual, error);
+    view.append(location, manual, error);
     sheetUI.setActions(find);
     if (source === 'naver') {
       view.append(el('p', '자주 찾는 지역이에요. 메뉴에 따라 검색 결과가 없을 수 있어요.', 'meal-muted'));
@@ -95,7 +103,7 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     view.append(el('p', '여러 조건을 함께 골라도 돼요.', 'meal-muted'));
     const complete = button('선택 완료', () => {
       if (blocked() || !selected.size) return;
-      dialog.close(); setSituations(situationSlots([...selected]), [...selected]);
+      dialog.close(); setSituations(situationSlots([...selected]), situationRequest([...selected]));
     }); complete.className = 'primary-action'; complete.disabled = !selected.size;
     for (const [title, values] of [['누구와', SITUATIONS.slice(0, 5)], ['조건', SITUATIONS.slice(5)]]) {
       const chips = el('div', '', 'meal-chips');
@@ -146,12 +154,7 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     if (id === 2) situations();
     if (id === 3) regions();
     if (id === 4) compare();
-    if (id === 5) {
-      waiting = true;
-      try { reply(await faq(), [], '추천 기준·데이터 안내'); }
-      catch (_) { reply('추천 기준 안내를 불러오지 못했어요. 잠시 후 다시 눌러주세요.'); }
-      finally { waiting = false; }
-    }
+    if (id === 5) send('추천은 어떤 기준으로 하나요?');
   }
   function togglePin(id) {
     if (!PLUGIN_IDS.includes(id)) return;

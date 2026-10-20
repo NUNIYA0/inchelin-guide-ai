@@ -218,6 +218,7 @@ export function decideMode(analysisValue, stateValue) {
     return { ...base, mode: "A", intent };
   }
   if (intent === "place_search") {
+    if (!hasFood && (state.pendingQuestionSlot === "menu" || analysis.sub_intent === "choose_menu")) return { ...base, mode: "B", questionSlot: "menu", intent };
     if (hasRegion) return { ...base, mode: "C", showCards: true, needSearch: true, intent };
     return { ...base, mode: "B", questionSlot: "region", intent };
   }
@@ -316,9 +317,10 @@ export function validateRestaurantSelection(selectedIds, candidates, excludedIds
     if (selected.length === limit) break;
   }
   for (const candidate of allowed) {
+    if (selected.length >= limit) break;
     const id = String(candidate.id);
     if (!selected.includes(id)) selected.push(id);
     if (selected.length === limit) break;
   }
-  return selected;
+  return selected.slice(0, limit);
 }

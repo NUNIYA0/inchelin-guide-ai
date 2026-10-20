@@ -130,7 +130,7 @@ function normalizeQuickReplyLabel(value) {
 
 function normalizeQuickReplies(value) {
   if (!Array.isArray(value)) return [];
-  return [...new Set(value.map(item => typeof item === "string" ? normalizeQuickReplyLabel(item) : "").filter(Boolean))].slice(0, 4);
+  return [...new Set(value.map(item => typeof item === "string" ? normalizeQuickReplyLabel(item) : "").filter(Boolean))].slice(0, 8);
 }
 
 function compactMessageForQuickReplies(value, replies) {
@@ -161,7 +161,7 @@ function chatResponse(message, suggestions = [], restaurants = [], meta = null) 
   const visibleSuggestions = hasMenuCards || repeatedSuggestions.length < 2 ? normalizedSuggestions : [];
   return {
     message: hasMenuCards && meta?.mode !== "B" ? compactMessageForQuickReplies(normalizedMessage, normalizedSuggestions) : normalizedMessage,
-    suggestions: meta?.variant === "service" ? [] : visibleSuggestions,
+    suggestions: meta?.variant === "service" ? normalizedSuggestions.filter(reply => ["메뉴 탐색", "지역별 찾기"].includes(reply)) : visibleSuggestions,
     restaurants: meta?.variant === "service" ? [] : Array.isArray(restaurants) ? restaurants : [],
     ...(meta && typeof meta === "object" ? { meta } : {}),
   };
@@ -671,7 +671,7 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   const useCurrentLocation = /현재\s*위치|내\s*주변/.test(latest);
   const region = useCurrentLocation ? "" : locationMatches(latest).at(-1) || (state.pendingQuestionSlot === "region" ? bareRegionReply(latest) : "");
   const food = latest.match(FOOD_SEARCH_PATTERN)?.[0] || "";
-  const slotFood = /^(?:국물|고기)$/.test(food) ? "" : food;
+  const slotFood = food === "국물" ? "" : food;
   const service = /인슐랭|너\s*누구|AI\s*야|인공지능|뭐\s*할\s*수|누가\s*만들|사용법|대화.{0,8}삭제|채팅.{0,8}삭제|공유\s*링크|지난\s*대화|새\s*대화|로그인|로그아웃|어떻게\s*(?:써|사용|삭제|공유|로그인|로그아웃)|무료|요금|위치\s*정보|기록\s*저장|모바일|추천.{0,8}기준|어떤\s*원칙|원칙으로.{0,12}골라|데이터\s*출처|등록\s*(?:안\s*된|되지\s*않은|된)\s*식당|등록\s*식당\s*(?:기준|범위)|카드.{0,5}왜|와인/i.test(latest);
   const outOfScope = /당구장|병원|의원|약국|학원|미용실|네일|주식|날씨|편의점/.test(latest);
   const foodTalk = /유래|먹는\s*법|조리\s*법|만드는\s*법|재료|어울리는\s*(?:반찬|곁들임)/.test(latest);
@@ -705,15 +705,16 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
     intent = "menu_trouble";
     sub = state.aCandidates.some(candidate => latest.includes(candidate)) ? "select" : /다른|말고/.test(latest) ? "narrow" : slotFood ? "declare" : /든든|가볍|해장|매운|따뜻|시원|비\s*오는|국물/.test(latest) ? "mood" : "open";
   } else if (/안녕|고마워|감사|ㅋㅋ|별로야/.test(latest)) intent = "general";
+  if (intent === "place_search" && !slotFood && !state.slots.menu && !state.slots.food_type && /먹을\s*곳\s*찾아줘/.test(latest)) sub = "choose_menu";
   const targetIndex = ordinalReference(latest);
   const delta = {
     region: region || null,
     use_current_location: useCurrentLocation,
-    food_type: /한식|중식|일식|양식|분식|카페|디저트/.test(slotFood) ? slotFood : null,
-    menu: slotFood && !/한식|중식|일식|양식|분식|카페|디저트/.test(slotFood) ? slotFood : null,
-    companion: latest.match(/혼자|연인|데이트|가족|부모님|친구|동료|회사\s*사람|팀|회식|모임/)?.[0] || null,
+    food_type: /^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면)$/.test(slotFood) ? slotFood : null,
+    menu: slotFood && !/^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면)$/.test(slotFood) ? slotFood : null,
+    companion: [...new Set([...latest.matchAll(/가족\s*모임|접대[·\s]*비즈니스|혼밥|혼자|연인|데이트|가족|부모님|친구|동료|회사\s*사람|팀|회식|모임/g)].map(match => match[0] === "혼자" ? "혼밥" : match[0]))].join(" · ") || null,
     meal_time: latest.match(/아침|점심|저녁|야식/)?.[0] || null,
-    parking: /주차(?:가|는|되는|가능)/.test(latest) ? true : null,
+    parking: /주차\s*(?:가|는|되는|가능|필요)/.test(latest) ? true : null,
     other: [...latest.matchAll(/든든|해장|국물|따뜻|가볍|산뜻|매운|매콤|시원|비\s*오는|조용한?|단체석/g)].map(match => match[0]),
   };
   return normalizeAnalysis({
@@ -759,6 +760,7 @@ async function analyzeResponseModeIntent(env, messages, stateValue) {
   const state = normalizeResponseState(stateValue);
   const fallback = fallbackResponseModeAnalysis(messages, state);
   if (fallback.intent === "compare") return fallback;
+  if (fallback.sub_intent === "choose_menu") return fallback;
   const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
   if (/말고/.test(latest) && fallback.slots.region) return fallback;
   if (fallback.intent === "place_search" && locationMatches(latest).length && fallback.slots.menu) return fallback;
@@ -787,6 +789,7 @@ async function analyzeResponseModeIntent(env, messages, stateValue) {
       const parsed = normalizeAnalysis(JSON.parse(extractOutputText(await response.json())));
       if (parsed.slots.region && !validRegionCandidate(parsed.slots.region)) parsed.slots.region = null;
       if (!parsed.slots.region && fallback.slots.region) parsed.slots.region = fallback.slots.region;
+      if (fallback.slots.parking === true) parsed.slots.parking = true;
       return parsed;
     } catch (error) {
       if (attempt === 1) console.error("Response mode analysis failed", error instanceof Error ? error.message : "unknown error");
@@ -861,7 +864,7 @@ function modeAResponse(analysis, state) {
   if (candidates.length) suggestions.push("다른 메뉴 보기");
   const message = candidates.length ? `오늘은 서로 다른 방향의 메뉴 ${candidates.length}가지로 좁혀봤어요.\n\n마음에 드는 메뉴를 말씀해 주시면 더 구체적으로 이어가거나 원하는 지역의 식당도 찾아드릴 수 있어요.` : "이 대화에서 준비된 메뉴 후보를 모두 보여드렸어요. 새로운 취향이나 식사 시간대를 알려주세요.";
   const nextState = updateStateAfterResponse(state, { mode: "A", questionSlot: null, showCards: false }, { aCandidates: candidates.map(candidate => candidate.menu) });
-  return chatResponse(message, suggestions, [], { responseModeState: nextState, mode: "A" });
+  return chatResponse(message, suggestions, [], { responseModeState: nextState, mode: "A", intent: analysis.intent });
 }
 
 function menuGuidance(food) {
@@ -882,12 +885,16 @@ function menuGuidance(food) {
   return `${withParticle(`**${food}**`, "으로/로")} 골라볼게요. ${tip || "같은 메뉴도 조리 방식과 양념에 따라 맛이 달라지니 담백한 맛과 진한 맛 중 취향에 맞게 골라보세요. 곁들임은 메인과 다른 식감의 채소 반찬이나 샐러드로 구성해보세요."}`;
 }
 
-function modeBResponse(state) {
+function modeBResponse(state, questionSlot = "region", intent = "place_search") {
+  if (questionSlot === "menu") {
+    const nextState = updateStateAfterResponse(state, { mode: "B", questionSlot: "menu", showCards: false }, {});
+    return chatResponse("어떤 메뉴가 끌리세요?", ["고기", "한식", "면", "일식", "중식", "분식", "카페", "메뉴 탐색"], [], { responseModeState: nextState, mode: "B", intent });
+  }
   const food = state.slots.menu || state.slots.food_type;
   const intro = food ? menuGuidance(food) : "좋아요, 조건에 맞는 식당을 골라드릴게요.";
   const message = `${intro}\n\n현재 위치를 연결해도 돼요.\n\n**어느 지역에서 찾을까요?**`;
   const nextState = updateStateAfterResponse(state, { mode: "B", questionSlot: "region", showCards: false }, {});
-  return chatResponse(message, ["현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요", "지역 직접 입력|동네나 역 이름을 직접 입력해요"], [], { responseModeState: nextState, mode: "B" });
+  return chatResponse(message, ["현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요", "지역 직접 입력|동네나 역 이름을 직접 입력해요"], [], { responseModeState: nextState, mode: "B", intent });
 }
 
 function generalModeResponse(analysis, state, source, latest) {
@@ -897,7 +904,8 @@ function generalModeResponse(analysis, state, source, latest) {
   else if (analysis.intent === "out_of_scope") message = "저는 메뉴 고민과 음식점 탐색을 돕는 AI예요. 그 요청은 범위 밖이지만, 오늘 드실 메뉴가 고민되시면 함께 골라드릴게요.";
   else message = /고마|감사/.test(latest) ? "도움이 되었다니 좋아요. 오늘 메뉴가 다시 고민되면 편하게 말씀해 주세요." : "안녕하세요. 오늘 메뉴 고민부터 실제 식당 찾기까지 함께할 수 있어요.";
   const nextState = updateStateAfterResponse(state, { mode: "GENERAL", questionSlot: null, showCards: false }, {});
-  return chatResponse(message, [], [], { responseModeState: nextState, mode: "GENERAL", variant: analysis.intent });
+  const suggestions = analysis.intent === "service" && analysis.sub_intent === "data_basis" ? ["메뉴 탐색", "지역별 찾기"] : [];
+  return chatResponse(message, suggestions, [], { responseModeState: nextState, mode: "GENERAL", variant: analysis.intent, intent: analysis.intent });
 }
 
 function responseStateCardTarget(analysis, state) {
@@ -1408,7 +1416,7 @@ function stripSearchMarkup(value) {
     .trim();
 }
 
-const FOOD_SEARCH_PATTERN = /마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고기|국물|제육볶음|불고기덮밥|불고기|비빔밥|덮밥|가츠동|볶음밥|짬뽕|탕수육|메밀국수|칼국수|비빔국수|카레|전골|만두|죽|스테이크/;
+const FOOD_SEARCH_PATTERN = /마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회(?!식)|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고기|국물|제육볶음|불고기덮밥|불고기|비빔밥|덮밥|가츠동|볶음밥|짬뽕|탕수육|메밀국수|칼국수|비빔국수|카레|전골|만두|죽|스테이크|(?<![가-힣])면(?![가-힣])/;
 
 function mostSpecificSearchLocation(value) {
   const parts = safeText(value, 240).split(/\s+/).filter(Boolean);
@@ -1663,6 +1671,7 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
   const menus = factValue(place, "representative_menu") || place.registered_data?.representativeMenus || place.registered_data?.representative_menu || [];
   const searchable = `${place.name} ${place.registered_data?.rawCategory || place.registered_data?.category || ""} ${Array.isArray(menus) ? menus.join(" ") : menus}`;
   const cuisineRules = [
+    [/^면$/, /국수|냉면|라멘|우동|면|파스타/],
     [/한식/, /한식|국밥|찌개|전골|탕|백반|갈비|삼겹살|족발|보쌈/],
     [/중식|중국/, /중식|중국|짜장|짬뽕|마라/],
     [/일식|일본/, /일식|일본|초밥|스시|회|라멘|우동/],
@@ -2256,7 +2265,7 @@ async function handleChat(request, env) {
   // Known service questions are resolved before link research and model routing.
   const serviceState = normalizeResponseState(context.responseModeState || { lastCards: recentRestaurants, shownPlaces: recentRestaurants });
   const serviceAnalysis = fallbackResponseModeAnalysis(messages, serviceState);
-  if (serviceAnalysis.intent === "service") {
+  if (serviceAnalysis.intent === "service" && decideMode(serviceAnalysis, serviceState).mode === "GENERAL") {
     return json(generalModeResponse(serviceAnalysis, serviceState, createRestaurantProvider(env).source, latestUserMessage));
   }
   if (!env.OPENAI_API_KEY) return json({ error: "AI 서비스 설정이 필요합니다." }, 503);
@@ -2348,7 +2357,7 @@ async function handleChat(request, env) {
     : decideMode(analysis, responseState);
   if (!linkedPlaceResearch && decision.mode === "GENERAL") return json(generalModeResponse(analysis, responseState, dataSource, latestUserMessage));
   if (!linkedPlaceResearch && decision.mode === "A") return json(modeAResponse(analysis, responseState));
-  if (!linkedPlaceResearch && decision.mode === "B") return json(modeBResponse(responseState));
+  if (!linkedPlaceResearch && decision.mode === "B") return json(modeBResponse(responseState, decision.questionSlot, analysis.intent));
   if (!linkedPlaceResearch && decision.mode === "D" && !decision.needSearch) return json(modeDFollowupResponse(analysis, responseState, latestUserMessage, Boolean(currentLocation)));
 
   const intentAnalysis = providerIntentFromResponseMode(analysis, responseState, decision);
@@ -2526,17 +2535,18 @@ async function handleChat(request, env) {
       return a - b;
     });
   }
-  const restaurants = orderedPlaces.map(place => restaurantCard(place, dataSource, messages.map(item => item.content).join(" "), signals.locationName));
+  const restaurants = orderedPlaces.slice(0, selectionLimit).map(place => restaurantCard(place, dataSource, latestUserMessage, signals.locationName));
   if (restaurants.length && ["C", "D"].includes(decision.mode)) {
     message = restaurantResultsMessage(responseState, restaurants.length, Boolean(currentLocation));
   }
   if (restaurants.length && dataSource === "naver") {
     const optionalText = [latestUserMessage, responseState.slots.companion, ...responseState.slots.other].join(" ");
     const notices = [];
-    if (responseState.slots.parking === true && restaurants.some(card => card.parking == null)) notices.push("주차");
+    if ((responseState.slots.parking === true || /주차\s*(?:가능|필요|되는)/.test(latestUserMessage)) && restaurants.some(card => card.parking == null)) notices.push("주차");
     if (/단체석/.test(optionalText)) notices.push("단체석");
     if (/조용|분위기/.test(optionalText)) notices.push("조용한 분위기");
     if (notices.length) message += `\n\n${withParticle(notices.join("·"), "은/는")} 네이버 검색 결과에서 확인되지 않아 매장에 확인이 필요해요.`;
+    if (responseState.slots.companion) message += `\n\n${responseState.slots.companion} 상황을 고려해 지역·메뉴로 찾았어요. 모임에 적합한 시설인지는 매장에 확인해 주세요.`;
   }
   const suggestions = restaurants.length ? recommendationQuickReplies(Boolean(currentLocation)) : result.suggestions;
   const nextState = updateStateAfterResponse(responseState, decision, { cards: restaurants, noResults: false });
@@ -2544,6 +2554,7 @@ async function handleChat(request, env) {
     responseModeState: nextState,
     mode: decision.mode,
     variant: decision.intent,
+    intent: analysis.intent,
   }));
 }
 
@@ -2556,11 +2567,8 @@ export default {
     if (url.pathname === "/api/service-faq/data-basis") {
       if (request.method !== "GET") return json({ error: "Method not allowed" }, 405);
       const source = createRestaurantProvider(env).source;
-      const answers = ["data_basis.registered_only", "data_basis.criteria"].map(id => {
-        const item = SERVICE_FAQ.items.find(entry => entry.id === id);
-        return item?.answer?.[source] || item?.answer?.default || SERVICE_FAQ.fallback_answer;
-      });
-      return json({ message: answers.join("\n\n"), source });
+      const item = SERVICE_FAQ.items.find(entry => entry.id === "data_basis.criteria");
+      return json({ message: item?.answer?.[source] || item?.answer?.default || SERVICE_FAQ.fallback_answer, source });
     }
 
     if (url.pathname === "/api/chat") {

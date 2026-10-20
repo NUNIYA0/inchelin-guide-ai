@@ -1,4 +1,4 @@
-import { createBottomSheet } from './bottom-sheet-v1.js';
+import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
 export const CATEGORY_MENUS = [
   { name: '한식', menus: ['국밥', '김치찌개', '냉면'] },
   { name: '중식', menus: ['마라탕', '마라샹궈'] },

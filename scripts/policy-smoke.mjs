@@ -252,7 +252,7 @@ function semanticAnalysis(overrides = {}) {
     message: "맛집 추천하는 기준이 뭐야?",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.match(result.body.message, /지역, 음식 종류/);
+  assert.match(result.body.message, /지역·메뉴·식사 상황/);
   assert.deepEqual(result.body.restaurants, []);
   assert.equal(result.calls.length, 0);
 }
@@ -996,7 +996,7 @@ function semanticAnalysis(overrides = {}) {
       selectedRestaurantIds: [],
     },
   });
-  assert.match(result.body.message, /지역, 음식 종류/);
+  assert.match(result.body.message, /지역·메뉴·식사 상황/);
   assert.deepEqual(result.body.restaurants, []);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
   assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
@@ -1454,7 +1454,7 @@ for (const message of ["등록 안 된 식당도 나와?", "등록 안 된 곳�
   assert.equal(result.body.meta.mode, "GENERAL");
   assert.equal(result.body.meta.variant, "service");
   assert.deepEqual(result.body.restaurants, []);
-  assert.deepEqual(result.body.suggestions, []);
+  assert.deepEqual(result.body.suggestions, ["메뉴 탐색", "지역별 찾기"]);
   assert.equal(result.calls.length, 0, "known service questions must bypass AI, research and restaurant search");
 }
 
@@ -1534,7 +1534,7 @@ for (const message of ["삼겹살 먹고 싶어", "파스타 먹고 싶어", "�
 for (const [message, expected] of [
   ["등록 안 된 식당도 나와?", /등록 식당만 보여주는 것이 아니라 네이버 검색/],
   ["인슐랭가이드에 등록된 곳만 추천해?", /전환 중/],
-  ["추천은 어떤 기준으로 해?", /조건의 일치와 영업 정보 검증 여부/],
+  ["추천은 어떤 기준으로 해?", /지역·메뉴·식사 상황/],
   ["식당 정보는 어떻게 검증해?", /상호명·주소·음식점 분류/],
   ["추천 카드는 왜 3개야?", /최대 3곳/],
   ["거리는 어떻게 계산해?", /직선거리/],
@@ -1569,7 +1569,7 @@ for (const [message, expected] of [
   ["로그인해야 돼?", /로그인하지 않아도/],
   ["위치 정보는 왜 필요해?", /가까운 음식점/],
   ["모바일에서도 돼?", /모바일 화면/],
-  ["추천은 어떤 기준으로 해?", /지역, 음식 종류/],
+  ["추천은 어떤 기준으로 해?", /지역·메뉴·식사 상황/],
   ["등록 안 된 식당도 나와?", /네이버 검색/],
   ["추천 카드는 왜 3개야?", /최대 3곳/],
   ["와인 추천해줘", /^와인 추천은 준비 중이에요\.$/],
@@ -1659,6 +1659,61 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+// v113: natural plugin requests use the same classifier/decideMode path as typed input.
+{
+  const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "stub-id", NAVER_API_HUB_CLIENT_SECRET: "stub-secret" };
+  const empty = normalizeResponseState({});
+  const area = await runCase({ message: "홍대에서 먹을 곳 찾아줘", env, context: { responseModeState: empty } });
+  assert.equal(area.body.meta.intent, "place_search");
+  assert.equal(area.body.meta.mode, "B");
+  assert.equal(area.body.meta.responseModeState.slots.region, "홍대");
+  assert.equal(area.body.message, "어떤 메뉴가 끌리세요?");
+  assert.equal(area.body.suggestions.length, 8);
+  assert.ok(area.body.suggestions.includes("메뉴 탐색"));
+  const here = await runCase({ message: "내 주변에서 먹을 곳 찾아줘", env,
+    context: { currentLocationName: "홍대", currentLocation: { latitude: 37.55, longitude: 126.92 }, responseModeState: empty } });
+  assert.equal(here.body.meta.intent, "place_search");
+  assert.equal(here.body.meta.mode, "B");
+  assert.equal(here.body.meta.responseModeState.pendingQuestionSlot, "menu");
+  const scenario = await runCase({ message: "회식하기 좋은 곳, 주차 필요한 곳으로 찾아줘", env, context: { responseModeState: empty } });
+  assert.equal(scenario.body.meta.intent, "place_search");
+  assert.equal(scenario.body.meta.responseModeState.slots.companion, "회식");
+  assert.equal(scenario.body.meta.responseModeState.slots.parking, true);
+  assert.equal(scenario.body.meta.responseModeState.slots.menu, null, "회식 is not seafood 회");
+  const cards = [{ id: "a", name: "식당A", address: "첫 주소" }, { id: "b", name: "식당B", address: "둘째 주소" }];
+  const compare = await runCase({ message: "식당A랑 식당B 비교해줘", env, context: { responseModeState: { ...empty, lastCards: cards } } });
+  assert.equal(compare.body.meta.variant, "compare");
+  assert.equal(compare.body.meta.mode, "D");
+  const criteria = await runCase({ message: "추천은 어떤 기준으로 하나요?", env: { RESTAURANT_DATA_SOURCE: "naver" } });
+  assert.equal(criteria.body.meta.intent, "service");
+  assert.equal(criteria.body.meta.mode, "GENERAL");
+  assert.deepEqual(criteria.body.restaurants, []);
+  assert.deepEqual(criteria.body.suggestions, ["메뉴 탐색", "지역별 찾기"]);
+  assert.equal((criteria.body.message.match(/[.!?]/g) || []).length, 3);
+  assert.doesNotMatch(criteria.body.message, /영업 정보|영업시간|평점순|인기순/);
+  const menu = await runCase({ message: "오늘 뭐 먹을지 같이 골라줘", env });
+  assert.equal(menu.body.meta.intent, "menu_trouble");
+  assert.equal(menu.body.meta.mode, "A");
+  for (const result of [area, here, scenario, compare, criteria, menu]) assert.equal(result.calls.length, 0);
+  const items = Array.from({ length: 5 }, (_, i) => ({ title: "테스트삼겹살" + i, category: "한식>돼지고기구이", roadAddress: "서울특별시 강남구 테스트로 " + i, mapx: String(1270000000 + i), mapy: String(375000000 + i) }));
+  const id = item => "naver:" + item.title + ":" + item.mapx + ":" + item.mapy;
+  const first = await runCase({ message: "강남역에서 삼겹살 먹을건데 주차 가능한 곳", env,
+    naverResponse: { items }, aiResponse: { message: "5곳을 찾았어요.", suggestions: [], selectedRestaurantIds: items.slice(2).map(id) } });
+  assert.equal(first.body.meta.responseModeState.slots.parking, true);
+  assert.match(first.body.message, /주차는 네이버 검색 결과에서 확인되지 않아 매장에 확인이 필요해요/);
+  assert.equal(first.body.restaurants.length, 3);
+  assert.match(first.body.message, /식당 3곳을 찾았어요/);
+  assert.doesNotMatch(first.body.message, /5곳/);
+  assert.deepEqual(validateRestaurantSelection(["c", "d", "e"], ["a", "b", "c", "d", "e"].map(id => ({ id })), [], 3), ["c", "d", "e"]);
+  const selected = normalizeResponseState({ slots: { region: "강남역", menu: "삼겹살", companion: "회식", parking: null, other: [] } });
+  const latest = await runCase({ message: "회식하기 좋은 곳으로 찾아줘", env, context: { responseModeState: selected },
+    history: [{ role: "user", content: "이전에는 조용한 곳을 찾았어" }], naverResponse: { items } });
+  assert.match(latest.body.message, /회식 상황을 고려해/);
+  assert.doesNotMatch(latest.body.message, /조용/);
+  assert.deepEqual(latest.body.meta.responseModeState.slots.other, []);
+  assert.match(indexHtml, /지금 내 주변에서 삼겹살집 찾아줘/);
+  assert.doesNotMatch(indexHtml, /지금 내 주변에서 영업 중인 곳 찾아줘|지역별 찾기:|상황별 추천:|선택한 조건으로 식당을 찾아줘/);
+}
 // v112: scenario regressions. All provider/model traffic is intercepted by runCase.
 {
   const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "stub-id", NAVER_API_HUB_CLIENT_SECRET: "stub-secret" };
@@ -1779,7 +1834,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   const faq = JSON.parse(await readFile(new URL('../data/service-faq.json', import.meta.url), 'utf8'));
   const response = await worker.fetch(new Request('https://example.test/api/service-faq/data-basis'), { RESTAURANT_DATA_SOURCE: 'naver' });
   const body = await response.json();
-  assert.equal(body.message, ['data_basis.registered_only', 'data_basis.criteria'].map(id => faq.items.find(item => item.id === id).answer.naver).join('\n\n'));
+  assert.equal(body.message, faq.items.find(item => item.id === 'data_basis.criteria').answer.naver);
   assert.match(body.message, /전환 중/);
   const denied = await worker.fetch(new Request('https://example.test/api/service-faq/data-basis', { method: 'POST' }), {});
   assert.equal(denied.status, 405);
@@ -1807,10 +1862,10 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
     return {
       region: selectPluginRegion, situations: selectPluginSituations,
       setState(value) { state = value; }, location() { return currentLocationCoords; }
-    };`)((...args) => replies.push(args), message => sent.push(message), initial);
+    };`)((...args) => replies.push(args), (...args) => sent.push(args), initial);
   transitions.region('역삼');
   assert.equal(transitions.location(), null);
-  let next = replies.at(-1)[3];
+  let next = sent.at(-1)[1].responseState;
   assert.equal(next.slots.region, '역삼');
   assert.equal(next.slots.use_current_location, false);
   assert.equal(next.slots.menu, null);
@@ -1818,20 +1873,23 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.deepEqual(next.lastCards, []);
   assert.equal(next.focus, null);
   assert.equal(next.pendingQuestionSlot, 'menu');
-  assert.equal(replies.at(-1)[0], '어떤 메뉴가 끌리세요?');
+  assert.equal(sent.at(-1)[0], '역삼에서 먹을 곳 찾아줘');
+  const regionReply = await runCase({ message: sent.at(-1)[0], env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver' }, context: { responseModeState: next } });
+  assert.equal(regionReply.body.message, '어떤 메뉴가 끌리세요?');
+  assert.deepEqual(regionReply.body.suggestions, ['고기', '한식', '면', '일식', '중식', '분식', '카페', '메뉴 탐색']);
   transitions.setState(next);
-  transitions.situations({ companion: '혼밥 · 데이트', parking: true, other: [] }, ['혼밥', '데이트', '주차 필요']);
-  next = replies.at(-1)[3];
+  transitions.situations({ companion: '혼밥 · 데이트', parking: true, other: [] }, '혼자 먹기 좋은 곳, 데이트하기 좋은 곳, 주차 필요한 곳으로 찾아줘');
+  next = sent.at(-1)[1].responseState;
   assert.equal(next.slots.region, '역삼');
   assert.equal(next.slots.parking, true);
   assert.equal(next.slots.companion, '혼밥 · 데이트');
-  assert.deepEqual(next.slots.other, ['조용한'], 'replace situation tags without dropping other constraints');
-  assert.equal(sent.length, 0, 'ask for a menu before searching when menu is empty');
+  assert.deepEqual(next.slots.other, [], 'new selection replaces old unverified conditions');
+  assert.equal(sent.length, 2, 'both plugins send natural requests through ask');
   transitions.setState(initial);
-  transitions.situations({ companion: '회식', parking: true, other: ['단체석'] }, ['회식', '주차 필요', '단체석']);
-  assert.deepEqual(sent, ['선택한 조건으로 식당을 찾아줘']);
+  transitions.situations({ companion: '회식', parking: true, other: ['단체석'] }, '회식하기 좋은 곳, 주차 필요한 곳, 단체석이 필요한 곳으로 찾아줘');
+  assert.equal(sent.at(-1)[0], '회식하기 좋은 곳, 주차 필요한 곳, 단체석이 필요한 곳으로 찾아줘');
   const result = await runCase({ message: '냉면 먹고 싶어', env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver', NAVER_API_HUB_CLIENT_ID: 'stub-id', NAVER_API_HUB_CLIENT_SECRET: 'stub-secret' },
-    context: { responseModeState: replies[1][3] }, naverResponse: { items: [] } });
+    context: { responseModeState: next }, naverResponse: { items: [] } });
   assert.equal(result.body.meta.responseModeState.slots.region, '역삼');
   assert.equal(result.body.meta.responseModeState.slots.parking, true);
   assert.equal(result.body.meta.responseModeState.slots.menu, '냉면');
@@ -1992,7 +2050,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   const asset = await worker.fetch(new Request("https://example.test/assets/meal-tools-v2.js"), {}, {});
   assert.equal(asset.status, 200);
   assert.match(asset.headers.get("content-type"), /javascript/);
-  const askSource = indexHtml.match(/    function ask\(question, \{ freshMenu = false, compareCards = null \} = \{\}\) \{[\s\S]*?\n    \}/)?.[0];
+  const askSource = indexHtml.match(/    function ask\(question, \{ freshMenu = false, compareCards = null, responseState = null, alreadyAdded = false \} = \{\}\) \{[\s\S]*?\n    \}/)?.[0];
   assert.ok(askSource);
   const requests = [];
   const ask = new Function("showChatView", "appendMessage", "$", "resizeInput", "buildAIRequest", "generateAnswer", `let generating = false, chatMessages = [], lastAIRequest, currentLocationName = '역삼', currentLocationCoords = { latitude: 37.5, longitude: 127 };\n${askSource}\nreturn ask;`)(() => {}, () => {}, () => ({}), () => {}, () => ({ messages: [{ role: "user", content: "이전 지역 조건" }], context: { currentLocationName: "역삼", currentLocation: { latitude: 37.5, longitude: 127 }, responseModeState: { slots: { region: "역삼" } } } }), request => requests.push(request));

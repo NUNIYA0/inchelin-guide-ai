@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mountPluginActions, readPins, persistPins, situationSlots, latestCards, selectedComparison, validRegion, NO_COMPARE } from '../dist/assets/plugin-actions-v1.js';
+import { mountPluginActions, readPins, persistPins, situationSlots, situationRequest, latestCards, selectedComparison, validRegion, NO_COMPARE } from '../dist/assets/plugin-actions-v1.js';
 
 // DOM fixture exercises the same sheet/button handlers as the frontend, without APIs.
 export async function testPluginActionsUI() {
@@ -33,10 +33,13 @@ export async function testPluginActionsUI() {
   assert.equal(validRegion('찾아줘'), false);
   assert.equal(validRegion('<script>'), false);
   assert.equal(validRegion(''), false);
+  assert.equal(situationRequest(['회식', '주차 필요']), '회식하기 좋은 곳, 주차 필요한 곳으로 찾아줘');
+  const all = situationRequest(['혼밥', '회식', '데이트', '가족 모임', '접대·비즈니스', '주차 필요', '단체석']);
+  for (const phrase of ['혼자', '회식', '데이트', '가족 모임', '접대·비즈니스', '주차', '단체석']) assert.ok(all.includes(phrase));
   const sent = [], replies = [], regions = [], situations = [], pins = [];
   let messages = [], slots = {}, busy = false, located = 0, opened = 0, faqCalls = 0;
   try {
-    globalThis.document = { body, activeElement: opener, createElement: tag => new Node(tag) };
+    globalThis.document = { body, activeElement: opener, createElement: tag => new Node(tag), createElementNS: (ns, tag) => new Node(tag) };
     const options = {
       getMessages: () => messages, getSlots: () => slots, isBusy: () => busy,
       send: (...args) => sent.push(args), reply: (...args) => replies.push(args),
@@ -51,7 +54,10 @@ export async function testPluginActionsUI() {
     await actions.run(3);
     assert.equal(dialog.className, 'meal-tools-dialog bottom-sheet');
     assert.equal(byText(dialog, '닫기'), undefined, 'no top-left close chip');
-    byText(dialog, '×').click();
+    const close = nodes(dialog).find(node => node.className === 'sheet-close');
+    assert.equal(close.textContent.trim(), '');
+    assert.equal(close.children[0].tag, 'svg');
+    close.click();
     assert.equal(dialog.open, false);
     await actions.run(3);
     dialog.emit('cancel');
@@ -61,9 +67,8 @@ export async function testPluginActionsUI() {
     dialog.listeners.click({ target: dialog, clientX: 20, clientY: 90 });
     assert.equal(dialog.open, false, 'tap on the backdrop closes the sheet');
     await actions.run(3);
-    byText(dialog, '지역 직접 입력').click();
+    assert.equal(byText(dialog, '지역 직접 입력'), undefined);
     const input = nodes(dialog).find(node => node.tag === 'input');
-    assert.equal(input.focused, true);
     assert.equal(byText(dialog, '이 지역으로 찾기').disabled, true);
     input.value = '찾아줘'; input.emit('input'); byText(dialog, '이 지역으로 찾기').click();
     assert.equal(regions.length, 0);
@@ -109,8 +114,8 @@ export async function testPluginActionsUI() {
     messages.push({ role: 'assistant', meta: { responseModeState: { lastCards: [] } } });
     assert.deepEqual(latestCards(messages), [], 'reset/region selection cannot resurrect stale cards');
     await actions.run(5);
-    assert.equal(faqCalls, 1);
-    assert.deepEqual(replies.pop(), ['FAQ 고정 문구', [], '추천 기준·데이터 안내']);
+    assert.equal(faqCalls, 0, 'FAQ plugins use the same chat pipeline, not a separate answer route');
+    assert.deepEqual(sent.pop(), ['추천은 어떤 기준으로 하나요?']);
     actions.togglePin(3);
     assert.deepEqual(actions.getPins(), [1, 3]);
     assert.deepEqual(readPins(storage), [1, 3]);
@@ -130,8 +135,5 @@ export async function testPluginActionsUI() {
     assert.equal(opened, before);
     assert.equal(sent.length, 0);
     busy = false;
-    const badFaq = mountPluginActions({ ...options, faq: async () => { throw new Error('offline'); } });
-    await badFaq.run(5);
-    assert.match(replies.at(-1)[0], /불러오지 못했어요/);
   } finally { globalThis.document = previous; }
 }

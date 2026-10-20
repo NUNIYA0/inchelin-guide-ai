@@ -538,6 +538,7 @@
     .sheet-header { position: relative; flex: 0 0 auto; padding: 12px 60px 12px 16px; }
     .bottom-sheet .sheet-header h2 { margin: 0; font-size: 20px; font-weight: 700; }
     .sheet-close { position: absolute; top: 2px; right: 8px; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; font: 400 28px system-ui, sans-serif; color: #111; cursor: pointer; }
+    .sheet-close svg { width: 24px; height: 24px; vertical-align: middle; }
     .sheet-body { min-height: 0; overflow-y: auto; padding: 0 16px 16px; overscroll-behavior: contain; }
     .sheet-footer { flex: 0 0 auto; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #eee; display: grid; gap: 8px; }
     .sheet-footer:empty { display: none; }
@@ -863,7 +864,7 @@
       { label: '강남에서 회식하기 좋은 고깃집 추천해줘', prompt: '강남에서 회식하기 좋은 고깃집 추천해줘' },
       { label: '혼자 먹기 편한 한식집 찾아줘', prompt: '혼자 먹기 편한 한식집 찾아줘' },
       { label: '주차 가능한 맛집으로 추천해줘', prompt: '주차 가능한 맛집으로 추천해줘' },
-      { label: '지금 내 주변에서 영업 중인 곳 찾아줘', prompt: '지금 내 주변에서 영업 중인 곳 찾아줘', locationAction: true }
+      { label: '지금 내 주변에서 삼겹살집 찾아줘', prompt: '지금 내 주변에서 삼겹살집 찾아줘', locationAction: true }
     ];
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
@@ -1022,7 +1023,7 @@
       const content = String(message?.content ?? message?.text ?? '').trim();
       if (!['user', 'assistant'].includes(role) || !content) return null;
       const quickReplies = role === 'assistant' && Array.isArray(message?.quickReplies)
-        ? [...new Set(message.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 6)
+        ? [...new Set(message.quickReplies.map(item => String(item).trim()).filter(Boolean))].slice(0, 8)
         : [];
       const restaurants = role === 'assistant' && Array.isArray(message?.restaurants)
         ? message.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3)
@@ -1312,7 +1313,7 @@
       if (!content) throw new Error('AI response did not include assistant content.');
       const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : data?.quickReplies;
       const quickReplies = Array.isArray(suggestions)
-        ? [...new Set(suggestions.map(item => String(item).trim()).filter(Boolean))].slice(0, 6)
+        ? [...new Set(suggestions.map(item => String(item).trim()).filter(Boolean))].slice(0, 8)
         : [];
       const restaurants = Array.isArray(data?.restaurants) ? data.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3) : [];
       const meta = data?.meta && typeof data.meta === 'object' ? data.meta : null;
@@ -2085,6 +2086,13 @@
       const value = String(question || '').trim();
       if (!value) return;
       if (value === '지역별 찾기') { runPlugin(3); return; }
+      if (value === '메뉴 탐색') {
+        const state = pluginState();
+        state.slots = { ...state.slots, menu: null, food_type: null };
+        state.lastCards = []; state.focus = null; state.pendingQuestionSlot = null;
+        ask('오늘 뭐 먹을지 같이 골라줘', { responseState: state });
+        return;
+      }
       if (value === '상황 추가') { runPlugin(2); return; }
       if (value === '지역 바꾸기' || value === '다른 지역' || value === '지역 변경') {
         currentLocationName = '';
@@ -2100,16 +2108,17 @@
       }
       ask(value);
     }
-    function ask(question, { freshMenu = false, compareCards = null } = {}) {
+    function ask(question, { freshMenu = false, compareCards = null, responseState = null, alreadyAdded = false } = {}) {
       const value = question.trim();
       if (!value || generating) return;
       showChatView();
-      appendMessage('user', value);
+      if (!alreadyAdded) appendMessage('user', value);
       $('#welcomeInput').value = '';
       $('#chatInput').value = '';
       resizeInput($('#welcomeInput'));
       resizeInput($('#chatInput'));
       lastAIRequest = buildAIRequest(chatMessages);
+      if (responseState) lastAIRequest.context = { ...lastAIRequest.context, responseModeState: responseState, recentRestaurants: responseState.lastCards || [], hasRestaurantResults: Boolean(responseState.lastCards?.length) };
       if (compareCards) {
         lastAIRequest.context = { ...lastAIRequest.context, recentRestaurants: compareCards, hasRestaurantResults: true,
           responseModeState: { ...(lastAIRequest.context.responseModeState || {}), lastCards: compareCards, focus: null } };
@@ -2124,9 +2133,8 @@
     function pluginState() {
       return JSON.parse(JSON.stringify(buildAIRequest(chatMessages).context.responseModeState || { slots: {}, lastCards: [], shownPlaces: [], shownPlaceIds: [] }));
     }
-    function pluginReply(content, quickReplies = [], label = '', state = pluginState()) {
+    function pluginReply(content, quickReplies = [], state = pluginState()) {
       showChatView();
-      if (label) appendMessage('user', label);
       appendMessage('assistant', content, { quickReplies, meta: { mode: 'GENERAL', variant: 'plugin', responseModeState: state } });
     }
     function selectPluginRegion(region, useCoordinates = false, label = true) {
@@ -2135,15 +2143,13 @@
       const state = pluginState();
       state.slots = { ...state.slots, region, use_current_location: useCoordinates, menu: null, food_type: null };
       Object.assign(state, { lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null, aCandidates: [], aProposed: [], pendingQuestionSlot: 'menu', noResults: false });
-      pluginReply('어떤 메뉴가 끌리세요?', [], label ? '지역별 찾기: ' + region : '', state);
+      ask(useCoordinates ? '내 주변에서 먹을 곳 찾아줘' : region + '에서 먹을 곳 찾아줘', { responseState: state, alreadyAdded: !label });
     }
-    function selectPluginSituations(patch, labels) {
+    function selectPluginSituations(patch, message) {
       const state = pluginState();
-      state.slots = { ...state.slots, ...patch,
-        other: [...new Set([...(state.slots.other || []).filter(value => !['접대·비즈니스', '단체석'].includes(value)), ...patch.other])] };
+      state.slots = { ...state.slots, ...patch, other: [...patch.other] };
       state.pendingQuestionSlot = state.slots.menu || state.slots.food_type ? null : 'menu';
-      pluginReply('선택한 상황을 반영했어요.' + (state.pendingQuestionSlot ? ' 어떤 메뉴가 끌리세요?' : ''), [], '상황별 추천: ' + labels.join(', '), state);
-      if (!state.pendingQuestionSlot) ask('선택한 조건으로 식당을 찾아줘');
+      ask(message, { responseState: state });
     }
     function renderPinnedPlugins() {
       for (const container of qsa('.plugin-shortcuts')) {
@@ -2509,21 +2515,14 @@
     renderAuthNavigation();
     renderHistory();
     renderPlugins();
-    import('/assets/plugin-actions-v1.js?v=112').then(({ mountPluginActions }) => {
+    import('/assets/plugin-actions-v1.js?v=113').then(({ mountPluginActions }) => {
       let storage;
       try { storage = window.localStorage; } catch (_) { /* 브라우저 저장소가 막혀도 도구를 이용해요. */ }
       pluginActions = mountPluginActions({
         getMessages: () => chatMessages, getSlots: () => pluginState().slots,
         send: (message, options) => ask(message, options), reply: pluginReply,
         setRegion: selectPluginRegion, setSituations: selectPluginSituations,
-        locate: () => requestCurrentLocation('현재 위치 연결', { selectRegionOnly: true }),
-        faq: async () => {
-          const response = await fetch('/api/service-faq/data-basis');
-          if (!response.ok) throw new Error('FAQ unavailable');
-          const data = await response.json();
-          if (typeof data.message !== 'string' || !data.message) throw new Error('FAQ empty');
-          return data.message;
-        },
+        locate: () => requestCurrentLocation('내 주변에서 먹을 곳 찾아줘', { selectRegionOnly: true }),
         isBusy: () => generating || locationRequestInFlight,
         onOpen: () => closeOverlay('pluginOverlay'), storage,
         onPins: (values, saved) => {
@@ -2532,7 +2531,7 @@
         }
       });
     }).catch(() => showToast('플러그인을 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/meal-tools-v2.js?v=112').then(({ mountMealTools }) => {
+    import('/assets/meal-tools-v2.js?v=113').then(({ mountMealTools }) => {
       mountMealTools({ getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), onOpen: () => { closeOverlay('pluginOverlay'); return chatView.classList.contains('active') ? $('#chatForm .task-trigger') : $('#welcomeForm .task-trigger'); }, source: 'naver' });
     }).catch(() => {
       document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });
