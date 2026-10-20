@@ -327,6 +327,9 @@
     .quick-reply-description { grid-column: 1; min-width: 0; color: #777; font-size: 12px; font-weight: 400; line-height: 1.45; overflow-wrap: break-word; word-break: keep-all; }
     .quick-reply-arrow { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #888; font-size: 18px; line-height: 1; }
     .quick-reply:disabled { opacity: .48; cursor: default; }
+    .quick-replies.quick-replies-followup { display: flex; flex-wrap: wrap; gap: 8px; }
+    .quick-reply.quick-reply-chip { width: auto; min-height: 32px; padding: 6px 12px; border-radius: 999px; display: inline-flex; box-shadow: none; }
+    .quick-reply.quick-reply-chip .quick-reply-title { font-size: 12px; font-weight: 500; }
     .quick-replies.quick-replies-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .quick-reply.quick-reply-action { width: auto; min-height: 42px; padding: 9px 14px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; box-shadow: none; }
     .quick-reply.quick-reply-action .quick-reply-title { font-size: 13px; font-weight: 650; white-space: nowrap; }
@@ -1600,6 +1603,8 @@
         if (visibleQuickReplies.length) {
           const replies = document.createElement('div');
           replies.className = 'quick-replies';
+          const isFollowupChip = reply => Boolean(message.restaurants?.length) && /^(?:다른 곳도 보여줘|가까운 순으로|현재 위치 연결|조건 바꾸기)$/.test(quickReplyCard(reply).title);
+          if (visibleQuickReplies.every(isFollowupChip)) replies.classList.add('quick-replies-followup');
           const isActionReply = reply => /^(?:현재 위치|내 주변|지역|다른 지역|위치)/.test(quickReplyCard(reply).title);
           if (visibleQuickReplies.every(isActionReply)) replies.classList.add('quick-replies-actions');
           replies.setAttribute('aria-label', '빠른 답변');
@@ -1608,7 +1613,8 @@
             const actionReply = isActionReply(reply);
             const button = document.createElement('button');
             button.type = 'button';
-            button.className = `quick-reply${actionReply ? ' quick-reply-action' : ''}`;
+            const followupChip = isFollowupChip(reply);
+            button.className = `quick-reply${followupChip ? ' quick-reply-chip' : actionReply ? ' quick-reply-action' : ''}`;
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
@@ -1620,7 +1626,7 @@
               description.textContent = card.description;
               button.appendChild(description);
             }
-            if (!actionReply) {
+            if (!actionReply && !followupChip) {
               const arrow = document.createElement('span');
               arrow.className = 'quick-reply-arrow';
               arrow.setAttribute('aria-hidden', 'true');

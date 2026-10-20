@@ -434,7 +434,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.equal(result.body.suggestions.length, 3);
-  assert.match(result.body.message, /근처 식당/);
+  assert.match(result.body.message, /원하는 지역의 식당/);
   assert.equal(result.calls.length, 0);
 }
 
@@ -579,7 +579,7 @@ function semanticAnalysis(overrides = {}) {
     naverResponse: {
       items: [{
         title: "시골밥상",
-        category: "음식점>한식",
+        category: "음식점>한식>찌개",
         address: "서울특별시 강남구 역삼동 1",
         roadAddress: "서울특별시 강남구 테헤란로 1",
         mapx: "1270276000",
@@ -897,7 +897,7 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   assert.equal(result.body.restaurants[0].name, "강남국밥");
-  assert.deepEqual(result.body.suggestions, []);
+  assert.deepEqual(result.body.suggestions, ["다른 곳도 보여줘", "현재 위치 연결", "조건 바꾸기"]);
 }
 
 {
@@ -1166,7 +1166,7 @@ function semanticAnalysis(overrides = {}) {
   });
   const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 중식");
-  assert.equal(result.body.restaurants[0].name, "새한식당");
+  assert.deepEqual(result.body.restaurants, [], "a Korean-category result must not fill a Chinese-food search");
 }
 
 {
@@ -1235,6 +1235,85 @@ function semanticAnalysis(overrides = {}) {
   assert.notDeepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
   assert.equal(result.body.suggestions.length, 3);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+}
+
+// Stateful reproduction: menu -> typed region -> alternate restaurants.
+{
+  const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };
+  const makePlace = (title, category, number) => ({ title, category, roadAddress: `서울 강남구 역삼동 ${number}`, mapx: String(1270000000 + number), mapy: String(375000000 + number) });
+  const firstItems = [makePlace("역삼돼지구이", "한식>돼지고기구이", 1), makePlace("역삼삼겹살", "한식>삼겹살", 2), makePlace("역삼고깃집", "한식>육류", 3)];
+  const first = await runCase({ message: "삼겹살 먹고 싶어", env });
+  assert.equal(first.body.meta.mode, "B");
+  const history = [{ role: "user", content: "삼겹살 먹고 싶어" }, { role: "assistant", content: first.body.message }];
+  const second = await runCase({ message: "역삼", history, context: { responseModeState: first.body.meta.responseModeState }, env, naverResponse: { items: firstItems } });
+  assert.equal(second.body.restaurants.length, 3);
+  assert.equal(second.body.meta.responseModeState.slots.menu, "삼겹살");
+  assert.equal(second.body.meta.responseModeState.slots.region, "역삼");
+  assert.deepEqual(second.body.suggestions, ["다른 곳도 보여줘", "현재 위치 연결", "조건 바꾸기"]);
+  history.push({ role: "user", content: "역삼" }, { role: "assistant", content: second.body.message });
+  const newItem = makePlace("역삼새돼지구이", "한식>돼지고기구이", 7);
+  const third = await runCase({
+    message: "다른 곳도 보여줘", history, analyzerEnabled: true,
+    context: { responseModeState: second.body.meta.responseModeState, recentRestaurants: second.body.restaurants }, env,
+    naverResponse: { items: [firstItems[0], makePlace("오몬자", "음식점>일식", 4), makePlace("효뜨", "음식점>아시아음식", 5), makePlace("도래집", "음식점>한식", 6), newItem] },
+    aiResponse: { message: "바로 갈 수 있는 근처 삼겹살집 다른 3곳이에요. (제안 이유는 카드에만 있어요.)", suggestions: ["다른 맛집"], selectedRestaurantIds: ["outside"] },
+  });
+  assert.equal(third.body.meta.mode, "D");
+  assert.equal(third.body.restaurants.length, 1, "do not pad with unrelated food categories");
+  assert.equal(third.body.restaurants[0].name, "역삼새돼지구이");
+  assert.deepEqual(third.body.meta.responseModeState.slots, second.body.meta.responseModeState.slots);
+  assert.ok(third.body.restaurants.every(card => !second.body.restaurants.some(old => old.id === card.id)));
+  assert.match(third.body.message, /역삼 지역에서 삼겹살.*1곳/);
+  assert.match(third.body.message, /조건에 맞는 곳은 여기까지예요\. 지역이나 메뉴를 바꿔볼까요\?/);
+  assert.doesNotMatch(third.body.message, /제안 이유|근처|바로 갈 수 있는|3곳/);
+  for (const card of third.body.restaurants) {
+    assert.equal(card.distanceMeters, null);
+    assert.doesNotMatch(card.recommendationReason, /영업|거리/);
+    assert.ok(!card.recommendationReason.includes(card.address));
+  }
+  const searchCalls = third.calls.filter(call => call.href.includes("/search/v1/local"));
+  assert.equal(searchCalls.length, 1);
+  assert.equal(new URL(searchCalls[0].href).searchParams.get("query"), "역삼 삼겹살");
+  assert.equal(third.calls.filter(call => call.body?.text?.format?.name === "inchelin_response_mode_analysis").length, 0);
+  const fourth = await runCase({
+    message: "다른 곳도 보여줘", history,
+    context: { responseModeState: third.body.meta.responseModeState, recentRestaurants: third.body.restaurants }, env,
+    naverResponse: { items: [...firstItems, newItem, makePlace("도래집", "음식점>한식", 6)] },
+  });
+  assert.deepEqual(fourth.body.restaurants, []);
+  assert.equal(fourth.body.message, "조건에 맞는 곳은 여기까지예요. 지역이나 메뉴를 바꿔볼까요?");
+  assert.deepEqual(fourth.body.meta.responseModeState.slots, second.body.meta.responseModeState.slots);
+  assert.deepEqual(fourth.body.meta.responseModeState.lastCards, third.body.meta.responseModeState.lastCards);
+  assert.equal(fourth.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
+  const preserve = applyAnalysisToState(second.body.meta.responseModeState, { intent: "condition_change", sub_intent: "exclude_previous", change: { action: "exclude_previous" }, slots: { region: "홍대", food_type: "일식", menu: "초밥" }, flags: { new_topic: "hard" } });
+  assert.deepEqual(preserve.slots, second.body.meta.responseModeState.slots, "exclude_previous must not accept hallucinated slot replacement/reset");
+}
+
+{
+  const cards = [
+    { id: "first", name: "첫집", address: "서울 역삼동 1", parking: true, distanceMeters: 300 },
+    { id: "second", name: "둘째집", address: "서울 역삼동 2", parking: false, distanceMeters: 100 },
+    { id: "last", name: "마지막집", address: "서울 역삼동 3", parking: false, distanceMeters: 200 },
+  ];
+  const state = { lastMode: "C", lastCards: cards, focus: "last", slots: { region: "역삼", menu: "삼겹살" } };
+  for (const [message, expectedName, expectedId] of [["처음 거기 주차돼?", "첫집", "first"], ["첫 번째 거기 주차돼?", "첫집", "first"], ["두 번째 거기 주차돼?", "둘째집", "second"], ["세 번째 거기 주차돼?", "마지막집", "last"]]) {
+    const result = await runCase({ message, analyzerEnabled: true, context: { responseModeState: state }, env: { OPENAI_API_KEY: "test-key" } });
+    assert.ok(result.body.message.includes(expectedName));
+    assert.equal(result.body.meta.responseModeState.focus, expectedId);
+    assert.deepEqual(result.body.restaurants, []);
+    assert.equal(result.calls.length, 0, "ordinal references must override model/focus guesses");
+  }
+  const nearest = await runCase({ message: "가까운 순으로", context: { responseModeState: state, recentRestaurants: cards, currentLocation: { latitude: 37.5, longitude: 127 } }, env: { OPENAI_API_KEY: "test-key" } });
+  assert.deepEqual(nearest.body.restaurants.map(card => card.id), ["second", "last", "first"]);
+  assert.deepEqual(nearest.body.suggestions, ["다른 곳도 보여줘", "가까운 순으로", "조건 바꾸기"]);
+  assert.equal(nearest.calls.length, 0);
+  const noCoords = await runCase({ message: "가까운 순으로", context: { responseModeState: state }, env: { OPENAI_API_KEY: "test-key" } });
+  assert.deepEqual(noCoords.body.restaurants, []);
+  assert.ok(noCoords.body.suggestions.some(item => /위치|주변/.test(item)));
+  const change = await runCase({ message: "조건 바꾸기", context: { responseModeState: state }, env: { OPENAI_API_KEY: "test-key" } });
+  assert.match(change.body.message, /어떤 조건/);
+  assert.deepEqual(change.body.restaurants, []);
+  assert.equal(change.calls.length, 0);
 }
 
 // FAQ grounding: three representative questions for each service sub-intent.
@@ -1309,8 +1388,8 @@ assert.equal(withParticle("피자", "을/를"), "피자를");
   assert.equal(new Set(result.body.restaurants.map(card => card.recommendationReason)).size, 3);
   for (const card of result.body.restaurants) {
     assert.match(card.recommendationReason, /강남 지역 조건과 일치/);
-    assert.ok(card.recommendationReason.includes(card.address));
-    assert.match(card.recommendationReason, /영업 여부는 확인되지 않았어요/);
+    assert.ok(!card.recommendationReason.includes(card.address));
+    assert.doesNotMatch(card.recommendationReason, /영업 여부는 확인되지 않았어요/);
     assert.doesNotMatch(card.recommendationReason, /거리|\d+(?:\.\d+)?\s*(?:m|km)\b|인기|평점|분위기|현재 영업 중/);
     assert.equal(card.distanceMeters, null);
   }
@@ -1465,6 +1544,20 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+assert.match(indexHtml, /quick-replies-followup/);
+assert.match(indexHtml, /quick-reply-chip[^}]*min-height: 32px/);
+{
+  const routeSource = indexHtml.match(/    function routeQuestion\(question\) \{[\s\S]*?\n    \}/)?.[0];
+  const locationSource = indexHtml.match(/    function isCurrentLocationIntent\(value\) \{[\s\S]*?\n    \}/)?.[0];
+  assert.ok(routeSource && locationSource);
+  const sent = [];
+  let locationRequests = 0;
+  const route = new Function("ask", "requestCurrentLocation", `${locationSource}\n${routeSource}\nreturn routeQuestion;`)(value => sent.push(value), () => { locationRequests += 1; });
+  for (const label of ["다른 곳도 보여줘", "가까운 순으로", "조건 바꾸기"]) route(label);
+  assert.deepEqual(sent, ["다른 곳도 보여줘", "가까운 순으로", "조건 바꾸기"]);
+  route("현재 위치 연결");
+  assert.equal(locationRequests, 1, "location chip must keep the existing browser geolocation action");
+}
 assert.match(
   indexHtml,
   /: \{ placeId: '', url: candidate \};/,
