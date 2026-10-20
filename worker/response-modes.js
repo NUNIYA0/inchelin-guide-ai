@@ -185,7 +185,7 @@ export function decideMode(analysisValue, stateValue) {
   const analysis = normalizeAnalysis(analysisValue);
   const state = normalizeResponseState(stateValue);
   let intent = analysis.intent;
-  if (analysis.confidence < 0.6) intent = analysis.flags.food_related ? "menu_trouble" : "general";
+  if (analysis.confidence < 0.6 && intent !== "service") intent = analysis.flags.food_related ? "menu_trouble" : "general";
   const hasRegion = Boolean(state.slots.region || state.slots.use_current_location);
   const hasFood = Boolean(state.slots.food_type || state.slots.menu);
   const hasPrev = state.lastCards.length > 0;

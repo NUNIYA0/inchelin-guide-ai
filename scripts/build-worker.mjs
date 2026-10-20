@@ -46,6 +46,7 @@ for (const path of await walk(assetsRoot)) {
 
 const template = await readFile(join(root, "worker", "index.template.js"), "utf8");
 const responseModes = await readFile(join(root, "worker", "response-modes.js"), "utf8");
+const korean = await readFile(join(root, "worker", "korean.js"), "utf8");
 const serviceFaq = JSON.parse(await readFile(join(root, "data", "service-faq.json"), "utf8"));
 const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
@@ -56,9 +57,11 @@ const hostingManifest = await readFile(join(root, ".openai", "hosting.json"));
 await Promise.all([
   writeFile(join(outputRoot, "dist", "server", "index.js"), worker),
   writeFile(join(outputRoot, "dist", "server", "response-modes.js"), responseModes),
+  writeFile(join(outputRoot, "dist", "server", "korean.js"), korean),
   writeFile(join(outputRoot, ".openai", "hosting.json"), hostingManifest),
   writeFile(join(hostingOutputRoot, "server", "index.js"), worker),
   writeFile(join(hostingOutputRoot, "server", "response-modes.js"), responseModes),
+  writeFile(join(hostingOutputRoot, "server", "korean.js"), korean),
   writeFile(join(hostingOutputRoot, ".openai", "hosting.json"), hostingManifest),
 ]);
 console.log(`Built Worker with ${Object.keys(assets).length} embedded assets.`);

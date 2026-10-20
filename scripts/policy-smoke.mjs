@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import worker from "../build/dist/server/index.js";
+import { koreanParticle, withParticle } from "../worker/korean.js";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -19,7 +20,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, webResearchResponse = "웹 검색에서 동일 매장의 메뉴판과 리뷰를 확인했습니다.", aiResponse, intentAnalysis, expectedStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, webResearchResponse = "웹 검색에서 동일 매장의 메뉴판과 리뷰를 확인했습니다.", aiResponse, intentAnalysis, modeIntentAnalysis, analyzerEnabled = false, expectedStatus = 200 }) {
   const originalFetch = globalThis.fetch;
   const calls = [];
   globalThis.fetch = async (url, options = {}) => {
@@ -40,6 +41,10 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     }
     if (href.includes("api.openai.com")) {
       const body = options.body ? JSON.parse(options.body) : {};
+      if (body.text?.format?.name === "inchelin_response_mode_analysis") {
+        assert.ok(modeIntentAnalysis, "Live-routing regression must provide a stubbed mode analysis");
+        return Response.json({ output_text: JSON.stringify(modeIntentAnalysis) });
+      }
       if (body.text?.format?.name === "inchelin_intent_analysis") {
         assert.ok(intentAnalysis, "Semantic routing tests must provide intentAnalysis");
         return Response.json({ output_text: JSON.stringify(intentAnalysis) });
@@ -50,7 +55,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
     throw new Error(`Unexpected URL: ${href}`);
   };
   try {
-    const response = await worker.fetch(request(message, history, context), { ...env, INTENT_ANALYZER_DISABLED: "true" }, {});
+    const response = await worker.fetch(request(message, history, context), { ...env, INTENT_ANALYZER_DISABLED: analyzerEnabled ? "false" : "true" }, {});
     assert.equal(response.status, expectedStatus);
     return { body: await response.json(), calls };
   } finally {
@@ -550,7 +555,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.body.restaurants[0].longitude, 127);
   assert.equal(result.body.restaurants[0].latitude, 37.5);
   assert.ok(result.body.restaurants[0].distanceMeters > 0);
-  assert.match(result.body.restaurants[0].recommendationReason, /거리에서 찾은/);
+  assert.match(result.body.restaurants[0].recommendationReason, /직선거리 \d+(?:\.\d+)?[mk]/);
   assert.equal(result.body.restaurants[0].naverPlaceId, "123");
   assert.equal(result.body.restaurants[0].naverPlaceUrl, "https://map.naver.com/p/entry/place/123");
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
@@ -1233,6 +1238,84 @@ function semanticAnalysis(overrides = {}) {
 }
 
 // FAQ grounding: three representative questions for each service sub-intent.
+const serviceFaq = JSON.parse(await readFile(new URL("../data/service-faq.json", import.meta.url), "utf8"));
+const previousCards = [{ id: "old", name: "이전고깃집", address: "서울 강남구 테헤란로 1", category: "고깃집" }];
+{
+  const decision = decideMode({ intent: "service", confidence: 0.4, flags: { food_related: true } }, { lastCards: previousCards, slots: { region: "강남", menu: "삼겹살" } });
+  assert.equal(decision.mode, "GENERAL");
+  assert.equal(decision.showCards, false);
+  assert.equal(decision.needSearch, false);
+}
+for (const message of ["등록 안 된 식당도 나와?", "등록 안 된 곳도 추천해?", "추천은 어떤 기준으로 해?"]) {
+  const faq = serviceFaq.items.find(item => item.examples.includes(message));
+  const result = await runCase({
+    message,
+    analyzerEnabled: true,
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    history: [{ role: "user", content: "https://naver.me/previous 강남 삼겹살집 찾아줘" }, { role: "assistant", content: "식당 세 곳을 찾았어요." }],
+    context: { recentRestaurants: previousCards, hasRestaurantResults: true, responseModeState: { lastMode: "C", lastCards: previousCards, slots: { region: "강남", menu: "삼겹살" } } },
+    aiResponse: { message: "다른 출처 포함 여부는 확인해볼게요", suggestions: [], selectedRestaurantIds: ["old"] },
+  });
+  assert.equal(result.body.message, faq.answer.naver, "service answer must equal FAQ text verbatim");
+  assert.equal(result.body.meta.mode, "GENERAL");
+  assert.equal(result.body.meta.variant, "service");
+  assert.deepEqual(result.body.restaurants, []);
+  assert.deepEqual(result.body.suggestions, []);
+  assert.equal(result.calls.length, 0, "known service questions must bypass AI, research and restaurant search");
+}
+
+// The live analyzer is enabled here, but its response is stubbed locally.
+{
+  const result = await runCase({
+    message: "마스코트 제작자는 누구인가요?",
+    analyzerEnabled: true,
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
+    context: { recentRestaurants: previousCards, responseModeState: { lastCards: previousCards } },
+    modeIntentAnalysis: { intent: "service", sub_intent: "about", confidence: 1, flags: {}, slots: {}, reference: {} },
+    aiResponse: { message: "다른 출처 포함 여부는 확인해볼게요", suggestions: [], selectedRestaurantIds: ["old"] },
+  });
+  assert.equal(result.body.message, serviceFaq.fallback_answer);
+  assert.equal(result.body.meta.mode, "GENERAL");
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.length, 1, "model-classified service may analyze but must never generate an answer");
+  assert.equal(result.calls[0].body.text.format.name, "inchelin_response_mode_analysis");
+}
+
+for (const [word, expected] of [
+  ["국밥", ["이", "을", "은", "으로", "과"]],
+  ["파스타", ["가", "를", "는", "로", "와"]],
+  ["삼겹살", ["이", "을", "은", "로", "과"]],
+  ["**삼겹살**", ["이", "을", "은", "로", "과"]],
+  ["국밥 ", ["이", "을", "은", "으로", "과"]],
+  ["삼겹살".normalize("NFD"), ["이", "을", "은", "로", "과"]],
+]) {
+  assert.deepEqual(["이/가", "을/를", "은/는", "으로/로", "과/와"].map(pair => koreanParticle(word, pair)), expected);
+}
+assert.equal(withParticle("삼겹살", "으로/로"), "삼겹살로");
+assert.equal(withParticle("국밥", "으로/로"), "국밥으로");
+assert.equal(withParticle("피자", "을/를"), "피자를");
+
+{
+  const result = await runCase({
+    message: "강남 고깃집 추천해줘",
+    env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" },
+    naverResponse: { items: [
+      { title: "테헤란고기", category: "음식점>한식>고깃집", roadAddress: "서울 강남구 테헤란로 10", mapx: "1270276000", mapy: "374979000" },
+      { title: "논현고기", category: "음식점>한식>고깃집", roadAddress: "서울 강남구 논현로 20", mapx: "1270277000", mapy: "374979100" },
+      { title: "역삼고기", category: "음식점>한식>고깃집", roadAddress: "서울 강남구 역삼로 30", mapx: "1270278000", mapy: "374979200" },
+    ] },
+  });
+  assert.equal(result.body.restaurants.length, 3);
+  assert.equal(new Set(result.body.restaurants.map(card => card.recommendationReason)).size, 3);
+  for (const card of result.body.restaurants) {
+    assert.match(card.recommendationReason, /강남 지역 조건과 일치/);
+    assert.ok(card.recommendationReason.includes(card.address));
+    assert.match(card.recommendationReason, /영업 여부는 확인되지 않았어요/);
+    assert.doesNotMatch(card.recommendationReason, /거리|\d+(?:\.\d+)?\s*(?:m|km)\b|인기|평점|분위기|현재 영업 중/);
+    assert.equal(card.distanceMeters, null);
+  }
+}
+
 for (const message of ["삼겹살 먹고 싶어", "파스타 먹고 싶어", "한식 먹고 싶어", "피자 먹고 싶어"]) {
   const result = await runCase({ message, env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" } });
   assert.equal(result.body.meta.mode, "B");
@@ -1241,6 +1324,8 @@ for (const message of ["삼겹살 먹고 싶어", "파스타 먹고 싶어", "�
   assert.ok(menuAnswer.split(/[.!]/).filter(sentence => sentence.trim()).length <= 4);
   assert.match(menuAnswer, /곁들|마무리/);
   if (message.includes("삼겹살")) {
+    assert.match(menuAnswer, /삼겹살\*\*로/);
+    assert.doesNotMatch(menuAnswer, /삼겹살\*\*으로/);
     assert.match(menuAnswer, /두툼|얇게/);
     assert.match(menuAnswer, /된장찌개|냉면/);
   }

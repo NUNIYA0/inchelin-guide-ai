@@ -9,6 +9,7 @@ import {
   updateStateAfterResponse,
   validateRestaurantSelection,
 } from "./response-modes.js";
+import { withParticle } from "./korean.js";
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -161,8 +162,8 @@ function chatResponse(message, suggestions = [], restaurants = [], meta = null) 
   const visibleSuggestions = hasMenuCards || repeatedSuggestions.length < 2 ? normalizedSuggestions : [];
   return {
     message: hasMenuCards && meta?.mode !== "B" ? compactMessageForQuickReplies(normalizedMessage, normalizedSuggestions) : normalizedMessage,
-    suggestions: visibleSuggestions,
-    restaurants: Array.isArray(restaurants) ? restaurants : [],
+    suggestions: meta?.variant === "service" ? [] : visibleSuggestions,
+    restaurants: meta?.variant === "service" ? [] : Array.isArray(restaurants) ? restaurants : [],
     ...(meta && typeof meta === "object" ? { meta } : {}),
   };
 }
@@ -234,7 +235,7 @@ function recommendationReasonResponse(text, restaurants) {
     if (restaurant.parking === true) facts.push("주차 가능 정보가 확인됐어요.");
   }
   const explanation = facts.length ? facts.join(" ") : "상호명과 주소처럼 확인된 정보를 현재 대화의 조건과 비교해 추천했어요.";
-  return chatResponse(`**${restaurant.name}**은 ${explanation}\n\n확인되지 않은 분위기나 인기 정보는 추천 근거로 만들지 않아요.`);
+  return chatResponse(`${withParticle(`**${restaurant.name}**`, "은/는")} ${explanation}\n\n확인되지 않은 분위기나 인기 정보는 추천 근거로 만들지 않아요.`);
 }
 
 const LOCATION_TOKEN_SOURCE = "서울|부산|대구|인천|광주|대전|울산|세종|제주|강남|강북|홍대|성수|잠실|판교|분당|일산|수원|용산|송도|여의도|을지로|종로|[가-힣]{2,}(?:시|군|구|동|읍|면|역)";
@@ -726,7 +727,7 @@ const RESPONSE_MODE_SCHEMA = {
 async function analyzeResponseModeIntent(env, messages, stateValue) {
   const state = normalizeResponseState(stateValue);
   const fallback = fallbackResponseModeAnalysis(messages, state);
-  if (env.INTENT_ANALYZER_DISABLED === "true" || !env.OPENAI_API_KEY) return fallback;
+  if (fallback.intent === "service" || env.INTENT_ANALYZER_DISABLED === "true" || !env.OPENAI_API_KEY) return fallback;
   const recent = messages.slice(-12);
   const instructions = buildIntentAnalysisInstructions(state);
   for (let attempt = 0; attempt < 2; attempt += 1) {
@@ -796,17 +797,21 @@ function faqSimilarity(left, right) {
 function serviceFaqAnswer(text, subIntent, source) {
   const normalizedQuestion = value => String(value || "").replace(/[^0-9a-z가-힣]/gi, "").toLowerCase();
   const exact = SERVICE_FAQ.items.find(item => item.examples.some(example => normalizedQuestion(example) === normalizedQuestion(text)));
-  if (exact) return exact.answer?.[source] || exact.answer?.default || "그 부분은 아직 정확히 안내드리기 어려워요. 메뉴나 식당이 고민되시면 말씀해 주세요.";
-  if (subIntent === "wine") return "와인 추천은 준비 중이에요.";
+  if (exact) return exact.answer?.[source] || exact.answer?.default || SERVICE_FAQ.fallback_answer;
+  if (subIntent === "wine") return SERVICE_FAQ.items.find(item => item.id === "wine.preparing")?.answer?.default || SERVICE_FAQ.fallback_answer;
   const candidates = SERVICE_FAQ.items.filter(item => item.sub_intent === subIntent);
   const inputTokens = new Set(faqTokens(text));
   const ranked = candidates.map(item => ({
     item,
-    score: Math.max(0, ...item.examples.map(example => faqTokens(example).filter(token => inputTokens.has(token)).length * 2 + faqSimilarity(text, example))),
+    score: Math.max(0, ...item.examples.map(example => {
+      const tokens = new Set(faqTokens(example));
+      const overlap = [...tokens].filter(token => inputTokens.has(token)).length;
+      return 0.4 * overlap / Math.max(1, tokens.size, inputTokens.size) + 0.6 * faqSimilarity(text, example);
+    })),
   })).sort((a, b) => b.score - a.score);
-  const matched = ranked[0]?.score >= 0.16 ? ranked[0].item : null;
-  if (!matched?.answer) return "그 부분은 아직 정확히 안내드리기 어려워요. 메뉴나 식당이 고민되시면 말씀해 주세요.";
-  return matched.answer[source] || matched.answer.default || "그 부분은 아직 정확히 안내드리기 어려워요. 메뉴나 식당이 고민되시면 말씀해 주세요.";
+  const matched = ranked[0]?.score >= 0.45 ? ranked[0].item : null;
+  if (!matched?.answer) return SERVICE_FAQ.fallback_answer;
+  return matched.answer[source] || matched.answer.default || SERVICE_FAQ.fallback_answer;
 }
 
 function modeAResponse(analysis, state) {
@@ -832,7 +837,7 @@ function menuGuidance(food) {
     [/카페|디저트/, "커피와 함께라면 진한 디저트와 산뜻한 디저트 중 원하는 맛부터 골라보세요. 달콤한 메뉴에는 무가당 음료를 곁들이면 각각의 맛을 즐기기 좋아요."],
   ];
   const tip = tips.find(([pattern]) => pattern.test(food))?.[1];
-  return `**${food}**으로 골라볼게요. ${tip || "같은 메뉴도 조리 방식과 양념에 따라 맛이 달라지니 담백한 맛과 진한 맛 중 취향에 맞게 골라보세요. 곁들임은 메인과 다른 식감의 채소 반찬이나 샐러드로 구성해보세요."}`;
+  return `${withParticle(`**${food}**`, "으로/로")} 골라볼게요. ${tip || "같은 메뉴도 조리 방식과 양념에 따라 맛이 달라지니 담백한 맛과 진한 맛 중 취향에 맞게 골라보세요. 곁들임은 메인과 다른 식감의 채소 반찬이나 샐러드로 구성해보세요."}`;
 }
 
 function modeBResponse(state) {
@@ -886,14 +891,14 @@ function modeDFollowupResponse(analysis, state) {
   }
   let answer;
   if (analysis.sub_intent === "parking") answer = target.parking === true ? "주차가 가능하다고 확인돼요." : target.parking === false ? "주차가 어렵다고 확인돼요." : "주차 정보는 확인된 게 없어요.";
-  else if (analysis.sub_intent === "hours") answer = target.openingHours ? `확인된 영업시간은 ${target.openingHours}이에요.` : "영업시간은 확인된 정보가 없어요.";
-  else if (analysis.sub_intent === "phone") answer = target.phone ? `확인된 전화번호는 ${target.phone}예요.` : "전화번호는 확인된 정보가 없어요.";
-  else if (analysis.sub_intent === "menu_info") answer = target.representativeMenus?.length ? `확인된 대표 메뉴는 ${target.representativeMenus.join(", ")}예요.` : "대표 메뉴는 확인된 정보가 없어요.";
-  else if (analysis.sub_intent === "location") answer = target.address ? `주소는 ${target.address}예요.` : "주소는 확인된 정보가 없어요.";
+  else if (analysis.sub_intent === "hours") answer = target.openingHours ? `확인된 영업시간은 ${withParticle(target.openingHours, "이에요/예요")}.` : "영업시간은 확인된 정보가 없어요.";
+  else if (analysis.sub_intent === "phone") answer = target.phone ? `확인된 전화번호는 ${withParticle(target.phone, "이에요/예요")}.` : "전화번호는 확인된 정보가 없어요.";
+  else if (analysis.sub_intent === "menu_info") answer = target.representativeMenus?.length ? `확인된 대표 메뉴는 ${withParticle(target.representativeMenus.join(", "), "이에요/예요")}.` : "대표 메뉴는 확인된 정보가 없어요.";
+  else if (analysis.sub_intent === "location") answer = target.address ? `주소는 ${withParticle(target.address, "이에요/예요")}.` : "주소는 확인된 정보가 없어요.";
   else if (target.recommendationReason) answer = target.recommendationReason;
-  else answer = [target.category, target.address].filter(Boolean).length ? `확인된 정보는 ${[target.category, target.address].filter(Boolean).join(" · ")}예요.` : "현재 카드에서 확인할 수 있는 추가 정보가 없어요.";
+  else answer = [target.category, target.address].filter(Boolean).length ? `확인된 정보는 ${withParticle([target.category, target.address].filter(Boolean).join(" · "), "이에요/예요")}.` : "현재 카드에서 확인할 수 있는 추가 정보가 없어요.";
   const nextState = updateStateAfterResponse(state, { mode: "D", questionSlot: null, showCards: false }, { focus: target.id });
-  return chatResponse(`**${target.name}**은 ${answer}`, [], [], { responseModeState: nextState, mode: "D" });
+  return chatResponse(`${withParticle(`**${target.name}**`, "은/는")} ${answer}`, [], [], { responseModeState: nextState, mode: "D" });
 }
 
 function safeUrl(value) {
@@ -1991,17 +1996,30 @@ function naverMapSearchUrl(name, address) {
   return query ? `https://map.naver.com/p/search/${encodeURIComponent(query)}` : "";
 }
 
-function factualRecommendationReason(place, source, userText) {
+function factualRecommendationReason(place, source, userText, locationName = "") {
   const category = safeText(place.registered_data?.category, 160);
+  const address = safeText(factValue(place, "current_address") || place.address, 300);
+  const name = safeText(factValue(place, "current_name") || place.name, 160);
+  const facts = [];
+  const location = safeText(locationName, 240);
+  if (location && normalizeIdentityText(address).includes(normalizeIdentityText(location))) {
+    facts.push(`${location} 지역 조건과 일치해요.`);
+  }
+  // Addresses distinguish candidates even when category and verification status match.
+  if (address) facts.push(`${address}에서 확인된 ${withParticle(category || "음식점", "이에요/예요")}.`);
+  else facts.push(`${withParticle(name || "이 식당", "은/는")} ${category ? `${category} 분류로 확인됐어요.` : "상호명이 확인됐어요."}`);
   const distance = place.distance_meters !== null && place.distance_meters !== undefined && place.distance_meters !== "" ? Number(place.distance_meters) : NaN;
   if (Number.isFinite(distance)) {
     const label = distance < 1000 ? `${Math.round(distance)}m` : `${(distance / 1000).toFixed(distance < 10000 ? 1 : 0)}km`;
-    return `${label} 거리에서 찾은${category ? ` ${category}` : " 식당"}이에요.`;
+    facts.push(`현재 위치에서 직선거리 ${withParticle(label, "이에요/예요")}.`);
   }
-  if (/주차/.test(userText) && factValue(place, "parking") === true) return "주차 가능 정보가 확인된 곳이에요.";
-  if (place.business_status === "active") return "현재 영업 중으로 확인된 곳이에요.";
-  if (source === "inchelin") return "인슐랭가이드 등록 정보를 기준으로 추천했어요.";
-  return category ? `${category} 조건과 일치하는 곳이에요.` : "상호명과 주소가 확인된 곳이에요.";
+  if (/주차/.test(userText) && factValue(place, "parking") === true) facts.push("주차 가능 정보가 확인됐어요.");
+  if (place.business_status === "active") facts.push("현재 영업 중으로 확인됐어요.");
+  else if (place.business_status === "temporarily_closed") facts.push("현재 임시 휴업으로 확인됐어요.");
+  else if (hasConfirmedFact(place, "opening_hours") || place.registered_data?.openingHours || place.registered_data?.opening_hours) facts.push("영업시간 정보가 확인됐어요.");
+  else facts.push("현재 영업 여부는 확인되지 않았어요.");
+  if (source === "inchelin") facts.push("인슐랭가이드 등록 식당이에요.");
+  return facts.join(" ");
 }
 
 function safeRestaurantUrl(value, type = "general") {
@@ -2016,7 +2034,7 @@ function safeRestaurantUrl(value, type = "general") {
   }
 }
 
-function restaurantCard(place, source, userText = "") {
+function restaurantCard(place, source, userText = "", locationName = "") {
   const registered = place.registered_data || {};
   const representativeMenus = firstPresent(factValue(place, "representative_menu"), registered.representative_menu, registered.representativeMenus);
   const normalizedMenus = Array.isArray(representativeMenus)
@@ -2052,7 +2070,7 @@ function restaurantCard(place, source, userText = "") {
     menuPrice: sanitizeDataValue(firstPresent(factValue(place, "menu_price"), registered.menu_price)),
     parking: firstPresent(factValue(place, "parking"), registered.parking),
     distanceMeters: place.distance_meters !== null && place.distance_meters !== undefined && Number.isFinite(Number(place.distance_meters)) ? Number(place.distance_meters) : null,
-    recommendationReason: factualRecommendationReason(place, source, userText),
+    recommendationReason: factualRecommendationReason(place, source, userText, locationName),
     naverPlaceId: placeDetails.placeId || null,
     naverPlaceUrl: placeDetails.url || (source === "naver" ? naverMapSearchUrl(restaurantName, address) : null),
     naverLink: placeDetails.url || (source === "naver" ? naverMapSearchUrl(restaurantName, address) : null),
@@ -2110,14 +2128,14 @@ function referencedRecentRestaurant(text, restaurants) {
 function recentRestaurantFactResponse(restaurant, field, source) {
   const name = restaurant.name;
   if (field.key === "parking" && typeof restaurant.parking === "boolean") {
-    return chatResponse(`${name}은 확인된 정보 기준으로 ${restaurant.parking ? "주차가 가능해요." : "주차가 어려워요."}\n\n다른 조건도 이어서 물어보셔도 돼요.`);
+    return chatResponse(`${withParticle(name, "은/는")} 확인된 정보 기준으로 ${restaurant.parking ? "주차가 가능해요." : "주차가 어려워요."}\n\n다른 조건도 이어서 물어보셔도 돼요.`);
   }
   if (field.key === "business_status" && restaurant.businessStatus !== "unknown") {
     const label = restaurant.businessStatus === "active" ? "현재 영업 중" : restaurant.businessStatus === "temporarily_closed" ? "현재 임시 휴업 중" : "현재 폐업";
-    return chatResponse(`${name}은 확인된 정보 기준으로 ${label}이에요.\n\n영업시간처럼 다른 정보도 이어서 확인해드릴게요.`);
+    return chatResponse(`${withParticle(name, "은/는")} 확인된 정보 기준으로 ${withParticle(label, "이에요/예요")}.\n\n영업시간처럼 다른 정보도 이어서 확인해드릴게요.`);
   }
   if (field.key === "opening_hours" && restaurant.openingHours) {
-    return chatResponse(`${name}의 확인된 영업시간은 ${restaurant.openingHours}이에요.\n\n방문 전 최신 정보도 한 번 더 확인해 주세요.`);
+    return chatResponse(`${name}의 확인된 영업시간은 ${withParticle(restaurant.openingHours, "이에요/예요")}.\n\n방문 전 최신 정보도 한 번 더 확인해 주세요.`);
   }
   return chatResponse(
     `${name}의 ${field.label} 정보는 현재 확인되지 않아요.\n\n확인되지 않은 내용은 추정하지 않을게요.`,
@@ -2131,8 +2149,6 @@ function recommendationQuickReplies(value) {
 }
 
 async function handleChat(request, env) {
-  if (!env.OPENAI_API_KEY) return json({ error: "AI 서비스 설정이 필요합니다." }, 503);
-
   const declaredLength = Number(request.headers.get("content-length") || 0);
   if (declaredLength > 120000) return json({ error: "대화 내용이 너무 깁니다." }, 413);
 
@@ -2164,6 +2180,13 @@ async function handleChat(request, env) {
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
   const hasRestaurantResults = context.hasRestaurantResults === true || recentRestaurants.length > 0;
   const latestUserMessage = [...messages].reverse().find(message => message.role === "user")?.content || "";
+  // Known service questions are resolved before link research and model routing.
+  const serviceState = normalizeResponseState(context.responseModeState || { lastCards: recentRestaurants, shownPlaces: recentRestaurants });
+  const serviceAnalysis = fallbackResponseModeAnalysis(messages, serviceState);
+  if (serviceAnalysis.intent === "service") {
+    return json(generalModeResponse(serviceAnalysis, serviceState, createRestaurantProvider(env).source, latestUserMessage));
+  }
+  if (!env.OPENAI_API_KEY) return json({ error: "AI 서비스 설정이 필요합니다." }, 503);
   const latestLinkedUrl = linkedNaverUrl(latestUserMessage);
   const asksAboutPreviousLink = /(?:링크|주소).{0,12}(?:접속|확인|열|안\s*되|봤)|(?:접속|확인).{0,12}(?:링크|주소)/.test(latestUserMessage);
   const previousLinkedUrl = asksAboutPreviousLink
@@ -2214,6 +2237,8 @@ async function handleChat(request, env) {
   }
   const analysis = await analyzeResponseModeIntent(env, messages, responseState);
   responseState = applyAnalysisToState(responseState, analysis);
+  // A model-classified service question can never reach answer generation or card selection.
+  if (analysis.intent === "service") return json(generalModeResponse(analysis, responseState, dataSource, latestUserMessage));
   const decision = linkedPlaceResearch
     ? { mode: "GENERAL", variant: "linked_place", intent: "general", questionSlot: null, showCards: false, needSearch: false, excludePlaceIds: [] }
     : decideMode(analysis, responseState);
@@ -2315,7 +2340,7 @@ async function handleChat(request, env) {
 
   const webSearchEnabled = Boolean(linkedPlaceResearch && !linkedWebResearch);
   const modeInstruction = decision.mode === "C"
-    ? `응답 모드 C다. ${signals.locationName ? `${signals.locationName} 지역` : "확인된 위치"}과 누적 조건을 서두 한 문장으로 요약하고, 후보 중 최대 3개 id를 selectedRestaurantIds로 골라라. 카드에 없는 특성은 쓰지 말고 마지막은 조건을 더하면 다시 고를 수 있다는 질문 없는 한 문장으로 끝내라.`
+    ? `응답 모드 C다. ${withParticle(signals.locationName ? `${signals.locationName} 지역` : "확인된 위치", "과/와")} 누적 조건을 서두 한 문장으로 요약하고, 후보 중 최대 3개 id를 selectedRestaurantIds로 골라라. 카드에 없는 특성은 쓰지 말고 마지막은 조건을 더하면 다시 고를 수 있다는 질문 없는 한 문장으로 끝내라.`
     : decision.mode === "D"
       ? "응답 모드 D의 조건 변경이다. 바뀐 조건을 한 문장으로 반영하고, 직전까지 보인 매장과 겹치지 않는 후보 id를 최대 3개 골라라."
       : decision.mode === "E"
@@ -2398,7 +2423,7 @@ async function handleChat(request, env) {
       return a - b;
     });
   }
-  const restaurants = orderedPlaces.map(place => restaurantCard(place, dataSource, messages.map(item => item.content).join(" ")));
+  const restaurants = orderedPlaces.map(place => restaurantCard(place, dataSource, messages.map(item => item.content).join(" "), signals.locationName));
   const suggestions = restaurants.length ? recommendationQuickReplies(result.suggestions) : result.suggestions;
   const nextState = updateStateAfterResponse(responseState, decision, { cards: restaurants, noResults: false });
   return json(chatResponse(message, suggestions, decision.showCards ? restaurants : [], {
