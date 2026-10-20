@@ -1666,7 +1666,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   const panel = new Function('$', 'pinned', `${definitions}\nlet activeFilter = 'all';\n${renderSource}\nreturn { plugins: PLUGINS, sections: PLUGIN_SECTIONS, render(filter, term = '') { activeFilter = filter; $('#pluginSearch').value = term; renderPlugins(); return $('#pluginGrid').innerHTML; } };`)(selector => nodes[selector], [1]);
   assert.deepEqual(panel.plugins.map(p => p.name), ['메뉴 탐색', '상황별 추천', '지역별 찾기', '등록 맛집 비교', '맛집 검색 데이터', '최신 매장 정보']);
   assert.deepEqual(panel.plugins.map(p => p.id), [1, 2, 3, 4, 5, 6], 'preserve existing pin identities');
-  assert.deepEqual(panel.sections.map(section => section.title), ['탐색', '추천·비교', '데이터', '재미']);
+  assert.deepEqual(panel.sections.map(section => section.title), ['탐색', '추천·비교', '정보', '재미']);
   const html = panel.render('all');
   const sections = [...html.matchAll(/data-plugin-section="([^"]+)"[\s\S]*?<\/section>/g)];
   assert.deepEqual(sections.map(section => section[1]), ['explore', 'recommend', 'data', 'fun']);
@@ -1679,6 +1679,17 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal((html.match(/data-plugin="/g) || []).length, 6);
   assert.equal((html.match(/data-meal-tool="/g) || []).length, 2);
   assert.equal(nodes['#pluginCount'].textContent, '8개 항목');
+  assert.equal((html.match(/class="plugin-text"/g) || []).length, 8, 'names and descriptions must share a vertical text block');
+  for (const description of [
+    '오늘 뭐 먹을지 후보를 좁혀드려요',
+    '동네나 역 주변 맛집을 찾아드려요',
+    '회식·데이트·혼밥 등 상황에 맞춰 골라드려요',
+    '고른 식당들의 확인된 정보를 나란히 비교해요',
+    '지금 연결된 검색 결과를 기준으로 찾아요',
+    '확인된 최신 매장 정보를 함께 보여드려요',
+    '후보를 돌려 오늘의 메뉴를 정해요',
+    '여러 명이 함께 메뉴를 정해요'
+  ]) assert.ok(html.includes(description), description);
   for (const type of ['explore', 'recommend', 'data', 'fun']) {
     const filtered = panel.render(type);
     assert.deepEqual([...filtered.matchAll(/data-plugin-section="([^"]+)"/g)].map(match => match[1]), [type]);
@@ -1694,7 +1705,80 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.doesNotMatch(taskMenu, /돌림판|사다리게임/);
   const filters = indexHtml.match(/id="pluginFilters"[\s\S]*?<\/div>/)?.[0];
   assert.deepEqual([...filters.matchAll(/data-filter="([^"]+)"/g)].map(match => match[1]), ['all', 'explore', 'recommend', 'data', 'fun']);
+  assert.match(filters, /data-filter="data">정보<\/button>/);
   assert.match(indexHtml, /onOpen: \(\) => \{ closeOverlay\('pluginOverlay'\)/);
+}
+// Readability contract: CSS/layout checks, not a browser screenshot test.
+{
+  const css = indexHtml.match(/<style>([\s\S]*?)<\/style>/)[1];
+  const rule = selector => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const match = css.match(new RegExp("(?:^|\\n)\\s*" + escaped + " \\{([^}]+)\\}"));
+    assert.ok(match, selector);
+    return Object.fromEntries(match[1].split(";").filter(part => part.includes(":")).map(part => {
+      const colon = part.indexOf(":");
+      return [part.slice(0, colon).trim(), part.slice(colon + 1).trim()];
+    }));
+  };
+  const name = rule(".plugin-name"), desc = rule(".plugin-desc");
+  assert.equal(name.display, "block");
+  assert.equal(name["font-size"], "16px");
+  assert.equal(name["font-weight"], "600");
+  assert.equal(name.color, "#111");
+  assert.equal(desc["font-size"], "14px");
+  assert.equal(desc["font-weight"], "400");
+  assert.equal(desc["line-height"], "1.5");
+  assert.equal(desc.color, "#555");
+  assert.equal(desc["white-space"], "normal");
+  assert.equal(desc["overflow-wrap"], "anywhere");
+  assert.ok(!("overflow" in desc) && !("text-overflow" in desc) && !("-webkit-line-clamp" in desc), "no hidden or ellipsized descriptions");
+  assert.equal(rule(".plugin-text")["flex-direction"], "column");
+  assert.equal(rule(".plugin-text").gap, "4px");
+  const section = rule(".plugin-section h3");
+  assert.equal(section.margin, "24px 0 8px");
+  assert.equal(section["font-size"], "14px");
+  assert.equal(section["font-weight"], "700");
+  assert.equal(section.color, "#333");
+  const card = rule(".plugin-card"), pin = rule(".pin-btn"), filters = rule(".plugin-filters"), chip = rule(".filter-btn");
+  assert.equal(card.padding, "14px");
+  assert.equal(card["min-height"], "56px");
+  assert.equal(rule(".plugin-grid").gap, "10px");
+  assert.equal(pin.width, "44px");
+  assert.equal(pin["min-height"], "44px");
+  assert.equal(filters.gap, "8px");
+  assert.equal(filters["flex-wrap"], "nowrap");
+  assert.equal(filters["overflow-x"], "auto");
+  assert.equal(chip["font-size"], "14px");
+  assert.equal(chip.height, "38px");
+  assert.equal(chip.flex, "0 0 auto");
+  assert.equal(rule("#pluginOverlay .dialog")["font-family"], "var(--plugin-body-font)");
+  assert.match(rule("#pluginTitle")["font-family"], /Sebang Gothic/);
+  assert.equal(rule("#pluginOverlay .eyebrow")["font-size"], "14px");
+  const gray = 0x55 / 255;
+  const contrast = 1.05 / (((gray + 0.055) / 1.055) ** 2.4 + 0.05);
+  assert.ok(contrast >= 4.5, "#555 on white meets WCAG AA");
+  assert.match(css, /@media \(max-width: 800px\)\s*\{\s*\.plugin-grid \{ grid-template-columns: 1fr; \}/);
+  // Conservative full-em character widths; whitespace half-em. No clipping is used.
+  const definitions = indexHtml.slice(indexHtml.indexOf("    const PLUGINS ="), indexHtml.indexOf("    const GUIDES ="));
+  const descriptions = new Function(definitions + "\nreturn [...PLUGINS, ...FUN_PLUGINS].map(p => p.desc);")();
+  for (const viewport of [360, 1440]) {
+    const mobile = viewport <= 560;
+    const panelWidth = Math.min(880, viewport - (mobile ? 20 : 44));
+    const contentWidth = panelWidth - (mobile ? 36 : 56);
+    const columns = viewport <= 800 ? 1 : 2;
+    const cardWidth = (contentWidth - (columns - 1) * 10) / columns;
+    const textWidth = cardWidth - 2 * 14 - 2 - 38 - 44 - 2 * 10;
+    assert.ok(textWidth > 0);
+    for (const description of descriptions) {
+      let lines = 1, used = 0;
+      for (const char of description) {
+        const width = /\s/.test(char) ? 7 : 14;
+        if (used + width > textWidth) { lines++; used = 0; }
+        used += width;
+      }
+      assert.ok(lines <= 2, `${viewport}px: description fits two lines: ${description}`);
+    }
+  }
 }
 // Browser-only menu tools: no network calls or external dependencies.
 {
