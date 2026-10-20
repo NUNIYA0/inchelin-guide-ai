@@ -8,6 +8,7 @@ import { testPluginActionsUI } from "./plugin-actions-smoke.mjs";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
+  MODE_A_POOL,
   decideMode,
   normalizeResponseState,
   resetSlots,
@@ -426,7 +427,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     aiResponse: { message: "한 끼 제대로 먹고 싶다면 **국밥**이나 **찌개**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.ok(result.body.suggestions.some(item => item.includes("국밥")));
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
@@ -436,7 +437,7 @@ function semanticAnalysis(overrides = {}) {
     message: "점심 메뉴 추천해줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.match(result.body.message, /원하는 지역의 식당/);
   assert.equal(result.calls.length, 0);
 }
@@ -451,7 +452,7 @@ function semanticAnalysis(overrides = {}) {
       selectedRestaurantIds: [],
     },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -461,7 +462,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     aiResponse: { message: "가볍게 먹기엔 **메밀소바**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -481,7 +482,7 @@ function semanticAnalysis(overrides = {}) {
     message: "오늘 뭐 먹지?",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.doesNotMatch(result.body.message, /메뉴 추천.*맛집 추천/);
   assert.equal(result.calls.length, 0);
 }
@@ -496,7 +497,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
     aiResponse: { message: "가볍게 먹기엔 **샐러드**나 **메밀소바**가 좋아요.", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -1011,7 +1012,7 @@ function semanticAnalysis(overrides = {}) {
     }),
     aiResponse: { message: "따뜻하고 부담이 적다면 **순두부찌개**나 **쌀국수**가 잘 맞아요.", suggestions: [], selectedRestaurantIds: [] },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.doesNotMatch(result.body.message, /어느 지역/);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
   assert.equal(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length, 0);
@@ -1022,7 +1023,7 @@ function semanticAnalysis(overrides = {}) {
     message: "오늘 저녁 메뉴 추천해줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", INTENT_ANALYZER_DISABLED: "false" },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.equal(result.calls.length, 0);
 }
 
@@ -1210,8 +1211,8 @@ function semanticAnalysis(overrides = {}) {
       selectedRestaurantIds: [],
     },
   });
-  assert.equal(result.body.suggestions.length, 3);
-  assert.ok(result.body.suggestions.every(item => item.includes("|")));
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
+  assert.ok(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").every(item => item.includes("|")));
   assert.doesNotMatch(result.body.message, /포케|메밀국수|샌드위치/);
 }
 
@@ -1220,7 +1221,7 @@ function semanticAnalysis(overrides = {}) {
     message: "오늘 뭐 먹을지 같이 골라줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.doesNotMatch(result.body.message, /한식|중식|일식|양식/);
   assert.equal(result.calls.length, 0);
 }
@@ -1236,7 +1237,7 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   assert.notDeepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
-  assert.equal(result.body.suggestions.length, 3);
+  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -1324,7 +1325,7 @@ function semanticAnalysis(overrides = {}) {
   const menuChange = await runCase({ message: "메뉴 바꾸기", env, context: { responseModeState: state } });
   assert.equal(menuChange.body.meta.responseModeState.slots.region, "울릉도");
   assert.equal(menuChange.body.meta.mode, "A");
-  assert.equal(menuChange.body.suggestions.length, 3);
+  assert.equal(menuChange.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
 }
 
 {
@@ -1346,7 +1347,7 @@ function semanticAnalysis(overrides = {}) {
   }
   const soft = await runCase({ message: "이번엔 점심 뭐 먹지?", env: { OPENAI_API_KEY: "test-key" }, context: { responseModeState: previous } });
   assert.equal(soft.body.meta.mode, "A");
-  assert.equal(soft.body.suggestions.length, 3);
+  assert.equal(soft.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
   assert.equal(soft.body.meta.responseModeState.slots.region, "역삼");
   assert.equal(soft.body.meta.responseModeState.slots.menu, null);
 }
@@ -1378,7 +1379,7 @@ function semanticAnalysis(overrides = {}) {
   assert.deepEqual(third.body.meta.responseModeState.slots, second.body.meta.responseModeState.slots);
   assert.ok(third.body.restaurants.every(card => !second.body.restaurants.some(old => old.id === card.id)));
   assert.match(third.body.message, /역삼 지역에서 삼겹살.*1곳/);
-  assert.match(third.body.message, /조건에 맞는 곳은 여기까지예요\. 지역이나 메뉴를 바꿔볼까요\?/);
+  assert.doesNotMatch(third.body.message, /조건에 맞는 곳은 여기까지예요/, "fewer than 3 cards is not proof of exhaustion");
   assert.doesNotMatch(third.body.message, /제안 이유|근처|바로 갈 수 있는|3곳/);
   for (const card of third.body.restaurants) {
     assert.equal(card.distanceMeters, null);
@@ -1658,6 +1659,71 @@ for (const row of intentRows) {
 }
 
 const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url), "utf8");
+// v112: scenario regressions. All provider/model traffic is intercepted by runCase.
+{
+  const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "stub-id", NAVER_API_HUB_CLIENT_SECRET: "stub-secret" };
+  const item = (region, number) => ({ title: region + "삼겹살" + number, category: "한식>돼지고기구이", roadAddress: "서울특별시 " + region + " 테스트로 " + number, mapx: "1270000000", mapy: "375000000" });
+  const selected = normalizeResponseState({ slots: { parking: true, other: ["단체석"] } });
+  const menu = await runCase({ message: "삼겹살 먹고 싶어", env, context: { responseModeState: selected } });
+  const search = await runCase({ message: "강남역", env, context: { responseModeState: menu.body.meta.responseModeState }, naverResponse: { items: [item("강남역", 1), item("강남역", 2)] } });
+  assert.equal(search.body.restaurants.length, 2, JSON.stringify(search.body));
+  assert.match(search.body.message, /주차.*단체석.*네이버 검색 결과에서 확인되지 않아 매장에 확인이 필요해요/);
+  assert.ok(search.calls.some(call => call.href.includes("/search/v1/local")));
+  const oldState = normalizeResponseState({ ...search.body.meta.responseModeState, slots: { ...search.body.meta.responseModeState.slots, region: "역삼" } });
+  const changed = await runCase({ message: "역삼 말고 홍대에서 조용한 곳으로", env, analyzerEnabled: true, context: { responseModeState: oldState }, naverResponse: { items: [item("홍대", 1)] } });
+  assert.equal(changed.body.meta.responseModeState.slots.region, "홍대");
+  assert.equal(changed.body.meta.responseModeState.slots.menu, "삼겹살");
+  assert.equal(changed.body.restaurants.length, 1);
+  assert.match(changed.body.message, /조용한 분위기.*확인되지 않아/);
+  assert.doesNotMatch(changed.body.message, /여기까지예요/);
+  assert.ok(changed.calls.some(call => call.href.includes("/search/v1/local") && new URL(call.href).searchParams.get("query") === "홍대 삼겹살"));
+  const empty = await runCase({ message: "역삼 말고 홍대에서 조용한 곳으로", env, context: { responseModeState: oldState }, naverResponse: { items: [] } });
+  assert.match(empty.body.message, /홍대에서 삼겹살 조건에 맞는 곳을 찾지 못했어요/);
+  assert.doesNotMatch(empty.body.message, /여기까지예요/);
+  const follow = await runCase({ message: "첫 번째 집 영업시간이랑 전화번호 알려줘", env, context: { responseModeState: changed.body.meta.responseModeState } });
+  assert.match(follow.body.message, /영업시간과 전화번호는 확인된 정보가 없어요\. 상세보기에서 확인해 주세요/);
+  const knownState = normalizeResponseState(changed.body.meta.responseModeState);
+  knownState.lastCards[0].phone = "02-123-4567";
+  const mixed = await runCase({ message: "첫 번째 집 영업시간이랑 전화번호 알려줘", env, context: { responseModeState: knownState } });
+  assert.match(mixed.body.message, /02-123-4567/);
+  assert.match(mixed.body.message, /영업시간은 확인된 정보가 없어요/);
+  const conditions = await runCase({ message: "조건 바꾸기", env, context: { responseModeState: oldState } });
+  assert.deepEqual(conditions.body.suggestions, ["지역 바꾸기", "메뉴 바꾸기", "상황 추가"]);
+  assert.ok(MODE_A_POOL.length >= 12);
+  for (const candidate of MODE_A_POOL) {
+    const chosen = await runCase({ message: candidate.menu + " 먹고 싶어", env });
+    assert.equal(chosen.body.meta.mode, "B", candidate.menu + " must continue to menu guidance/region");
+    assert.ok(chosen.body.meta.responseModeState.slots.menu);
+    assert.equal(chosen.calls.length, 0);
+  }
+  assert.equal(new Set(MODE_A_POOL.map(item => item.family)).size, MODE_A_POOL.length);
+  for (const meal_time of ["아침", "점심", "저녁", "야식"]) {
+    const chosen = chooseModeACandidates({ intent: "menu_trouble", slots: {} }, { slots: { meal_time } });
+    assert.equal(chosen.length, 3);
+    // Time matches are preferred; late-night has exactly three distinct directions.
+    assert.ok(chosen.every(candidate => MODE_A_POOL.find(item => item.menu === candidate.menu).times.includes(meal_time)));
+  }
+  const first = await runCase({ message: "오늘 뭐 먹을지 같이 골라줘", env, context: { currentMealPeriod: "저녁" } });
+  assert.equal(first.body.meta.responseModeState.slots.meal_time, "저녁");
+  assert.ok(first.body.suggestions.includes("다른 메뉴 보기"));
+  const next = await runCase({ message: "다른 메뉴 보기", env, context: { responseModeState: first.body.meta.responseModeState } });
+  const previous = first.body.meta.responseModeState.aProposed;
+  assert.equal(next.body.meta.mode, "A");
+  assert.equal(next.body.meta.responseModeState.aCandidates.length, 3);
+  assert.ok(next.body.meta.responseModeState.aCandidates.every(value => !previous.includes(value)));
+  let state = normalizeResponseState({});
+  for (let round = 0; round < 8; round++) {
+    const chosen = chooseModeACandidates({ intent: "menu_trouble", slots: {} }, state);
+    assert.ok(chosen.every(value => !state.aProposed.includes(value.menu)));
+    state = updateStateAfterResponse(state, { mode: "A" }, { aCandidates: chosen.map(value => value.menu) });
+  }
+  assert.deepEqual(chooseModeACandidates({ intent: "menu_trouble" }, state), []);
+  assert.match(indexHtml, /value === '상황 추가'.*runPlugin\(2\)/);
+  assert.match(indexHtml, /\.sheet-body[^}]*padding: 0 16px 16px/);
+  assert.match(indexHtml, /\.bottom-sheet \.primary-action[^}]*height: 48px/);
+  assert.match(indexHtml, /safe-area-inset-bottom/);
+  assert.match(indexHtml, /aria-pressed="true"\]::before \{ content: "✓ "/);
+}
 // Five working tools (retired latest-information entry removed), then the two games.
 {
   const definitions = indexHtml.slice(indexHtml.indexOf("    const PLUGINS ="), indexHtml.indexOf("    const GUIDES ="));

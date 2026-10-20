@@ -181,6 +181,7 @@ export function applyAnalysisToState(stateValue, analysisValue) {
   for (const key of ["region", "food_type", "menu", "companion", "meal_time"]) {
     if (delta[key] !== null) slots[key] = delta[key];
   }
+  if (delta.region && delta.region !== state.slots.region && !delta.use_current_location && (state.lastCards.length || analysis.change?.slot === "region")) slots.use_current_location = false;
   if (delta.parking !== null) slots.parking = delta.parking;
   if (delta.use_current_location) slots.use_current_location = true;
   if (delta.other.length) slots.other = [...new Set([...slots.other, ...delta.other])].slice(0, 8);
@@ -206,7 +207,7 @@ export function decideMode(analysisValue, stateValue) {
       mode: "D",
       showCards: intent === "condition_change",
       needSearch: intent === "condition_change",
-      excludePlaceIds: intent === "condition_change" ? [...state.shownPlaceIds] : [],
+      excludePlaceIds: intent === "condition_change" && (analysis.change?.action === "exclude_previous" || analysis.sub_intent === "exclude_previous") ? [...state.shownPlaceIds] : [],
       intent,
     };
     intent = "place_search";
@@ -233,29 +234,49 @@ const MENU_GROUPS = [
   { tags: ["양식"], values: [["부드러운 면 요리", "크림파스타", "고소하고 편안하게 즐겨요"], ["든든한 고기 요리", "스테이크", "기분 전환이 되는 한 접시예요"], ["가벼운 오븐 요리", "피자", "여럿이 나누어 먹기 좋아요"]] },
 ];
 
-const DEFAULT_MENU_SETS = [
-  [["국물 있는 한 그릇", "국밥", "따뜻하고 든든하게 먹고 싶을 때 좋아요"], ["가벼운 면 요리", "냉면", "깔끔하고 부담 적게 즐겨요"], ["밥과 토핑 한 그릇", "덮밥", "빠르게 먹고 속은 든든하게 채워요"]],
-  [["바삭한 한 접시", "돈까스", "식감이 좋고 든든한 한 끼예요"], ["따뜻한 면 요리", "칼국수", "부드러운 면과 국물이 편안해요"], ["채소와 밥 한 그릇", "비빔밥", "여러 재료를 균형 있게 즐겨요"]],
-  [["구운 고기 한 상", "삼겹살", "든든하게 먹고 싶을 때 잘 맞아요"], ["부드러운 면 한 접시", "파스타", "편안하게 기분 전환하기 좋아요"], ["깔끔한 한입 메뉴", "초밥", "여러 맛을 조금씩 즐겨요"]],
-];
+// Eighteen distinct directions; same-conversation proposals are never recycled.
+export const MODE_A_POOL = [
+  ["국밥", "따뜻한 국물", "국물과 밥으로 든든하게 먹어요", "국물", ["아침", "점심"]],
+  ["냉면", "시원한 면", "산뜻한 국물이나 양념을 골라요", "찬면", ["점심"]],
+  ["덮밥", "밥과 토핑", "간편하게 한 그릇으로 먹어요", "덮밥", ["아침", "점심"]],
+  ["삼겹살", "고기 구이", "고기와 채소를 함께 구워 먹어요", "구이", ["저녁"]],
+  ["파스타", "소스를 고르는 면", "오일·토마토·크림 중 취향을 골라요", "파스타", ["점심", "저녁"]],
+  ["초밥", "여러 맛 한입씩", "서로 다른 토핑을 조금씩 맛봐요", "초밥", ["점심", "저녁"]],
+  ["샌드위치", "간편한 빵 한 끼", "원하는 속재료로 가볍게 골라요", "빵", ["아침"]],
+  ["포케", "채소와 곡물", "다양한 토핑을 산뜻하게 먹어요", "채소", ["아침", "점심"]],
+  ["죽", "부드러운 한 그릇", "부드러운 식감으로 천천히 먹어요", "죽", ["아침"]],
+  ["돈까스", "바삭한 한 접시", "바삭한 식감과 소스를 즐겨요", "튀김", ["점심"]],
+  ["피자", "나눠 먹는 오븐 요리", "서로 다른 토핑을 함께 골라요", "오븐", ["저녁"]],
+  ["치킨", "함께 나누는 닭요리", "구이와 양념 중 스타일을 골라요", "닭요리", ["저녁", "야식"]],
+  ["떡볶이", "매콤한 분식", "떡과 소스를 취향에 맞게 골라요", "분식", ["야식"]],
+  ["쌀국수", "향긋한 국물면", "향채와 토핑을 곁들여 먹어요", "국물면", ["점심"]],
+  ["카레", "향신료 한 그릇", "맵기와 토핑을 골라 먹어요", "카레", ["점심"]],
+  ["비빔밥", "채소와 비벼 먹는 밥", "여러 나물과 밥을 함께 즐겨요", "비빔밥", ["아침", "점심"]],
+  ["전골", "함께 끓이는 한 냄비", "재료를 나누어 먹기 좋아요", "전골", ["저녁"]],
+  ["만두", "속을 고르는 한 접시", "찜·구이 중 원하는 식감을 골라요", "만두", ["야식"]],
+].map(([menu, direction, reason, family, times]) => ({ menu, direction, reason, family, times }));
 
 export function chooseModeACandidates(analysisValue, stateValue) {
   const analysis = normalizeAnalysis(analysisValue);
   const state = normalizeResponseState(stateValue);
   const context = [analysis.sub_intent, ...Object.values(state.slots).flat()].filter(Boolean).join(" ");
   const matched = MENU_GROUPS.find(group => group.tags.some(tag => context.includes(tag)));
-  const pools = matched ? [matched.values, ...DEFAULT_MENU_SETS] : DEFAULT_MENU_SETS;
+  const pool = [...(matched?.values || []), ...MODE_A_POOL.map(item => [item.direction, item.menu, item.reason])];
   const used = new Set(state.aProposed.map(String));
   const selected = [];
-  for (const pool of pools) {
-    for (const item of pool) {
-      if (!used.has(item[1]) && !selected.some(candidate => candidate.menu === item[1])) {
-        selected.push({ direction: item[0], menu: item[1], reason: item[2] });
-      }
-      if (selected.length === 3) return selected;
-    }
+  const meal = state.slots.meal_time || analysis.slots.meal_time || "";
+  const ranked = pool.filter((item, index) => !used.has(item[1]) && pool.findIndex(other => other[1] === item[1]) === index).map(item => {
+    const entry = MODE_A_POOL.find(candidate => candidate.menu === item[1]);
+    const random = new Uint32Array(1); crypto.getRandomValues(random);
+    const score = (matched?.values.some(candidate => candidate[1] === item[1]) ? 10 : 0)
+      + (entry?.times.includes(meal) ? 2 : 0) + random[0] / 0x100000000;
+    return { direction: item[0], menu: item[1], reason: item[2], family: entry?.family || item[0], score };
+  }).sort((a, b) => b.score - a.score);
+  for (const item of ranked) {
+    if (!selected.some(candidate => candidate.family === item.family)) selected.push(item);
+    if (selected.length === 3) break;
   }
-  return DEFAULT_MENU_SETS.flat().slice(0, 3).map(item => ({ direction: item[0], menu: item[1], reason: item[2] }));
+  return selected.map(({ direction, menu, reason }) => ({ direction, menu, reason }));
 }
 
 export function updateStateAfterResponse(stateValue, decision, { cards = [], aCandidates = [], noResults = false, focus = undefined } = {}) {

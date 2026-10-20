@@ -56,7 +56,7 @@ export function testMealToolsUI() {
     assert.equal(dialog.querySelectorAll('input').length, 8);
     assert.equal(byText(dialog, '＋ 후보 추가').disabled, true);
     byText(dialog, '돌림판 돌리기').click();
-    assert.ok(dialog.textContent.includes('후보를 2~8개 입력해 주세요.'));
+    assert.equal(byText(dialog, '돌림판 돌리기').disabled, true, 'empty options disable the sheet action');
     dialog.querySelectorAll('input').forEach((input, i) => { input.value = `메뉴${i}`; input.emit('input'); });
     byText(dialog, '돌림판 돌리기').click();
     assert.ok(dialog.textContent.includes('돌림판 결과:'));

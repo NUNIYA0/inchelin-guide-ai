@@ -330,6 +330,7 @@
     .quick-replies.quick-replies-followup { display: flex; flex-wrap: wrap; gap: 8px; }
     .quick-reply.quick-reply-chip { width: auto; min-height: 32px; padding: 6px 12px; border-radius: 999px; display: inline-flex; box-shadow: none; }
     .quick-reply.quick-reply-chip .quick-reply-title { font-size: 12px; font-weight: 500; }
+    .quick-reply.menu-more { grid-column: 1 / -1; justify-self: start; }
     .quick-replies.quick-replies-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .quick-reply.quick-reply-action { width: auto; min-height: 42px; padding: 9px 14px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; box-shadow: none; }
     .quick-reply.quick-reply-action .quick-reply-title { font-size: 13px; font-weight: 650; white-space: nowrap; }
@@ -530,6 +531,24 @@
     .plugin-action-dialog .meal-chip { font-size: 14px; }
     .plugin-compare-row { display: flex; gap: 10px; align-items: center; min-height: 48px; padding: 8px 0; cursor: pointer; }
     .plugin-compare-row input { width: 22px; height: 22px; flex: 0 0 auto; }
+    .bottom-sheet { inset: auto 0 0; margin: 0 auto; width: min(640px, 100%); max-height: min(92dvh, 880px); padding: 0; border: 0; border-radius: 24px 24px 0 0; overflow: hidden; font: 400 14px/1.5 system-ui, -apple-system, "Malgun Gothic", sans-serif; }
+    .bottom-sheet[open] { display: flex; flex-direction: column; animation: sheet-rise .2s ease-out; }
+    @keyframes sheet-rise { from { transform: translateY(100%); } to { transform: translateY(0); } }
+    .sheet-handle { flex: 0 0 auto; width: 36px; height: 4px; background: #ccc; border-radius: 3px; margin: 10px auto 4px; }
+    .sheet-header { position: relative; flex: 0 0 auto; padding: 12px 60px 12px 16px; }
+    .bottom-sheet .sheet-header h2 { margin: 0; font-size: 20px; font-weight: 700; }
+    .sheet-close { position: absolute; top: 2px; right: 8px; width: 44px; height: 44px; padding: 0; border: 0; background: transparent; font: 400 28px system-ui, sans-serif; color: #111; cursor: pointer; }
+    .sheet-body { min-height: 0; overflow-y: auto; padding: 0 16px 16px; overscroll-behavior: contain; }
+    .sheet-footer { flex: 0 0 auto; padding: 12px 16px max(16px, env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #eee; display: grid; gap: 8px; }
+    .sheet-footer:empty { display: none; }
+    .bottom-sheet .primary-action { display: block; width: 100%; margin: 0; min-height: 48px; height: 48px; border-radius: 12px; background: #000; color: #fff; font: 600 16px system-ui, sans-serif; }
+    .bottom-sheet .primary-action:disabled { background: #ddd; color: #666; cursor: default; }
+    .bottom-sheet .meal-muted { font-size: 14px; color: #555; line-height: 1.5; }
+    .bottom-sheet .meal-chip { min-height: 44px; font: 400 14px/1.5 system-ui, sans-serif; }
+    .bottom-sheet .meal-chip[aria-pressed="true"]::before { content: "✓ "; }
+    .bottom-sheet .meal-chips { gap: 8px; }
+    .bottom-sheet .plugin-compare-row { min-height: 56px; }
+    .bottom-sheet .plugin-compare-row:has(input:checked) { background: #f2f2f2; border-radius: 8px; }
     .release-card { border-top: 1px solid #eee; padding: 18px 0; }
     .release-meta { display: flex; gap: 9px; align-items: center; color: #888; font-size: 12px; }
     .badge { border-radius: 999px; padding: 3px 7px; background: #111; color: white; }
@@ -1653,7 +1672,7 @@
         if (visibleQuickReplies.length) {
           const replies = document.createElement('div');
           replies.className = 'quick-replies';
-          const isFollowupChip = reply => Boolean(message.restaurants?.length || message.meta?.restaurantSearchStatus === 'no_results') && /^(?:다른 곳도 보여줘|가까운 순으로|현재 위치 연결|조건 바꾸기|지역 넓히기|메뉴 바꾸기)$/.test(quickReplyCard(reply).title);
+          const isFollowupChip = reply => /^(?:다른 메뉴 보기|지역 바꾸기|메뉴 바꾸기|상황 추가)$/.test(quickReplyCard(reply).title) || Boolean(message.restaurants?.length || message.meta?.restaurantSearchStatus === 'no_results') && /^(?:다른 곳도 보여줘|가까운 순으로|현재 위치 연결|조건 바꾸기|지역 넓히기|메뉴 바꾸기)$/.test(quickReplyCard(reply).title);
           if (visibleQuickReplies.every(isFollowupChip)) replies.classList.add('quick-replies-followup');
           const isActionReply = reply => /^(?:현재 위치|내 주변|지역|다른 지역|위치)/.test(quickReplyCard(reply).title);
           if (visibleQuickReplies.every(isActionReply)) replies.classList.add('quick-replies-actions');
@@ -1665,6 +1684,7 @@
             button.type = 'button';
             const followupChip = isFollowupChip(reply);
             button.className = `quick-reply${followupChip ? ' quick-reply-chip' : actionReply ? ' quick-reply-action' : ''}`;
+            if (card.title === '다른 메뉴 보기') button.classList.add('menu-more');
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
@@ -1871,6 +1891,10 @@
           currentLocationName = '';
           currentLocationCoords = null;
         }
+        else if (answer.meta?.responseModeState?.slots?.use_current_location === false) {
+          currentLocationCoords = null;
+          currentLocationName = answer.meta.responseModeState.slots.region || '';
+        }
         status.remove();
         appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants, meta: answer.meta });
       } catch (error) {
@@ -2061,6 +2085,7 @@
       const value = String(question || '').trim();
       if (!value) return;
       if (value === '지역별 찾기') { runPlugin(3); return; }
+      if (value === '상황 추가') { runPlugin(2); return; }
       if (value === '지역 바꾸기' || value === '다른 지역' || value === '지역 변경') {
         currentLocationName = '';
         currentLocationCoords = null;
@@ -2484,7 +2509,7 @@
     renderAuthNavigation();
     renderHistory();
     renderPlugins();
-    import('/assets/plugin-actions-v1.js').then(({ mountPluginActions }) => {
+    import('/assets/plugin-actions-v1.js?v=112').then(({ mountPluginActions }) => {
       let storage;
       try { storage = window.localStorage; } catch (_) { /* 브라우저 저장소가 막혀도 도구를 이용해요. */ }
       pluginActions = mountPluginActions({
@@ -2507,7 +2532,7 @@
         }
       });
     }).catch(() => showToast('플러그인을 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/meal-tools-v2.js').then(({ mountMealTools }) => {
+    import('/assets/meal-tools-v2.js?v=112').then(({ mountMealTools }) => {
       mountMealTools({ getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), onOpen: () => { closeOverlay('pluginOverlay'); return chatView.classList.contains('active') ? $('#chatForm .task-trigger') : $('#welcomeForm .task-trigger'); }, source: 'naver' });
     }).catch(() => {
       document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });

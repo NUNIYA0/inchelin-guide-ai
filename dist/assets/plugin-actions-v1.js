@@ -1,3 +1,4 @@
+import { createBottomSheet } from './bottom-sheet-v1.js';
 // These tools collect messages/slots only. Response modes stay in the existing pipeline.
 export const PLUGIN_IDS = [1, 2, 3, 4, 5];
 // Naver local search supports these region queries; availability still depends on the menu.
@@ -30,7 +31,7 @@ export function latestCards(messages) {
 export function selectedComparison(cards, indexes) {
   const selected = [...new Set(indexes)].map(index => cards[index]).filter(Boolean);
   if (selected.length < 2 || selected.length > 3) throw new Error('비교할 식당을 2~3개 골라주세요.');
-  return { message: selected.map(card => '(' + card.name + ')').join('랑 ') + ' 비교해줘', cards: selected };
+  return { message: selected.map(card => card.name).join('랑 ') + ' 비교해줘', cards: selected };
 }
 export function validRegion(value) {
   return typeof value === 'string' && /^[가-힣a-zA-Z0-9·.\s-]{2,40}$/.test(value.trim()) && !/찾아줘|추천해줘|알려줘|먹을 곳|갈만한/.test(value);
@@ -44,17 +45,11 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     const node = el('button', text, 'meal-chip'); node.type = 'button';
     node.addEventListener('click', action); return node;
   };
-  const dialog = el('dialog', '', 'meal-tools-dialog plugin-action-dialog');
-  dialog.setAttribute('aria-labelledby', 'pluginActionTitle');
-  document.body.append(dialog);
-  dialog.addEventListener('close', () => opener?.focus());
-  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
+  const sheetUI = createBottomSheet({ titleId: 'pluginActionTitle', onClose: () => opener?.focus() });
+  const dialog = sheetUI.dialog;
   function sheet(title) {
-    dialog.replaceChildren();
-    const heading = el('h2', title); heading.id = 'pluginActionTitle';
-    dialog.append(button('닫기', () => dialog.close()), heading);
-    if (!dialog.open) dialog.showModal();
-    return dialog;
+    sheetUI.open(title);
+    return sheetUI.body;
   }
   const blocked = () => waiting || isBusy();
   function finishRegion(value) {
@@ -73,13 +68,23 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
       finishRegion(input.value);
     };
     manual.addEventListener('submit', event => { event.preventDefault(); submit(); });
-    manual.append(input, button('지역 선택 완료', submit));
-    view.append(button('현재 위치 연결', () => { if (blocked()) return; dialog.close(); locate(); }),
-      button('지역 직접 입력', () => input.focus()), manual, error);
+    const find = button('이 지역으로 찾기', submit); find.className = 'primary-action'; find.disabled = true;
+    let selectedRegion = '';
+    input.addEventListener('input', () => { selectedRegion = input.value.trim(); find.disabled = !validRegion(selectedRegion); });
+    const location = button('현재 위치 연결', () => { if (blocked()) return; dialog.close(); locate(); }); location.className = 'primary-action';
+    manual.append(input);
+    view.append(location, button('지역 직접 입력', () => input.focus()), manual, error);
+    sheetUI.setActions(find);
     if (source === 'naver') {
       view.append(el('p', '자주 찾는 지역이에요. 메뉴에 따라 검색 결과가 없을 수 있어요.', 'meal-muted'));
       const chips = el('div', '', 'meal-chips');
-      NAVER_REGIONS.forEach(region => chips.append(button(region, () => finishRegion(region))));
+      NAVER_REGIONS.forEach(region => {
+        const chip = button(region, () => {
+          selectedRegion = region; input.value = region; find.disabled = false;
+          chips.querySelectorAll('button').forEach(node => node.setAttribute('aria-pressed', String(node === chip)));
+        });
+        chip.setAttribute('aria-pressed', 'false'); chips.append(chip);
+      });
       view.append(chips);
     }
   }
@@ -88,20 +93,23 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     const slots = getSlots();
     const selected = new Set(SITUATIONS.filter(value => (slots.companion || '').includes(value) || (slots.other || []).includes(value) || (value === '주차 필요' && slots.parking)));
     view.append(el('p', '여러 조건을 함께 골라도 돼요.', 'meal-muted'));
-    const chips = el('div', '', 'meal-chips');
-    SITUATIONS.forEach(value => {
+    const complete = button('선택 완료', () => {
+      if (blocked() || !selected.size) return;
+      dialog.close(); setSituations(situationSlots([...selected]), [...selected]);
+    }); complete.className = 'primary-action'; complete.disabled = !selected.size;
+    for (const [title, values] of [['누구와', SITUATIONS.slice(0, 5)], ['조건', SITUATIONS.slice(5)]]) {
+      const chips = el('div', '', 'meal-chips');
+      view.append(el('h3', title), chips);
+      values.forEach(value => {
       const chip = button(value, () => {
         if (selected.has(value)) selected.delete(value); else selected.add(value);
         chip.setAttribute('aria-pressed', String(selected.has(value)));
+        complete.disabled = !selected.size;
       });
       chip.setAttribute('aria-pressed', String(selected.has(value))); chips.append(chip);
-    });
-    const error = el('p', '', 'meal-muted'); error.setAttribute('role', 'status');
-    view.append(chips, error, button('선택 완료', () => {
-      if (blocked()) return;
-      if (!selected.size) { error.textContent = '상황을 하나 이상 골라주세요.'; return; }
-      dialog.close(); setSituations(situationSlots([...selected]), [...selected]);
-    }));
+      });
+    }
+    sheetUI.setActions(complete);
   }
   function compare() {
     const cards = latestCards(getMessages());
@@ -112,20 +120,23 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     }
     const view = sheet('비교할 식당을 2~3개 골라주세요');
     const selected = new Set();
+    const counter = el('p', '0/3 선택', 'meal-muted'); counter.setAttribute('role', 'status'); view.append(counter);
+    const confirm = button('선택한 식당 비교', () => {
+      if (blocked() || selected.size < 2) return;
+      const result = selectedComparison(cards, [...selected].sort((a, b) => a - b));
+      dialog.close(); send(result.message, { compareCards: result.cards });
+    }); confirm.className = 'primary-action'; confirm.disabled = true;
     cards.forEach((card, index) => {
       const label = el('label', '', 'plugin-compare-row');
       const check = el('input'); check.type = 'checkbox';
-      check.addEventListener('change', () => { if (check.checked) selected.add(index); else selected.delete(index); });
-      label.append(check, el('span', card.name)); view.append(label);
+      check.addEventListener('change', () => {
+        if (check.checked) selected.add(index); else selected.delete(index);
+        counter.textContent = selected.size + '/3 선택'; confirm.disabled = selected.size < 2;
+      });
+      const text = el('span', '', 'plugin-text'); text.append(el('strong', card.name), el('span', card.address || '주소 정보가 없어요', 'meal-muted'));
+      label.append(check, text); view.append(label);
     });
-    const error = el('p', '', 'meal-muted'); error.setAttribute('role', 'status');
-    view.append(error, button('선택한 식당 비교', () => {
-      if (blocked()) return;
-      try {
-        const result = selectedComparison(cards, [...selected].sort((a, b) => a - b));
-        dialog.close(); send(result.message, { compareCards: result.cards });
-      } catch (err) { error.textContent = err.message; }
-    }));
+    sheetUI.setActions(confirm);
   }
   async function run(id, trigger) {
     if (!PLUGIN_IDS.includes(id) || blocked()) return;

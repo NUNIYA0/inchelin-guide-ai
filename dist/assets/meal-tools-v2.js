@@ -1,3 +1,4 @@
+import { createBottomSheet } from './bottom-sheet-v1.js';
 export const CATEGORY_MENUS = [
   { name: '한식', menus: ['국밥', '김치찌개', '냉면'] },
   { name: '중식', menus: ['마라탕', '마라샹궈'] },
@@ -84,15 +85,12 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
   const button = (text, action, className = 'meal-chip') => {
     const node = el('button', text, className); node.type = 'button'; node.addEventListener('click', action); return node;
   };
-  const dialog = el('dialog', '', 'meal-tools-dialog');
-  dialog.setAttribute('aria-labelledby', 'mealToolsTitle');
-  document.body.append(dialog);
+  const sheetUI = createBottomSheet({ titleId: 'mealToolsTitle', onClose: () => { cancel(); opener?.focus(); } });
+  const dialog = sheetUI.dialog;
   let kind, candidates, count, selected, timer, busy = false, opener;
   let content, result, run, editor, stage;
   const reduced = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
   const cancel = () => { clearTimeout(timer); busy = false; };
-  dialog.addEventListener('close', () => { cancel(); opener?.focus(); });
-  dialog.addEventListener('click', event => { if (event.target === dialog) dialog.close(); });
   const colors = ['#d3e4c6', '#f5d7bd', '#d8d5ee', '#f3d2db', '#bfe0df', '#ece2b2', '#cbd9ef', '#e5d4bf'];
   const send = (message, freshMenu = false) => {
     if (isBusy()) { result.textContent = '현재 답변이 끝나면 다시 눌러 주세요.'; return; }
@@ -115,7 +113,10 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     content.append(chips, el('h3', '세부 메뉴'), details);
     chips.firstElementChild?.click();
   }
-  function invalidate() { selected = null; result.replaceChildren(); stage.replaceChildren(); }
+  function invalidate() {
+    selected = null; result.replaceChildren(); stage.replaceChildren();
+    if (run) { run.disabled = busy || candidates.length < 2 || candidates.some(value => !value.trim()); sheetUI.setActions(run); }
+  }
   function renderEditor() {
     editor.replaceChildren();
     candidates.forEach((value, index) => {
@@ -134,6 +135,7 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
       const add = button('＋ 후보 추가', () => { candidates.push(''); invalidate(); renderEditor(); editor.querySelector('input:last-of-type')?.focus(); });
       add.disabled = candidates.length >= 8; editor.append(add);
     }
+    if (run) run.disabled = candidates.length < 2 || candidates.some(value => !value.trim());
   }
   function complete(action, ms) {
     if (reduced()) { action(); return; }
@@ -169,7 +171,8 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     } else wheel.style.transform = `rotate(${choice.rotation}deg)`;
     complete(() => {
       selected = choice.value;
-      result.replaceChildren(el('p', `돌림판 결과: ${choice.value}`, 'meal-result-title'), el('p', GAME_NOTICE, 'meal-muted'), button('이 결과로 대화하기', () => send(resultMessage('wheel', selected)), 'primary-action'));
+      result.replaceChildren(el('p', `돌림판 결과: ${choice.value}`, 'meal-result-title'), el('p', GAME_NOTICE, 'meal-muted'));
+      sheetUI.setActions(run, button('이 결과로 대화하기', () => send(resultMessage('wheel', selected)), 'primary-action'));
     }, 1500);
   }
   function showLadder() {
@@ -210,11 +213,9 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     candidates = autoCandidates(getMessages());
     while (candidates.length < 2) candidates.push('');
     count = candidates.length;
-    dialog.replaceChildren();
-    const close = button('×', () => dialog.close(), 'dialog-close'); close.setAttribute('aria-label', '닫기');
-    const title = el('h2', { category: '카테고리로 찾기', wheel: '오늘의 메뉴 돌림판', ladder: '함께 고르는 사다리게임' }[kind]); title.id = 'mealToolsTitle';
+    sheetUI.open({ category: '카테고리로 찾기', wheel: '오늘의 메뉴 돌림판', ladder: '함께 고르는 사다리게임' }[kind]);
     content = el('div', '', 'meal-tools-content'); result = el('div', '', 'meal-tools-result'); result.setAttribute('aria-live', 'polite');
-    dialog.append(close, title, content, result);
+    sheetUI.body.append(content, result);
     if (kind === 'category') renderCategories();
     else {
       content.append(el('p', kind === 'wheel' ? '최근 메뉴 후보나 식당 이름을 담았어요. 후보를 2~8개로 바꿀 수 있어요.' : '인원을 정하고 각 칸에 메뉴를 입력하세요. 결과에서 한 사람의 메뉴를 대화로 이어갈 수 있어요.', 'meal-muted'));
@@ -231,11 +232,11 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
         try { if (kind === 'wheel') showWheel(); else showLadder(); }
         catch (error) { result.textContent = error.message; }
       }, 'primary-action');
-      content.append(editor, run, el('p', GAME_NOTICE, 'meal-muted'), stage); renderEditor();
+      content.append(editor, el('p', GAME_NOTICE, 'meal-muted'), stage);
+      sheetUI.setActions(run); renderEditor();
     }
     document.querySelector('#taskMenu')?.classList.remove('open');
     document.querySelectorAll('.task-trigger').forEach(node => node.setAttribute('aria-expanded', 'false'));
-    dialog.showModal();
   }
   // Plugin sections are re-rendered by filters/search; delegate to keep their tools working.
   document.addEventListener('click', event => {
