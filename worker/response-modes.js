@@ -103,7 +103,7 @@ export function normalizeResponseState(value = {}) {
     phone: cleanString(card.phone, 80) || "",
     openingHours: cleanString(card.openingHours, 500) || "",
     parking: typeof card.parking === "boolean" ? card.parking : null,
-    distanceMeters: Number.isFinite(Number(card.distanceMeters)) ? Number(card.distanceMeters) : null,
+    distanceMeters: card.distanceMeters !== null && card.distanceMeters !== undefined && card.distanceMeters !== "" && Number.isFinite(Number(card.distanceMeters)) ? Number(card.distanceMeters) : null,
     recommendationReason: cleanString(card.recommendationReason, 500) || "",
     representativeMenus: Array.isArray(card.representativeMenus) ? card.representativeMenus.map(String).slice(0, 8) : [],
   })) : [];

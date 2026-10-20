@@ -160,7 +160,7 @@ function chatResponse(message, suggestions = [], restaurants = [], meta = null) 
   const repeatedSuggestions = normalizedSuggestions.filter(reply => plainMessage.includes(normalizeIdentityText(reply)));
   const visibleSuggestions = hasMenuCards || repeatedSuggestions.length < 2 ? normalizedSuggestions : [];
   return {
-    message: hasMenuCards ? compactMessageForQuickReplies(normalizedMessage, normalizedSuggestions) : normalizedMessage,
+    message: hasMenuCards && meta?.mode !== "B" ? compactMessageForQuickReplies(normalizedMessage, normalizedSuggestions) : normalizedMessage,
     suggestions: visibleSuggestions,
     restaurants: Array.isArray(restaurants) ? restaurants : [],
     ...(meta && typeof meta === "object" ? { meta } : {}),
@@ -647,7 +647,7 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   let intent = "general";
   let sub = null;
   if (outOfScope) intent = "out_of_scope";
-  else if (service) {
+  else if (service || SERVICE_FAQ.items.some(item => item.examples.some(example => faqSimilarity(latest, example) === 1))) {
     intent = "service";
     sub = /와인/.test(latest) ? "wine" : /추천.{0,8}기준|원칙|데이터|등록|검증|카드|거리|영업|폐업/.test(latest) ? "data_basis" : /무료|요금|위치\s*정보|기록\s*저장|로그인해야|모바일|공개\s*범위/.test(latest) ? "policy" : /어떻게|삭제|공유|지난\s*대화|새\s*대화|로그인|로그아웃|위치\s*버튼/.test(latest) ? "how_to" : "about";
   } else if (foodTalk) intent = "food_talk";
@@ -794,6 +794,9 @@ function faqSimilarity(left, right) {
 }
 
 function serviceFaqAnswer(text, subIntent, source) {
+  const normalizedQuestion = value => String(value || "").replace(/[^0-9a-z가-힣]/gi, "").toLowerCase();
+  const exact = SERVICE_FAQ.items.find(item => item.examples.some(example => normalizedQuestion(example) === normalizedQuestion(text)));
+  if (exact) return exact.answer?.[source] || exact.answer?.default || "그 부분은 아직 정확히 안내드리기 어려워요. 메뉴나 식당이 고민되시면 말씀해 주세요.";
   if (subIntent === "wine") return "와인 추천은 준비 중이에요.";
   const candidates = SERVICE_FAQ.items.filter(item => item.sub_intent === subIntent);
   const inputTokens = new Set(faqTokens(text));
@@ -814,9 +817,27 @@ function modeAResponse(analysis, state) {
   return chatResponse(message, suggestions, [], { responseModeState: nextState, mode: "A" });
 }
 
+function menuGuidance(food) {
+  const tips = [
+    [/삼겹살|목살|고깃집/, "두툼한 고기는 씹는 맛을 즐기기 좋고, 얇게 썬 고기는 바삭하게 구워 먹기 좋아요. 기름진 맛을 덜고 싶으면 쌈채소나 파채를 곁들이고, 마무리는 된장찌개나 냉면으로 골라보세요."],
+    [/국밥|설렁탕|곰탕/, "진한 국물과 고기를 즐기고 싶다면 국밥류가 잘 맞아요. 간은 국물을 먼저 맛본 뒤 맞추고, 깍두기나 부추를 곁들이면 맛을 바꿔가며 먹기 좋아요."],
+    [/찌개|전골|한식/, "밥과 국물을 함께 먹고 싶다면 찌개나 전골을, 담백한 구성이 좋다면 구이 정식을 골라보세요. 매운 음식에는 계란찜이나 두부 반찬을 곁들이면 한 끼를 다양하게 즐길 수 있어요."],
+    [/냉면|국수|우동|라멘|쌀국수|칼국수|메밀/, "면 요리는 국물 있는 스타일과 비벼 먹는 스타일부터 고르면 선택하기 쉬워요. 만두나 작은 주먹밥을 곁들이고, 양념은 조금씩 더해 취향에 맞춰보세요."],
+    [/피자/, "토마토소스는 산뜻한 맛을, 치즈가 중심인 피자는 진한 맛을 즐기기 좋아요. 여럿이 먹는다면 서로 다른 토핑을 나눠 고르고 샐러드를 곁들여보세요."],
+    [/파스타|양식|리소토/, "산뜻한 맛이 좋으면 토마토나 오일, 부드럽고 진한 맛이 좋으면 크림소스를 골라보세요. 샐러드나 구운 채소를 곁들이면 소스 맛과 번갈아 즐기기 좋아요."],
+    [/초밥|일식|돈까스|돈카츠|덮밥/, "담백하게 먹고 싶으면 생선구이나 덮밥, 바삭한 식감이 좋으면 돈카츠처럼 조리 방식을 기준으로 골라보세요. 작은 우동이나 장국, 채소 반찬을 곁들이면 구성을 다양하게 할 수 있어요."],
+    [/중식|짜장|짬뽕|탕수육|마라/, "진한 소스 맛을 원하면 볶음이나 비빔 메뉴, 국물이 당기면 탕이나 국물면을 골라보세요. 여럿이 먹을 때는 식사 메뉴에 작은 요리 한 가지를 나눠 곁들이기 좋아요."],
+    [/샐러드|포케|샌드위치/, "채소 위주로 산뜻하게 먹되 달걀이나 두부, 닭고기 같은 토핑을 곁들여 구성을 골라보세요. 드레싱은 따로 받아 조금씩 넣고, 더 든든하게 먹고 싶으면 빵이나 밥을 추가해보세요."],
+    [/치킨|햄버거|버거/, "바삭한 맛이 좋으면 튀김 스타일, 소스 맛을 즐기고 싶으면 양념 스타일로 골라보세요. 샐러드나 피클을 곁들이고, 함께 먹는 인원에 맞춰 사이드 양을 조절해보세요."],
+    [/카페|디저트/, "커피와 함께라면 진한 디저트와 산뜻한 디저트 중 원하는 맛부터 골라보세요. 달콤한 메뉴에는 무가당 음료를 곁들이면 각각의 맛을 즐기기 좋아요."],
+  ];
+  const tip = tips.find(([pattern]) => pattern.test(food))?.[1];
+  return `**${food}**으로 골라볼게요. ${tip || "같은 메뉴도 조리 방식과 양념에 따라 맛이 달라지니 담백한 맛과 진한 맛 중 취향에 맞게 골라보세요. 곁들임은 메인과 다른 식감의 채소 반찬이나 샐러드로 구성해보세요."}`;
+}
+
 function modeBResponse(state) {
   const food = state.slots.menu || state.slots.food_type;
-  const intro = food ? `**${food}**을 기준으로 실제 식당을 찾아볼게요.` : "좋아요, 조건에 맞는 식당을 골라드릴게요.";
+  const intro = food ? menuGuidance(food) : "좋아요, 조건에 맞는 식당을 골라드릴게요.";
   const message = `${intro}\n\n현재 위치를 연결해도 돼요.\n\n**어느 지역에서 찾을까요?**`;
   const nextState = updateStateAfterResponse(state, { mode: "B", questionSlot: "region", showCards: false }, {});
   return chatResponse(message, ["현재 위치 연결|기기의 위치를 확인해 가까운 맛집을 찾아요", "지역 직접 입력|동네나 역 이름을 직접 입력해요"], [], { responseModeState: nextState, mode: "B" });
@@ -1972,7 +1993,7 @@ function naverMapSearchUrl(name, address) {
 
 function factualRecommendationReason(place, source, userText) {
   const category = safeText(place.registered_data?.category, 160);
-  const distance = Number(place.distance_meters);
+  const distance = place.distance_meters !== null && place.distance_meters !== undefined && place.distance_meters !== "" ? Number(place.distance_meters) : NaN;
   if (Number.isFinite(distance)) {
     const label = distance < 1000 ? `${Math.round(distance)}m` : `${(distance / 1000).toFixed(distance < 10000 ? 1 : 0)}km`;
     return `${label} 거리에서 찾은${category ? ` ${category}` : " 식당"}이에요.`;

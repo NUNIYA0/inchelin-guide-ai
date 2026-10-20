@@ -584,6 +584,10 @@ function semanticAnalysis(overrides = {}) {
   });
   assert.equal(result.body.restaurants.length, 1);
   assert.equal(result.body.restaurants[0].name, "시골밥상");
+  assert.equal(result.body.restaurants[0].distanceMeters, null);
+  assert.doesNotMatch(result.body.restaurants[0].recommendationReason, /거리|\d+\s*m/);
+  assert.equal(result.body.meta.responseModeState.lastCards[0].distanceMeters, null);
+  assert.equal(result.body.meta.responseModeState.shownPlaces[0].distanceMeters, null);
   assert.match(result.body.restaurants[0].naverPlaceUrl, /^https:\/\/map\.naver\.com\/p\/search\//);
   const localCall = result.calls.find(call => call.href.includes("/search/v1/local"));
   assert.match(new URL(localCall.href).searchParams.get("query"), /강남/);
@@ -1229,6 +1233,53 @@ function semanticAnalysis(overrides = {}) {
 }
 
 // FAQ grounding: three representative questions for each service sub-intent.
+for (const message of ["삼겹살 먹고 싶어", "파스타 먹고 싶어", "한식 먹고 싶어", "피자 먹고 싶어"]) {
+  const result = await runCase({ message, env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" } });
+  assert.equal(result.body.meta.mode, "B");
+  const menuAnswer = result.body.message.split("\n\n")[0];
+  assert.ok(menuAnswer.split(/[.!]/).filter(sentence => sentence.trim()).length >= 2);
+  assert.ok(menuAnswer.split(/[.!]/).filter(sentence => sentence.trim()).length <= 4);
+  assert.match(menuAnswer, /곁들|마무리/);
+  if (message.includes("삼겹살")) {
+    assert.match(menuAnswer, /두툼|얇게/);
+    assert.match(menuAnswer, /된장찌개|냉면/);
+  }
+  assert.equal((result.body.message.match(/\?/g) || []).length, 1);
+  assert.match(result.body.message, /어느 지역/);
+  assert.match(result.body.message, /현재 위치/);
+  assert.equal(result.body.meta.responseModeState.pendingQuestionSlot, "region");
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.length, 0);
+}
+
+for (const [message, expected] of [
+  ["등록 안 된 식당도 나와?", /등록 식당만 보여주는 것이 아니라 네이버 검색/],
+  ["인슐랭가이드에 등록된 곳만 추천해?", /전환 중/],
+  ["추천은 어떤 기준으로 해?", /조건의 일치와 영업 정보 검증 여부/],
+  ["식당 정보는 어떻게 검증해?", /상호명·주소·음식점 분류/],
+  ["추천 카드는 왜 3개야?", /최대 3곳/],
+  ["거리는 어떻게 계산해?", /직선거리/],
+  ["거리순 추천이야?", /지역을 글로만 입력하거나 좌표가 없으면 거리 문구를 표시하지/],
+]) {
+  const result = await runCase({ message, env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" } });
+  assert.equal(result.body.meta.mode, "GENERAL");
+  assert.match(result.body.message, expected);
+  assert.doesNotMatch(result.body.message, /정확히 안내드리기 어려워요|평점순|인기순/);
+  assert.deepEqual(result.body.restaurants, []);
+  assert.equal(result.calls.length, 0);
+}
+
+{
+  const result = await runCase({ message: "등록 안 된 식당도 나와?", env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "inchelin" } });
+  assert.match(result.body.message, /등록된 식당만 추천/);
+  assert.doesNotMatch(result.body.message, /현재 베타/);
+}
+
+{
+  const state = normalizeResponseState({ lastCards: [null, undefined, "", 0, 123].map((distanceMeters, index) => ({ id: String(index), distanceMeters })) });
+  assert.deepEqual(state.lastCards.map(card => card.distanceMeters), [null, null, null, 0, 123]);
+}
+
 for (const [message, expected] of [
   ["인슐랭가이드가 뭐야?", /대화형 AI 맛집 가이드/],
   ["너 AI야?", /AI가 대화를 이해/],
