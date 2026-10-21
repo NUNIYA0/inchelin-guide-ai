@@ -1,7 +1,8 @@
 // Display copy is separate from routing/facts. Never repair factual claims by guessing.
-export const FORBIDDEN_COPY = /요청|제공된\s*(?:네이버\s*)?검색\s*결과|검증|정렬|후보|분류|입니다|습니다/;
+export const FORBIDDEN_COPY = /요청|제공된\s*(?:네이버\s*)?검색\s*결과|네이버\s*지역\s*검색\s*결과|사용자가|일치하는\s*매장들|검증|정렬|후보|분류|입니다|습니다|[가-힣]*(?:함|음|됨|임|뀜)(?=\s*(?:[.!?。]|$))|변경\s*(?=[.!。]|$)/;
 export const STYLE_RULES = `친구와 이야기하듯 자연스러운 해요체로 말한다. 사용자 말을 받아 한두 문장, 질문은 별도로 하나만 쓴다.
-금지어: 요청, 제공된 검색 결과, 제공된 네이버 검색 결과, 검증, 정렬, 후보, 분류. 금지 말투: ~입니다, ~습니다. 시스템 로그처럼 설명하지 않는다.
+금지어: 요청, 제공된 검색 결과, 제공된 네이버 검색 결과, 네이버 지역 검색 결과, 사용자가, 일치하는 매장들, 검증, 정렬, 후보, 분류. 금지 말투: ~입니다, ~습니다, ~함., ~음., ~됨., ~임., ~명시함, 확인함, 변경. 시스템 로그나 분석 메모처럼 설명하지 않는다.
+분석 JSON은 검색과 정책에만 쓴다. reasoning/note/설명/이유를 복사하지 않는다. turn_text는 분석 요약이 아니라 사용자에게 직접 말할 해요체 문장이다. summary와 reason도 동일한 말투 검사를 받는다.
 좋은 예 1: '강남역에서 삼겹살 먹고 싶으시군요. 먼저 3곳 골라봤어요.' 질문: '누구와 가세요?'
 좋은 예 2: '회식으로 가시는군요. 삼겹살집을 다시 골라봤어요.' 좌석 정보를 모르면 단체석이 편하다는 말은 하지 않는다.
 좋은 예 3: '쌀쌀해서 따뜻한 음식이 당기시는군요. 국물 요리와 다른 두 가지도 함께 골라봤어요.'
@@ -11,16 +12,74 @@ export const STYLE_RULES = `친구와 이야기하듯 자연스러운 해요체�
 
 export function hasForbiddenCopy(result) {
   const values = [result?.message, result?.intro, result?.turn_text?.summary, result?.turn_text?.reason, result?.next_question?.text,
+    ...(result?.suggestions || []), ...(result?.next_question?.chips || []).flatMap(item => [item.label, item.message]),
     ...(result?.card_reasons || []).map(item => item.reason), ...(result?.menus || []).flatMap(item => [item.description, item.reason])];
-  return values.some(value => typeof value === 'string' && FORBIDDEN_COPY.test(value));
+  return values.some(value => typeof value === 'string' && FORBIDDEN_COPY.test(value))
+    || repeatsCopySentences([result?.turn_text?.summary, result?.turn_text?.reason].filter(Boolean).join(' '));
+}
+
+export function repeatsCopySentences(value) {
+  const sentences = String(value || '').split(/[.!?。]+/).map(text => text.trim()).filter(Boolean);
+  const starts = new Set(), endings = new Set();
+  for (const sentence of sentences) {
+    const start = sentence.replace(/\s/g, '').slice(0, 10);
+    const ending = sentence.match(/([가-힣]{3,})$/)?.[1];
+    if (start.length >= 6 && starts.has(start) || ending && endings.has(ending)) return true;
+    starts.add(start); if (ending) endings.add(ending);
+  }
+  return false;
 }
 
 // Exactly one retry on style violations. Caller supplies the same bounded generation path.
 export async function generateFriendly(call) {
-  let result = await call(false);
+  let result;
+  try { result = await call(false); } catch { return null; }
   if (!hasForbiddenCopy(result)) return result;
   try { result = await call(true); } catch { return null; }
   return hasForbiddenCopy(result) ? null : result;
+}
+
+// Last server boundary: routing metadata is not display copy. Strip model-private
+// fields even on deterministic/early-return paths; never send them to the browser.
+export function stripAnalysisFields(value, inAnalysis = false, path = []) {
+  if (Array.isArray(value)) return value.map(item => stripAnalysisFields(item, inAnalysis, path));
+  if (!value || typeof value !== 'object') return value;
+  const allowedAnalysis = new Set(['intent', 'sub_intent', 'confidence', 'slots', 'reference', 'change', 'flags', 'stage', 'missing_slots', 'next_question', 'can_search']);
+  return Object.fromEntries(Object.entries(value).filter(([key]) =>
+    !/^_|reasoning|notes?|rationale|explanation|^turn_text$|^summary$|^reason$/i.test(key)
+      // Card/menu reasons are public, evidence-bound display fields, not analysis.
+      || (!path.includes('analysis') && path.includes('menuCards') && key === 'reason')
+  ).filter(([key]) => !inAnalysis || allowedAnalysis.has(key)).map(([key, item]) => [key,
+    // Only the root analysis object is allowlisted. Its typed routing children
+    // keep their fields, while private-key stripping still recurses everywhere.
+    stripAnalysisFields(item, key === 'analysis', [...path, key])
+  ]));
+}
+
+export function finalizeConversationCopy(response) {
+  const result = stripAnalysisFields(response);
+  const safe = (value, fallback = '') => typeof value === 'string' && FORBIDDEN_COPY.test(value) ? fallback : value;
+  // Fixed service FAQ is authoritative, not generated copy; never rewrite it.
+  const fixedFAQ = result.meta?.variant === 'service';
+  if (!fixedFAQ) {
+    const slots = result.meta?.responseModeState?.slots || {};
+    const count = result.restaurants?.length || 0;
+    const fallback = count ? `${slots.region ? slots.region + '에서 ' : ''}${slots.menu || slots.food_type || '먹을 곳'} ${count}곳을 골라봤어요.` : '지금 알 수 있는 내용만 안내해드릴게요.';
+    result.message = safe(result.message, fallback);
+    if (result.error) result.error = safe(result.error, '답변을 불러오지 못했어요. 다시 시도해 주세요.');
+    if (result.meta?.turnPolicy) {
+      const policy = result.meta.turnPolicy;
+      policy.intro = safe(policy.intro, result.message);
+      policy.questionText = safe(policy.questionText);
+      if (policy.next_question) policy.next_question.text = safe(policy.next_question.text, policy.questionText);
+    }
+    if (result.meta?.analysis?.next_question) result.meta.analysis.next_question.text = safe(result.meta.analysis.next_question.text, result.meta?.turnPolicy?.questionText || '');
+    if (result.meta?.notice) result.meta.notice = safe(result.meta.notice);
+    if (result.suggestions) result.suggestions = result.suggestions.filter(value => !FORBIDDEN_COPY.test(value));
+    if (result.meta?.menuCards) result.meta.menuCards = result.meta.menuCards.map(card => ({ ...card, description: safe(card.description), reason: safe(card.reason) }));
+    if (result.restaurants) result.restaurants = result.restaurants.map(card => ({ ...card, recommendationReason: safe(card.recommendationReason) }));
+  }
+  return result;
 }
 
 export function cardReasonOptions(card, preferences = {}) {

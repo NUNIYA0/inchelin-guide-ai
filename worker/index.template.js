@@ -13,7 +13,7 @@ import {
 } from "./response-modes.js";
 import { withParticle } from "./korean.js";
 import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
-import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons } from "./conversation-copy.js";
+import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy } from "./conversation-copy.js";
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION } from "./search-axes.js";
 
 const INDEX_HTML = __INDEX_HTML__;
@@ -395,8 +395,8 @@ function providerRequestFailedResponse(source = "inchelin", reason = "api_reques
   }
   return chatResponse(
     source === "naver"
-      ? "네이버 맛집 검색 요청에 실패했어요.\n\n잠시 후 다시 시도해 주세요."
-      : "맛집 데이터 요청에 실패했어요.\n\n잠시 후 다시 시도해 주세요.",
+      ? "네이버에서 맛집을 찾지 못했어요.\n\n잠시 후 다시 시도해 주세요."
+      : "맛집 정보를 불러오지 못했어요.\n\n잠시 후 다시 시도해 주세요.",
     ["다시 시도", "다른 조건으로 볼게"],
     [],
     { restaurantSearchStatus: "api_request_failed", provider: source }
@@ -2462,9 +2462,9 @@ async function handleChat(request, env) {
     return { id: card.id, options: cardReasonOptions(card, responseState.slots).map(option => option.text) };
   });
   const modeInstruction = decision.mode === "C"
-    ? `응답 모드 C다. ${withParticle(signals.locationName ? `${signals.locationName} 지역` : "확인된 위치", "과/와")} 메뉴 요청을 turn_text.summary 한 문장으로 요약하고, 검증 후보 중 최대 3개 id만 selectedRestaurantIds로 골라라. turn_text.reason은 지역·메뉴 일치 근거 한 문장이다. 질문은 next_question 하나만 제안하고 분위기·예산은 질문하지 마라. 코드가 질문 이력과 횟수를 검증한다.`
+    ? `응답 모드 C다. turn_text.summary에는 사용자에게 직접 말할 자연스러운 해요체 안내를 한 문장 쓴다. 예: '홍대에서 냉면 드시고 싶으시군요, 3곳 골라봤어요.' 분석 요약·내부 판단·명사형 종결은 쓰지 않는다. 검증 후보 중 최대 3개 id만 selectedRestaurantIds로 고른다. turn_text.reason은 필요한 사용자용 안내 한 문장 또는 빈 문자열이다. 질문은 next_question 하나만 제안하고 분위기·예산은 질문하지 마라. 코드가 질문 이력과 횟수를 검증한다.`
     : decision.mode === "D"
-      ? "응답 모드 D의 조건 변경이다. 바뀐 검색 조건을 turn_text.summary와 reason 두 문장 이내로 설명하고, 주어진 검증 후보에서만 최대 3개 id를 골라라. 질문은 검색을 바꾸는 축만 하나 제안하고 askedSlots와 횟수 제한을 지켜라."
+      ? "응답 모드 D의 조건 변경이다. turn_text는 분석 메모가 아닌 사용자에게 직접 말할 해요체다. 예: '좋아요, 홍대는 그대로 두고 국밥으로 바꿔봤어요.' summary와 reason 두 문장 이내로 말하고 불필요한 reason은 비운다. 주어진 검증 후보에서만 최대 3개 id를 골라라. 질문은 검색을 바꾸는 축만 하나 제안하고 askedSlots와 횟수 제한을 지켜라."
       : decision.mode === "E"
         ? "응답 모드 E다. 특정 매장의 확인된 정보만 짧게 답하고 해당 매장 id 하나만 골라라. 확인되지 않은 사실은 만들지 마라."
         : "링크 조사 결과에만 근거해 사용자의 질문에 직접 답하라.";
@@ -2533,7 +2533,7 @@ async function handleChat(request, env) {
 
   let result;
   try {
-    const rawContent = response.ok ? extractOutputText(await withTurnDeadline(() => response.json(), 2000)) : JSON.stringify({ message: "확인된 검색 후보로 이어갈게요.", suggestions: [], selectedRestaurantIds: [] });
+    const rawContent = response.ok ? extractOutputText(await withTurnDeadline(() => response.json(), 2000)) : JSON.stringify({ message: "먹을 곳을 함께 골라볼게요.", suggestions: [], selectedRestaurantIds: [] });
     const first = JSON.parse(rawContent);
     let initial = true;
     result = await generateFriendly(async retry => {
@@ -2544,10 +2544,10 @@ async function handleChat(request, env) {
     });
     result ||= { message: "먼저 식당을 골라봤어요.", suggestions: [], selectedRestaurantIds: [] };
   } catch {
-    if (groundedPlaces.length && ["C", "D"].includes(decision.mode)) result = { message: "확인된 검색 후보로 이어갈게요.", suggestions: [], selectedRestaurantIds: [] };
+    if (groundedPlaces.length && ["C", "D"].includes(decision.mode)) result = { message: "먹을 곳을 함께 골라볼게요.", suggestions: [], selectedRestaurantIds: [] };
     else return json({ error: "답변 형식을 확인하지 못했어요. 다시 시도해 주세요." }, 502);
   }
-  if ((!result || typeof result.message !== "string" || !result.message.trim()) && groundedPlaces.length && ["C", "D"].includes(decision.mode)) result = { message: "확인된 검색 후보로 이어갈게요.", suggestions: [], selectedRestaurantIds: [] };
+  if ((!result || typeof result.message !== "string" || !result.message.trim()) && groundedPlaces.length && ["C", "D"].includes(decision.mode)) result = { message: "먹을 곳을 함께 골라볼게요.", suggestions: [], selectedRestaurantIds: [] };
   let message = typeof result?.message === "string" ? sanitizeKoreanText(result.message).replace(/\s*[(（]?제안\s*이유는\s*카드에만\s*있어요[.!]?[)）]?\s*/g, " ").trim() : "";
   if (!message) return json({ error: "답변을 생성하지 못했어요. 다시 시도해 주세요." }, 502);
   const selectionLimit = decision.mode === "E" ? 1 : 3;
@@ -2581,7 +2581,7 @@ async function handleChat(request, env) {
     variant: decision.intent,
     intent: analysis.intent,
     analysis,
-    _turnDraft: { summary: result.turn_text?.summary || result.message, reason: result.turn_text?.reason, question: result.next_question || analysis.next_question },
+    _turnDraft: { summary: result.turn_text?.summary || result.message, reason: result.turn_text?.reason, question: result.next_question },
   }));
 }
 
@@ -2604,8 +2604,8 @@ export default {
       try {
         const payload = await request.clone().json().catch(() => ({}));
         const response = await handleChat(request, env);
-        if (!response.ok) return response;
-        return json(applyTurnPolicy(await response.json(), payload));
+        const body = await response.json();
+        return json(finalizeConversationCopy(response.ok ? applyTurnPolicy(body, payload) : body), response.status);
       } catch (error) {
         console.error("Chat handler failed", error instanceof Error ? error.message : "unknown error");
         return json({ error: "답변을 불러오지 못했어요. 다시 시도해 주세요." }, 500);

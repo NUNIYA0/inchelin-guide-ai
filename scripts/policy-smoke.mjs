@@ -9,6 +9,7 @@ import { testTurnPolicy } from "./turn-policy-smoke.mjs";
 import { testConversationUI } from "./conversation-ui-smoke.mjs";
 import { testSearchAxes } from "./search-axes-smoke.mjs";
 import { testAISearchPolicy } from "./ai-search-policy-smoke.mjs";
+import { testConversationCopyRegression } from "./conversation-copy-regression-smoke.mjs";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -752,7 +753,7 @@ function semanticAnalysis(overrides = {}) {
     naverResponse: { errorMessage: "Temporary upstream error" },
     naverStatus: 500,
   });
-  assert.match(result.body.message, /요청에 실패/);
+  assert.match(result.body.message, /네이버에서 맛집을 찾지 못했어요/);
   assert.equal(result.body.meta.restaurantSearchStatus, "api_request_failed");
 }
 
@@ -2131,4 +2132,5 @@ await testTurnPolicy(runCase);
 await testConversationUI(runCase);
 await testSearchAxes(runCase);
 await testAISearchPolicy(runCase);
+await testConversationCopyRegression(runCase);
 console.log("Inchelin data policy smoke tests passed.");

@@ -1,6 +1,6 @@
 import { normalizeResponseState } from './response-modes.js';
 import { withParticle } from './korean.js';
-import { FORBIDDEN_COPY } from './conversation-copy.js';
+import { FORBIDDEN_COPY, repeatsCopySentences } from './conversation-copy.js';
 import { nearbySuggestions, SEARCH_REGIONS, searchMessage } from './search-axes.js';
 
 export const IMMEDIATE_REQUEST = /바로\s*보여줘|그냥\s*추천해줘|질문\s*(?:없이|하지\s*마)/;
@@ -95,7 +95,8 @@ export function applyTurnPolicy(response, payload = {}) {
   }
   let question = plan.next_question;
   // A model may phrase an approved question, never add an axis or invent chips.
-  const proposed = proposal?.question || response.meta.analysis?.next_question;
+  // Analyst questions are routing hints only, never user-visible prose.
+  const proposed = proposal?.question;
   if (question && proposed?.slot === question.slot && typeof proposed.text === 'string'
     && proposed.text.length <= 70 && (proposed.text.match(/[?？]/g) || []).length === 1
     && !FORBIDDEN_COPY.test(proposed.text)
@@ -143,6 +144,10 @@ export function applyTurnPolicy(response, payload = {}) {
       : !state.slots.region ? '동네를 알려주시면 먹을 곳도 찾아드릴게요' : '먹고 싶은 메뉴부터 골라봐요';
   const generatedReason = candidateText(proposal?.reason);
   if (generatedReason) reason = generatedReason;
+  if (repeatsCopySentences(`${summary}. ${reason}.`)) {
+    const acknowledgment = reason.includes(',') ? reason.split(',')[0].trim() : '';
+    reason = acknowledgment && !repeatsCopySentences(`${summary}. ${acknowledgment}.`) ? acknowledgment : '';
+  }
   // Keep unverified preferences above the cards, outside the three-sentence copy.
   const notices = [];
   if (state.slots.parking === true && response.restaurants?.some(card => card.parking == null)) notices.push('주차');
