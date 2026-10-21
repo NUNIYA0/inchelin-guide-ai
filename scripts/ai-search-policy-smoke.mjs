@@ -68,7 +68,7 @@ export async function testAISearchPolicy(runCase) {
   assert.equal(vagueBare.body.meta.turnPolicy.next_question.slot, 'region');
   assert.equal(vagueBare.calls.length, 0);
   const vagueArea = await runCase({ message: '홍대입구', env, context: { responseModeState: vague.body.meta.responseModeState } });
-  assert.equal(vagueArea.body.meta.turnPolicy.next_question.slot, 'menu'); assert.ok(vagueArea.body.suggestions.includes('메뉴 탐색'));
+  assert.equal(vagueArea.body.meta.turnPolicy.next_question.slot, 'menu'); assert.ok(vagueArea.body.suggestions.includes('상관없어요'));
   const explore = await runCase({ message: '오늘 뭐 먹을지 같이 골라줘', env, context: { responseModeState: vagueArea.body.meta.responseModeState } });
   assert.equal(explore.body.meta.mode, 'A'); assert.equal(explore.body.meta.menuCards.length, 3);
   assert.equal(explore.body.meta.responseModeState.slots.region, '홍대');

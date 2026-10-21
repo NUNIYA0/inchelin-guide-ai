@@ -30,6 +30,17 @@ export function repeatsCopySentences(value) {
   return false;
 }
 
+export function compactMenuCopy(item) {
+  const shorten = (value, max) => [...String(value || '').replace(/\s+/g, ' ').trim()].slice(0, max).join('');
+  const description = shorten(item.description || item.direction, 22);
+  let reason = String(item.reason || '').trim();
+  const normalize = value => value.replace(/[^가-힣a-z0-9]/gi, '');
+  const descText = normalize(description), reasonText = normalize(reason);
+  if ([...reason].length > 30 || !/(?:요|세요)[.!]?$/u.test(reason) || FORBIDDEN_COPY.test(reason)
+    || descText && (reasonText.includes(descText) || descText.includes(reasonText))) reason = '';
+  return { ...item, description, direction: description, reason };
+}
+
 // Exactly one retry on style violations. Caller supplies the same bounded generation path.
 export async function generateFriendly(call) {
   let result;

@@ -36,7 +36,7 @@ export async function testConversationUI(runCase) {
   const refine = await runCase({ message: '회식이에요', env, context: { responseModeState: first.body.meta.responseModeState }, naverResponse: { items }, aiResponse: { ...clean, turn_text: { summary: '강남역 삼겹살집은 단체로 앉기 편한 쪽을 위로 올렸어요.', reason: '' } } });
   assert.doesNotMatch(refine.body.message, /앉기|단체로|검증|정렬|후보|입니다/);
   assert.match(refine.body.meta.notice, /단체석.*매장 확인/);
-  assert.deepEqual(refine.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기', '비교하기']);
+  assert.deepEqual(refine.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기']);
 
   // Menu choices are made by the model inside the allowlist, with contextual reasons.
   const menus = { intro: '쌀쌀한 날 친구들과 나눠 먹을 메뉴를 골라볼게요.', menus: [
@@ -88,6 +88,8 @@ export async function testConversationUI(runCase) {
     constructor(tag) { this.tag = tag; this.children = []; this.events = {}; this.attributes = {}; this.className = ''; this.classList = { add: name => { this.className += ' ' + name; } }; }
     appendChild(node) { this.children.push(node); node.parent = this; return node; }
     append(...nodes) { nodes.forEach(node => this.appendChild(node)); }
+    set innerHTML(value) { this.children = []; }
+    querySelectorAll(selector) { return nodes(this).filter(node => selector.split(',').some(part => node.className.split(' ').includes(part.trim().slice(1)))); }
     set textContent(value) { this.text = value; this.children = []; }
     get textContent() { return (this.text || '') + this.children.map(node => node.textContent).join(' '); }
     setAttribute(key, value) { this.attributes[key] = value; }
@@ -95,8 +97,8 @@ export async function testConversationUI(runCase) {
     click() { this.events.click?.(); }
     remove() { this.parent.children = this.parent.children.filter(node => node !== this); }
   }
-  const sent = [], host = new Node('div');
-  const document = { createElement: tag => new Node(tag) };
+  const sent = [], host = new Node('div'), trayHost = new Node('section');
+  const document = { createElement: tag => new Node(tag), getElementById: id => id === 'comparisonTray' ? trayHost : null };
   const openedAxes = [];
   const renderer = new Function('document', 'messagesEl', 'appendLimitedMarkdown', 'ask', 'resolveRestaurantDetail', 'showToast', 'isCurrentLocationIntent', 'canUseCurrentLocation', 'chooseMenuCard', 'routeQuestion', 'openSearchPicker', renderSource + '\nreturn { renderRestaurantCards, renderMessage };')(
     document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹고 싶어요']), value => sent.push([value]), axis => openedAxes.push(axis));
@@ -125,10 +127,24 @@ export async function testConversationUI(runCase) {
   ofClass(photo, 'restaurant-image')[0].events.error();
   assert.equal(ofClass(photo, 'restaurant-media').length, 0);
   const compareButtons = nodes(group).filter(node => node.tag === 'button' && node.text === '비교에 담기');
-  compareButtons[0].click(); compareButtons[1].click();
-  const compareAction = ofClass(group, 'compare-tray-action')[0];
-  assert.equal(compareAction.hidden, false); compareAction.click();
+  compareButtons[0].click();
+  assert.equal(ofClass(trayHost, 'comparison-submit')[0].disabled, true);
+  assert.match(trayHost.textContent, /1곳 더 담아 주세요/);
+  compareButtons[1].click();
+  assert.equal(ofClass(group, 'compare-tray-action').length, 0);
+  const compareAction = ofClass(trayHost, 'comparison-submit')[0];
+  assert.equal(compareAction.disabled, false); compareAction.click();
   assert.equal(sent.at(-1)[1].compareCards.length, 2);
+  assert.equal(sent.at(-1)[0], '첫고기랑 둘고기 비교해줘');
+  compareButtons[2].click();
+  const fourthGroup = renderer.renderRestaurantCards([{ ...card, id: 'fourth', name: '네번째집' }]);
+  nodes(fourthGroup).find(node => node.tag === 'button' && node.text === '비교에 담기').click();
+  assert.equal(ofClass(trayHost, 'comparison-item').length, 3, 'tray is capped at three across responses');
+  ofClass(trayHost, 'comparison-item')[0].click();
+  assert.equal(ofClass(trayHost, 'comparison-item').length, 2);
+  assert.equal(compareButtons[0].attributes['aria-pressed'], 'false', 'removal updates original card button');
+  ofClass(trayHost, 'comparison-item')[0].click();
+  assert.equal(ofClass(trayHost, 'comparison-submit')[0].disabled, true);
   const message = renderer.renderMessage({ role: 'assistant', content: first.body.message, restaurants: first.body.restaurants, quickReplies: first.body.suggestions, meta: first.body.meta });
   const bubble = ofClass(message, 'ai-bubble')[0];
   const conditions = ofClass(message, 'result-conditions')[0];
@@ -138,7 +154,7 @@ export async function testConversationUI(runCase) {
   const classes = bubble.children.map(node => node.className);
   assert.ok(classes.indexOf('message-copy') < classes.indexOf('restaurant-group'));
   assert.ok(classes.indexOf('restaurant-group') < classes.indexOf('turn-question'));
-  assert.ok(classes.indexOf('turn-question') < classes.indexOf('quick-replies quick-replies-followup'));
+  assert.ok(classes.indexOf('turn-question') < classes.indexOf('quick-replies quick-replies-followup answer-chips'));
   assert.equal(ofClass(message, 'message-copy')[0].textContent, first.body.meta.turnPolicy.intro);
   assert.equal(ofClass(message, 'turn-question').length, 1);
   const menuNode = renderer.renderMessage({ role: 'assistant', content: menu.body.message, restaurants: [], quickReplies: menu.body.suggestions, meta: menu.body.meta });
@@ -147,6 +163,26 @@ export async function testConversationUI(runCase) {
   const choice = ofClass(menuNode, 'menu-choice')[0]; choice.click();
   assert.equal(sent.at(-1)[0], '국밥 먹고 싶어요');
   assert.equal(ofClass(menuNode, 'menu-more').length, 1);
+  const menuBubble = ofClass(menuNode, 'ai-bubble')[0];
+  const menuClasses = menuBubble.children.map(node => node.className);
+  assert.ok(menuClasses.indexOf('message-copy') < menuClasses.indexOf('menu-hint'));
+  assert.ok(menuClasses.indexOf('menu-hint') < menuClasses.indexOf('quick-replies menu-cards'));
+  assert.ok(menuClasses.indexOf('quick-replies menu-cards') < menuClasses.indexOf('turn-question'));
+  assert.ok(menu.body.meta.menuCards.every(item => [...item.description].length <= 22 && [...item.reason].length <= 30));
+  assert.ok(ofClass(message, 'action-chips').every(group => group.children.length <= 2));
+  assert.ok(ofClass(message, 'answer-chips')[0].textContent.includes('상관없어요'));
+  assert.doesNotMatch(ofClass(message, 'action-chips')[0].textContent, /비교하기|메뉴 탐색/);
+  assert.equal(ofClass(group, 'restaurant-source').length, 1);
+  assert.ok(nodes(group).indexOf(ofClass(group, 'restaurant-source')[0]) > nodes(group).indexOf(ofClass(group, 'restaurant-list')[0]));
+  renderer.renderMessage({ role: 'user', content: '회식이에요' });
+  assert.equal(ofClass(message, 'answer-chips')[0].hidden, true, 'answered question choices disappear on next user turn');
+  assert.equal(ofClass(menuNode, 'menu-cards')[0].hidden, true);
+  assert.match(html, /\.menu-choice \.quick-reply-title \{ font: 700 17px/);
+  assert.match(html, /\.quick-reply-reason \{[^}]*font-size: 14px; font-weight: 400/);
+  assert.match(html, /\.chat-scroll-area \{[^}]*overflow: visible/);
+  assert.doesNotMatch(html, /chatScrollArea\.scroll(?:To|Top)/);
+  assert.match(html, /\.chat-dock \{ position: fixed/);
+  assert.match(html, /\.answer-chips\[hidden\][^}]*display: none !important/);
   assert.match(html, /\.restaurant-list\s*\{[^}]*flex-direction:\s*column/);
   assert.doesNotMatch(html, /restaurant-carousel-nav|restaurant-placeholder/);
   // New registered DB image fields are optional; no image endpoint is used.

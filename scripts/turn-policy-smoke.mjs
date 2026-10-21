@@ -27,7 +27,7 @@ export async function testTurnPolicy(runCase) {
   assert.equal(first.body.meta.turnPolicy.cardFirst, false);
   assert.ok(first.body.meta.turnPolicy.intro);
   assert.equal(first.body.meta.turnPolicy.next_question.slot, 'companion');
-  assert.deepEqual(first.body.suggestions, ['혼자', '2~3명', '회식', '가족']);
+  assert.deepEqual(first.body.suggestions, ['혼자', '2~3명', '회식', '가족', '상관없어요']);
   assert.deepEqual(first.body.suggestions, first.body.meta.turnPolicy.next_question.chips.map(chip => chip.label));
   assert.equal(first.body.meta.turnPolicy.questionSource, 'model');
   assert.match(first.body.message, /^강남역 삼겹살로 먼저 식당 3곳을 골랐어요/);
@@ -42,7 +42,7 @@ export async function testTurnPolicy(runCase) {
   assert.ok(refined.calls.some(call => call.href.includes('/search/v1/local') && new URL(call.href).searchParams.get('query').includes('회식')));
   assert.equal(questions(refined.body), 0);
   assert.match(refined.body.message, /회식으로 가시는군요/);
-  assert.deepEqual(refined.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기', '비교하기']);
+  assert.deepEqual(refined.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기']);
   boundedCopy(refined.body);
   // 3. Explicit fast path never adds a question, even when a slot could refine.
   for (const message of ['바로 보여줘', '그냥 추천해줘']) {
@@ -59,7 +59,7 @@ export async function testTurnPolicy(runCase) {
   assert.equal(narrow.body.meta.analysis.can_search, false);
   assert.deepEqual(narrow.body.restaurants, []);
   assert.equal(questions(narrow.body), 1);
-  assert.ok(narrow.body.suggestions.includes('현재 위치 연결'));
+  assert.ok(narrow.body.suggestions.includes('현재 위치'));
   assert.equal(narrow.calls.length, 0);
   boundedCopy(narrow.body);
   const regionOnly = await runCase({ message: '홍대에서 먹을 곳 찾아줘', env });
@@ -76,7 +76,7 @@ export async function testTurnPolicy(runCase) {
   let response = await runCase({ message: '강남에서 한식 먹을 곳 찾아줘', env, naverResponse: places('강남') });
   assert.equal(response.body.meta.turnPolicy.next_question.slot, 'companion');
   for (const [message, area, menu, next] of [
-    ['가족과 함께 가요', '강남', '삼겹살', 'sub_menu'],
+    ['가족과 함께 가요', '강남', '삼겹살', null],
     ['국밥 먹고 싶어요', '강남', '국밥', 'sub_region'],
     ['홍대에서 찾아줘', '홍대', '국밥', null],
   ]) {
@@ -86,10 +86,10 @@ export async function testTurnPolicy(runCase) {
     assert.ok(response.body.meta.responseModeState.refinementQuestionCount <= 2);
     boundedCopy(response.body);
   }
-  assert.equal(response.body.meta.responseModeState.questionCount, 3);
-  assert.equal(response.body.meta.responseModeState.refinementQuestionCount, 2);
+  assert.equal(response.body.meta.responseModeState.questionCount, 2);
+  assert.equal(response.body.meta.responseModeState.refinementQuestionCount, 1);
   assert.equal(questions(response.body), 0);
-  assert.equal(new Set(response.body.meta.responseModeState.askedSlots).size, 3);
+  assert.equal(new Set(response.body.meta.responseModeState.askedSlots).size, 2);
   // 7. FAQ, comparison and a specific restaurant cannot start a new interview.
   const faq = await runCase({ message: '추천은 어떤 기준으로 하나요?', env, context: { responseModeState: first.body.meta.responseModeState } });
   const compare = await runCase({ message: '첫 번째랑 두 번째 비교해줘', env, context: { responseModeState: first.body.meta.responseModeState } });

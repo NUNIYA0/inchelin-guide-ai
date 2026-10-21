@@ -19,15 +19,14 @@ export function turnPreferences(previous, latest, slots) {
 }
 export function questionTemplate(slot, state, response) {
   if (slot === 'region') return { slot, text: '어느 지역에서 찾을까요?', chips: [
-    chip('현재 위치 연결', '내 주변에서 먹을 곳 찾아줘'), chip('강남역', '강남역에서 찾아줘'),
+    chip('현재 위치', '내 주변에서 먹을 곳 찾아줘'), chip('강남역', '강남역에서 찾아줘'),
     chip('홍대', '홍대에서 찾아줘'), chip('역삼', '역삼에서 찾아줘'),
   ] };
   if (slot === 'menu') {
     const candidates = response.meta?.mode === 'A' ? (response.suggestions || []).filter(value => value.includes('|')).map(value => {
       const label = value.split('|')[0]; return chip(label, label + ' 먹고 싶어요');
     }) : MENU_CHIPS;
-    return { slot, text: '어떤 메뉴로 좁혀볼까요?', chips: [...candidates,
-      response.meta?.mode === 'A' ? chip('다른 메뉴 보기', '다른 메뉴도 추천해줘') : chip('메뉴 탐색', '오늘 뭐 먹을지 같이 골라줘')] };
+    return { slot, text: '어떤 메뉴가 끌리세요?', chips: response.meta?.mode === 'A' ? [] : candidates };
   }
   if (slot === 'companion') return { slot, text: '누구와 가세요?', chips: [
     chip('혼자', '혼자 먹을 거예요'), chip('2~3명', '2~3명이 가요'), chip('회식', '회식이에요'), chip('가족', '가족과 함께 가요'),
@@ -35,11 +34,11 @@ export function questionTemplate(slot, state, response) {
   if (slot === 'sub_menu') {
     const menu = state.slots.food_type;
     const options = { 고기: ['삼겹살', '갈비', '불고기'], 한식: ['국밥', '김치찌개', '비빔밥'], 면: ['냉면', '칼국수', '쌀국수'], 일식: ['초밥', '라멘', '돈까스'], 중식: ['마라탕', '짬뽕', '볶음밥'], 양식: ['파스타', '피자', '스테이크'], 분식: ['떡볶이', '만두'], 카페: ['베이커리', '디저트'] }[menu];
-    if (options) return { slot, text: '그중 어떤 세부 메뉴가 끌리세요?', chips: options.map(menu => chip(menu, menu + ' 먹고 싶어요')) };
+    if (options) return { slot, text: '어떤 메뉴가 끌리세요?', chips: options.map(menu => chip(menu, menu + ' 먹고 싶어요')) };
   }
   if (slot === 'sub_region') {
     const options = { 서울: ['강남역', '홍대', '성수'], 강남: ['강남역', '역삼', '선릉역'], 홍대: ['홍대입구역', '합정역', '상수역'], 부산: ['서면', '해운대', '광안리'] }[state.slots.region];
-    if (options) return { slot, text: '어느 동네나 역 쪽이 편하세요?', chips: options.map(region => chip(region, region + '에서 찾아줘')) };
+    if (options) return { slot, text: '어느 쪽이 편하세요?', chips: options.map(region => chip(region, region + '에서 찾아줘')) };
   }
   return null;
 }
@@ -47,7 +46,7 @@ export function planTurn(response, previousValue = {}, latest = '') {
   const previous = normalizeResponseState(previousValue);
   const state = normalizeResponseState(response.meta?.responseModeState || previous);
   const intent = response.meta?.analysis?.intent || response.meta?.intent || response.meta?.variant || '';
-  const exempt = ['service', 'compare', 'specific_place', 'general', 'food_talk', 'out_of_scope', 'hard_reset', 'linked_place'].includes(intent)
+  const exempt = ['service', 'compare', 'specific_place', 'general', 'food_talk', 'out_of_scope', 'hard_reset', 'linked_place', 'preference_skip'].includes(intent)
     || ['GENERAL', 'E'].includes(response.meta?.mode) || response.meta?.variant === 'compare';
   const hasRegion = Boolean(state.slots.region || state.slots.use_current_location);
   const hasFood = Boolean(state.slots.menu || state.slots.food_type);
@@ -57,7 +56,8 @@ export function planTurn(response, previousValue = {}, latest = '') {
   state.stage = exempt ? previous.stage : stage;
   state.preferences = turnPreferences(state.preferences, latest, state.slots);
   let next_question = null;
-  if (!exempt && !IMMEDIATE_REQUEST.test(latest) && state.questionCount < 3 && (stage !== 'refining' || state.refinementQuestionCount < 2)) {
+  const optionalPause = stage === 'refining' && hadCards && Boolean(previous.pendingQuestionSlot);
+  if (!exempt && !optionalPause && !IMMEDIATE_REQUEST.test(latest) && state.questionCount < 3 && (stage !== 'refining' || state.refinementQuestionCount < 2)) {
     const requestedRegion = response.meta?.mode === 'B' && /지역\s*(?:넓히기|바꾸기|변경)/.test(latest);
     const axes = requestedRegion ? ['region'] : !hasFood && (hasRegion || response.meta?.mode === 'A') ? ['menu'] : !hasRegion ? ['region'] : response.restaurants?.length ? [
       !state.slots.companion && !state.preferences.companion && 'companion',
@@ -98,7 +98,7 @@ export function applyTurnPolicy(response, payload = {}) {
   // Analyst questions are routing hints only, never user-visible prose.
   const proposed = proposal?.question;
   if (question && proposed?.slot === question.slot && typeof proposed.text === 'string'
-    && proposed.text.length <= 70 && (proposed.text.match(/[?？]/g) || []).length === 1
+    && proposed.text.length <= 24 && (proposed.text.match(/[?？]/g) || []).length === 1
     && !FORBIDDEN_COPY.test(proposed.text)
     && !/예산|분위기|주차|평점|인기|영업/.test(proposed.text)
     && ({ companion: /누구|몇\s*명|동행|어떤\s*분|함께/, region: /지역|동네|역/, menu: /메뉴|음식|방향/, sub_menu: /메뉴|음식/, sub_region: /지역|동네|역/ }[question.slot])?.test(proposed.text)) {
@@ -157,6 +157,7 @@ export function applyTurnPolicy(response, payload = {}) {
   if (count && state.slots.companion === '회식' && !notices.includes('단체석')) notices.push('단체석');
   const notice = count && notices.length ? `${unique(notices).join('·')} 정보는 아직 알 수 없어 매장 확인이 필요해요.` : '';
   if (question) {
+    question = { ...question, chips: [...question.chips, chip('상관없어요', '상관없어요')] };
     state.askedSlots = unique([...state.askedSlots, question.slot]);
     state.questionCount++;
     if (plan.stage === 'refining') state.refinementQuestionCount++;
@@ -164,7 +165,8 @@ export function applyTurnPolicy(response, payload = {}) {
   state.pendingQuestionSlot = question?.slot || null;
   state.previousOpenings = [...state.previousOpenings, opening(summary)].slice(-3);
   analysis.next_question = question;
-  let suggestions = question ? question.chips.map(value => response.meta.mode === 'A' ? (response.suggestions || []).find(old => old.split('|')[0] === value.label) || value.label : value.label) : count ? [] : response.suggestions || [];
+  let suggestions = response.meta.mode === 'A' ? [...(response.suggestions || []), ...(question?.chips || []).map(value => value.label)]
+    : question ? question.chips.map(value => value.label) : count ? [] : response.suggestions || [];
   if (IMMEDIATE_REQUEST.test(latest)) suggestions = [];
   // No-results and error explanations remain specific and must not claim a search succeeded.
   const sparse = count > 0 && count < 3;
@@ -176,7 +178,7 @@ export function applyTurnPolicy(response, payload = {}) {
     meta: { ...cleanMeta, analysis, responseModeState: state, notice,
       ...((count || response.meta.restaurantSearchStatus === 'no_results') && (state.slots.region || state.slots.use_current_location) && (state.slots.menu || state.slots.food_type) ? { searchConditions: { region: state.slots.use_current_location ? '현재 위치' : state.slots.region, food: state.slots.menu || state.slots.food_type } } : {}),
       turnPolicy: { ...analysis, cardFirst: false, intro: !count && !['A', 'B'].includes(response.meta.mode) ? response.message : intro, questionText: question?.text || '',
-        actionChips: (count || expand) && !IMMEDIATE_REQUEST.test(latest) ? [...(expand ? nearbySuggestions(state.slots.region, state.slots.menu || state.slots.food_type).map(item => item.label) : ['다른 곳도 보여줘']), '조건 바꾸기', ...(count > 1 ? ['비교하기'] : [])] : [],
+        actionChips: (count || expand) && !IMMEDIATE_REQUEST.test(latest) ? count ? ['다른 곳도 보여줘', '조건 바꾸기'] : ['조건 바꾸기'] : [],
         expansionChoices: expand ? nearbySuggestions(state.slots.region, state.slots.menu || state.slots.food_type) : [],
         questionSource: question && proposed?.text === question.text ? 'model' : question ? 'template' : null } } };
 }

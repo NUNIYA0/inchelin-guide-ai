@@ -130,6 +130,8 @@ export function normalizeResponseState(value = {}) {
     name: cleanString(card.name, 180) || "",
     address: cleanString(card.address, 300) || "",
     category: cleanString(card.category, 160) || "",
+    foodLabel: cleanString(card.foodLabel, 80) || "",
+    regionLabel: cleanString(card.regionLabel, 80) || "",
     phone: cleanString(card.phone, 80) || "",
     openingHours: cleanString(card.openingHours, 500) || "",
     businessStatus: ["active", "temporarily_closed", "permanently_closed"].includes(card.businessStatus) ? card.businessStatus : null,

@@ -27,10 +27,10 @@
       --sidebar: 278px;
     }
     * { box-sizing: border-box; }
-    html, body { height: 100%; }
+    html, body { min-height: 100%; height: auto; }
     body {
       margin: 0;
-      overflow: hidden;
+      overflow-x: clip;
       color: var(--ink);
       background: #fff;
       font-family: "Sebang Gothic", "Noto Sans KR", sans-serif;
@@ -38,9 +38,10 @@
     }
     button, textarea, input, select { font: inherit; }
     button { color: inherit; }
-    .app { height: 100dvh; min-height: 0; display: flex; overflow: hidden; }
+    .app { min-height: 100dvh; display: flex; }
     .rail {
-      position: relative;
+      position: fixed;
+      inset: 0 auto 0 0; height: 100dvh;
       z-index: 30;
       width: var(--rail);
       flex: 0 0 var(--rail);
@@ -134,16 +135,16 @@
     .sidebar-login { width: 100%; height: 39px; margin-top: 12px; border: 0; border-radius: 9px; background: #000; color: white; font-weight: 700; cursor: pointer; }
     .main {
       min-width: 0;
-      height: 100dvh;
-      min-height: 0;
+      min-height: 100dvh;
       flex: 1;
       display: flex;
       flex-direction: column;
       position: relative;
-      overflow: hidden;
+      overflow: visible;
+      margin-left: var(--rail);
       transition: margin-left .28s cubic-bezier(.2,.8,.2,1);
     }
-    .main.shift { margin-left: calc(var(--sidebar) - var(--rail)); }
+    .main.shift { margin-left: var(--sidebar); }
     .topbar {
       height: 74px;
       flex: 0 0 74px;
@@ -194,7 +195,7 @@
     .main.chat-mode .workspace {
       place-items: stretch;
       padding: 0 24px;
-      overflow: hidden;
+      overflow: visible;
     }
     .welcome { width: min(720px, 100%); transform: translateY(-3px); }
     h1 {
@@ -265,20 +266,22 @@
     .suggestion:hover { color: #111; padding-left: 9px; }
     .suggestion-arrow-wrap { width: 20px; height: 20px; flex: 0 0 20px; display: grid; place-items: center; }
     .suggestion-arrow { width: 18px; height: auto; display: block; object-fit: contain; }
-    .chat-view { width: min(760px, 100%); height: 100%; min-height: 0; display: none; flex-direction: column; overflow: hidden; margin: 0 auto; }
+    .chat-view { width: min(760px, 100%); display: none; flex-direction: column; overflow: visible; margin: 0 auto; }
     .chat-view.active { display: flex; }
     .shared-banner { flex: 0 0 auto; padding: 8px 2px 10px; color: #777; font-size: 12px; line-height: 1.4; }
     .shared-banner[hidden] { display: none; }
-    .chat-scroll-area { flex: 1 1 auto; min-height: 0; width: 100%; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; scroll-padding-bottom: 118px; -webkit-overflow-scrolling: touch; }
-    @media (min-width: 769px) {
-      .chat-scroll-area { scrollbar-width: thin; scrollbar-color: #cfcfcf transparent; }
-      .chat-scroll-area:hover { scrollbar-color: #bdbdbd transparent; }
-      .chat-scroll-area::-webkit-scrollbar { width: 7px; }
-      .chat-scroll-area::-webkit-scrollbar-track { background: transparent; }
-      .chat-scroll-area::-webkit-scrollbar-thumb { border-radius: 999px; background: #d4d4d4; }
-      .chat-scroll-area:hover::-webkit-scrollbar-thumb { background: #bdbdbd; }
-    }
-    .messages { min-height: 100%; padding: 22px 6px 118px; }
+    .chat-scroll-area { width: 100%; overflow: visible; }
+    .messages { padding: 22px 6px calc(var(--dock-height, 200px) + 24px); }
+    .message { scroll-margin-top: 72px; }
+    .chat-dock { position: fixed; z-index: 25; bottom: 0; left: var(--rail); right: 0; padding: 8px 16px max(4px, env(safe-area-inset-bottom)); background: #fff; border-top: 1px solid #eee; }
+    .main.shift .chat-dock { left: var(--sidebar); }
+    .chat-dock-inner { width: min(760px, 100%); margin: auto; }
+    .comparison-tray { padding: 8px 0; font: 400 14px/1.5 system-ui, sans-serif; }
+    .comparison-tray[hidden] { display: none; }
+    .comparison-items { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+    .comparison-item { max-width: 100%; min-height: 40px; padding: 8px 12px; border: 1px solid #ddd; border-radius: 999px; background: #fafafa; overflow-wrap: anywhere; cursor: pointer; }
+    .comparison-submit { width: 100%; min-height: 44px; border: 0; border-radius: 10px; background: #111; color: #fff; cursor: pointer; }
+    .comparison-submit:disabled { background: #eee; color: #666; cursor: default; }
     .message { max-width: 74%; margin: 0 0 24px; font-size: 14px; letter-spacing: -.01em; white-space: pre-wrap; word-break: keep-all; overflow-wrap: break-word; }
     .message.user { width: fit-content; margin-left: auto; border-radius: 20px 20px 5px 20px; background: #f1f1f1; padding: 12px 16px; font-size: 14px; font-weight: 400; line-height: 1.58; }
     .message.ai { width: 100%; max-width: 100%; margin-bottom: 26px; display: flex; flex-direction: column; align-items: flex-start; gap: 8px; color: #303030; font-size: 14px; font-weight: 400; line-height: 1.6; }
@@ -303,13 +306,17 @@
     .restaurant-detail-area { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 12px 16px 16px; }
     .restaurant-map-link { display: inline-flex; min-height: 44px; margin: 0; padding: 8px 12px; align-items: center; justify-content: center; border: 1px solid #dcdcdc; border-radius: 10px; background: #fff; color: #333; font: 500 14px/1.4 system-ui, sans-serif; text-decoration: none; cursor: pointer; }
     .restaurant-map-link[aria-pressed="true"] { color: #fff; background: #222; }
+    .restaurant-map-link[aria-pressed="true"]:hover { color: #fff; background: #333; }
     .restaurant-source { margin: 8px 2px 0; color: #666; font: 400 12px/1.5 system-ui, sans-serif; }
-    .compare-tray-action { width: 100%; margin-top: 8px; }
-    .compare-tray-action[hidden] { display: none; }
     .turn-question { margin: 12px 0 0; font-size: 14px; }
-    .quick-reply-reason { grid-column: 1; font-size: 14px; line-height: 1.5; color: #555; }
-    .quick-reply.menu-choice { min-height: 108px; border-color: #d6d6d6; }
-    .menu-choice .quick-reply-description { font-size: 14px; }
+    .quick-reply-reason { grid-column: 1; font-size: 14px; font-weight: 400; line-height: 1.5; color: #333; }
+    .quick-replies.menu-cards { display: grid; grid-template-columns: 1fr; gap: 12px; }
+    .quick-reply.menu-choice { padding: 16px; min-height: 100px; border-color: #d6d6d6; }
+    .menu-choice .quick-reply-title { font: 700 17px/1.4 system-ui, sans-serif; }
+    .menu-choice .quick-reply-description { font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
+    .menu-choice .quick-reply-description, .menu-choice .quick-reply-reason { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .menu-choice:active { transform: scale(.985); background: #eee; border-color: #888; }
+    .menu-hint { margin: 8px 0 0; font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
     .menu-choice .quick-reply-arrow { grid-row: 1 / span 3; }
     .restaurant-map-link:hover { background: #f7f7f7; }
     .restaurant-map-link:disabled { color: #999; background: #f7f7f7; cursor: default; }
@@ -326,8 +333,12 @@
     .quick-reply-arrow { grid-column: 2; grid-row: 1 / span 2; align-self: center; color: #888; font-size: 18px; line-height: 1; }
     .quick-reply:disabled { opacity: .48; cursor: default; }
     .quick-replies.quick-replies-followup { display: flex; flex-wrap: wrap; gap: 8px; }
-    .quick-reply.quick-reply-chip { width: auto; min-height: 32px; padding: 6px 12px; border-radius: 999px; display: inline-flex; box-shadow: none; }
-    .quick-reply.quick-reply-chip .quick-reply-title { font-size: 12px; font-weight: 500; }
+    .quick-reply.quick-reply-chip { width: auto; min-height: 40px; padding: 8px 12px; border-radius: 999px; display: inline-flex; align-items: center; box-shadow: none; font-size: 14px; }
+    .quick-reply.quick-reply-chip .quick-reply-title { font-size: 14px; font-weight: 500; }
+    .answer-chips { margin-top: 8px; }
+    .answer-chips[hidden], .menu-cards[hidden], .action-chips[hidden], .menu-more[hidden] { display: none !important; }
+    .action-chips { margin-top: 16px; border-top: 1px solid #f1f1f1; padding-top: 12px; }
+    .action-chips .quick-reply-chip, .menu-more, .skip-chip { border-color: #e6e6e6; background: #fafafa; color: #555; }
     .quick-reply.menu-more { grid-column: 1 / -1; justify-self: start; }
     .turn-notice { margin: 0 0 8px; color: #555; font: 400 14px/1.5 system-ui, sans-serif; }
     .result-conditions .meal-chip { font: 400 14px/1.5 system-ui, sans-serif; }
@@ -592,11 +603,12 @@
     @keyframes blink { 0%, 80%, 100% { opacity: .35; } 40% { opacity: 1; } }
     @media (max-width: 768px) {
       :root { --sidebar: min(86vw, 320px); }
-      html, body { width: 100%; overflow-x: hidden; }
+      html, body { width: 100%; overflow-x: clip; }
       body.drawer-open { overflow: hidden; }
       .app { width: 100%; min-height: 100dvh; }
       .rail { display: none; }
-      .main { width: 100%; height: 100dvh; min-height: 100dvh; margin-left: 0 !important; overflow: hidden; }
+      .main { width: 100%; min-height: 100dvh; margin-left: 0 !important; overflow: visible; }
+      .chat-dock, .main.shift .chat-dock { left: 0; }
       .topbar { display: none; }
       .mobile-header {
         position: sticky;
@@ -661,8 +673,8 @@
       .suggestion-arrow-wrap { align-self: flex-start; }
       .popover { position: fixed; top: calc(56px + env(safe-area-inset-top)); right: 12px; }
       .chat-view { width: 100%; height: auto; flex: 1 1 auto; min-height: 0; }
-      .main.chat-mode .workspace { padding: 0 16px; overflow: hidden; }
-      .messages { min-height: 100%; padding: 18px 2px 124px; }
+      .main.chat-mode .workspace { padding: 0 16px; overflow: visible; }
+      .messages { padding: 18px 0 calc(var(--dock-height, 220px) + 24px); }
       .message { max-width: 75%; font-size: 14px; }
       .message.user { padding: 12px 16px; font-size: 14px; line-height: 1.58; }
       .message.ai { width: 100%; max-width: 100%; gap: 8px; font-size: 14px; line-height: 1.6; }
@@ -772,6 +784,8 @@
           <div class="chat-scroll-area" id="chatScrollArea">
             <div class="messages" id="messages" aria-live="polite"></div>
           </div>
+          <div class="chat-dock" id="chatDock"><div class="chat-dock-inner">
+          <section class="comparison-tray" id="comparisonTray" aria-label="비교 트레이" hidden></section>
           <nav class="plugin-shortcuts" id="chatPluginShortcuts" aria-label="고정한 플러그인 바로가기" hidden></nav>
           <form class="composer chat-composer" id="chatForm">
             <textarea id="chatInput" aria-label="후속 질문 입력" placeholder="후속 질문을 입력하세요" rows="1"></textarea>
@@ -781,6 +795,7 @@
             </div>
           </form>
           <div class="disclaimer">AI 답변은 참고용이며 중요한 결정 전에는 원문과 전문가 확인이 필요합니다.</div>
+          </div></div>
         </div>
 
         <div class="guide-panel" id="guidePanel">
@@ -898,6 +913,9 @@
     const messagesEl = $('#messages');
     const sidebar = $('#sidebar');
     const main = $('#main');
+    if (typeof ResizeObserver !== 'undefined') new ResizeObserver(entries => {
+      document.documentElement.style.setProperty('--dock-height', Math.max(180, entries[0].target.getBoundingClientRect().height) + 'px');
+    }).observe($('#chatDock'));
     const scrim = $('#scrim');
     const moreMenu = $('#moreMenu');
     const taskMenu = $('#taskMenu');
@@ -1397,6 +1415,7 @@
     }
     function newChat() {
       stopGeneration(false);
+      clearComparisonTray();
       currentId = null;
       chatMessages = [];
       currentLocationName = '';
@@ -1409,7 +1428,7 @@
       $('#welcomeInput').focus();
     }
     function isNearConversationBottom() {
-      return chatScrollArea.scrollHeight - chatScrollArea.scrollTop - chatScrollArea.clientHeight < 120;
+      return document.documentElement.scrollHeight - window.scrollY - window.innerHeight < 240;
     }
     function appendLimitedMarkdown(parent, text) {
       const blocks = String(text).split(/\n{2,}/).map(block => block.trim()).filter(Boolean);
@@ -1528,16 +1547,37 @@
       }
     }
     const comparisonTray = new Map();
+    const comparisonButtons = new Map();
+    function comparisonMessage(cards) {
+      return cards.map((card, index) => {
+        if (index === cards.length - 1) return card.name;
+        const code = card.name.trim().charCodeAt(card.name.trim().length - 1) - 0xac00;
+        return card.name + (code >= 0 && code < 11172 && code % 28 ? '이랑' : '랑');
+      }).join(' ') + ' 비교해줘';
+    }
+    function renderComparisonTray() {
+      for (const [id, buttons] of comparisonButtons) for (const button of buttons) {
+        const selected = comparisonTray.has(id); button.textContent = selected ? '✓ 담았어요' : '비교에 담기'; button.setAttribute('aria-pressed', String(selected));
+      }
+      const host = document.getElementById?.('comparisonTray');
+      if (!host) return;
+      host.innerHTML = ''; host.hidden = comparisonTray.size === 0;
+      const items = document.createElement('div'); items.className = 'comparison-items';
+      for (const card of comparisonTray.values()) {
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'comparison-item'; remove.textContent = card.name + ' ×';
+        remove.setAttribute('aria-label', card.name + ' 비교에서 빼기');
+        remove.addEventListener('click', () => { comparisonTray.delete(card.id); renderComparisonTray(); }); items.appendChild(remove);
+      }
+      const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'comparison-submit'; compare.disabled = comparisonTray.size < 2;
+      compare.textContent = comparisonTray.size < 2 ? '1곳 더 담아 주세요' : '비교하기';
+      compare.addEventListener('click', () => { const cards = [...comparisonTray.values()]; if (cards.length >= 2) ask(comparisonMessage(cards), { compareCards: cards }); });
+      host.append(items, compare);
+    }
+    function clearComparisonTray() { comparisonTray.clear(); comparisonButtons.clear(); renderComparisonTray(); }
     function renderRestaurantCards(restaurants) {
       const group = document.createElement('section'); group.className = 'restaurant-group';
       const list = document.createElement('div'); list.className = 'restaurant-list';
       list.setAttribute('aria-label', '맛집 목록');
-      const trayAction = document.createElement('button'); trayAction.type = 'button'; trayAction.className = 'restaurant-map-link compare-tray-action';
-      const updateTray = () => { trayAction.hidden = comparisonTray.size < 2; trayAction.textContent = '담은 식당 ' + comparisonTray.size + '곳 비교하기'; };
-      trayAction.addEventListener('click', () => {
-        const cards = [...comparisonTray.values()].slice(0, 3);
-        if (cards.length >= 2) ask(cards.map(card => card.name).join('랑 ') + ' 비교해줘', { compareCards: cards });
-      });
       restaurants.slice(0, 3).forEach(restaurant => {
         const card = document.createElement('article'); card.className = 'restaurant-card';
         const content = document.createElement('div'); content.className = 'restaurant-card-content';
@@ -1571,20 +1611,21 @@
           detail.addEventListener('click', () => resolveRestaurantDetail(restaurant, actions)); actions.appendChild(detail);
         }
         const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-map-link';
-        const updateCompare = () => { const selected = comparisonTray.has(restaurant.id); compare.textContent = selected ? '✓ 비교에 담았어요' : '비교에 담기'; compare.setAttribute('aria-pressed', String(selected)); };
+        if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());
+        comparisonButtons.get(restaurant.id).add(compare);
         compare.addEventListener('click', () => {
           if (comparisonTray.has(restaurant.id)) comparisonTray.delete(restaurant.id);
           else if (comparisonTray.size < 3) comparisonTray.set(restaurant.id, restaurant);
           else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
-          updateCompare(); updateTray();
+          renderComparisonTray();
         });
-        updateCompare(); actions.appendChild(compare); card.appendChild(actions); list.appendChild(card);
+        actions.appendChild(compare); card.appendChild(actions); list.appendChild(card);
       });
       group.appendChild(list);
       if (restaurants.some(restaurant => restaurant.dataSource === 'naver')) {
         const source = document.createElement('p'); source.className = 'restaurant-source'; source.textContent = '네이버 검색 기준'; group.appendChild(source);
       }
-      updateTray(); group.appendChild(trayAction); return group;
+      renderComparisonTray(); return group;
     }
     function quickReplyCard(reply) {
       const raw = String(reply || '').trim();
@@ -1594,6 +1635,7 @@
       return { title, description, prompt: title || raw };
     }
     function renderMessage(message, extra = '', follow = false) {
+      if (message.role === 'user') messagesEl.querySelectorAll('.answer-chips, .menu-cards, .menu-more, .action-chips').forEach(group => { group.hidden = true; });
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
       const copy = document.createElement('div');
@@ -1620,22 +1662,19 @@
           const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; bubble.appendChild(notice);
         }
         if (message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
-        if (message.meta?.turnPolicy?.questionText) {
-          const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
-        }
+        const isMenuTurn = message.meta?.mode === 'A' && message.meta?.menuCards?.length;
+        if (isMenuTurn) { const hint = document.createElement('p'); hint.className = 'menu-hint'; hint.textContent = '끌리는 게 없으면 먹고 싶은 걸 말해 주세요'; bubble.appendChild(hint); }
+        const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
+        const menus = document.createElement('div'); menus.className = 'quick-replies menu-cards';
+        const menuActions = document.createElement('div'); menuActions.className = 'quick-replies quick-replies-followup action-chips';
         const visibleQuickReplies = (message.quickReplies || []).filter(reply => {
           const card = quickReplyCard(reply);
+          if (['비교하기', '메뉴 탐색'].includes(card.title)) return false;
           if (isCurrentLocationIntent(card.title) && !canUseCurrentLocation()) return false;
           return true;
         });
         if (visibleQuickReplies.length) {
-          const replies = document.createElement('div');
-          replies.className = 'quick-replies';
-          const isFollowupChip = reply => Boolean(message.meta?.turnPolicy?.next_question && message.meta?.mode !== 'A') || /^(?:다른 메뉴 보기|지역 바꾸기|메뉴 바꾸기|상황 추가)$/.test(quickReplyCard(reply).title) || Boolean(message.restaurants?.length || message.meta?.restaurantSearchStatus === 'no_results') && /^(?:다른 곳도 보여줘|가까운 순으로|현재 위치 연결|조건 바꾸기|지역 넓히기|메뉴 바꾸기)$/.test(quickReplyCard(reply).title);
-          if (visibleQuickReplies.every(isFollowupChip)) replies.classList.add('quick-replies-followup');
           const isActionReply = reply => /^(?:현재 위치|내 주변|지역|다른 지역|위치)/.test(quickReplyCard(reply).title);
-          if (visibleQuickReplies.every(isActionReply)) replies.classList.add('quick-replies-actions');
-          replies.setAttribute('aria-label', '빠른 답변');
           visibleQuickReplies.forEach(reply => {
             const card = quickReplyCard(reply);
             const menuChoice = message.meta?.menuCards?.find(choice => choice.name === card.title);
@@ -1643,7 +1682,7 @@
             const actionReply = isActionReply(reply);
             const button = document.createElement('button');
             button.type = 'button';
-            const followupChip = isFollowupChip(reply);
+            const followupChip = !menuChoice;
             button.className = `quick-reply${followupChip ? ' quick-reply-chip' : actionReply ? ' quick-reply-action' : ''}`;
             if (card.title === '다른 메뉴 보기') button.classList.add('menu-more');
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
@@ -1657,10 +1696,11 @@
               description.textContent = card.description;
               button.appendChild(description);
             }
-            if (menuChoice) {
+            if (menuChoice && menuChoice.reason) {
               const reason = document.createElement('span'); reason.className = 'quick-reply-reason'; reason.textContent = menuChoice.reason; button.appendChild(reason);
-              button.classList.add('menu-choice');
             }
+            if (menuChoice) button.classList.add('menu-choice');
+            if (card.title === '상관없어요') button.classList.add('skip-chip');
             if (!actionReply && !followupChip) {
               const arrow = document.createElement('span');
               arrow.className = 'quick-reply-arrow';
@@ -1677,13 +1717,20 @@
               const policyChoice = message.meta?.turnPolicy?.next_question?.chips?.find(choice => choice.label === card.title);
               routeQuestion(policyChoice?.message || card.prompt);
             });
-            replies.appendChild(button);
+            if (menuChoice) menus.appendChild(button);
+            else if (card.title === '다른 메뉴 보기') menuActions.appendChild(button);
+            else answers.appendChild(button);
           });
-          bubble.appendChild(replies);
         }
+        if (menus.children.length) bubble.appendChild(menus);
+        if (message.meta?.turnPolicy?.questionText) {
+          const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
+        }
+        if (answers.children.length) bubble.appendChild(answers);
+        if (menuActions.children.length) bubble.appendChild(menuActions);
         if (message.meta?.turnPolicy?.actionChips?.length) {
-          const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup'; actions.setAttribute('aria-label', '이어서 할 일');
-          message.meta.turnPolicy.actionChips.forEach(label => {
+          const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
+          message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label;
             button.addEventListener('click', () => { const choice = message.meta?.turnPolicy?.expansionChoices?.find(item => item.label === label); routeQuestion(choice?.message || label); }); actions.appendChild(button);
           });
@@ -1694,13 +1741,14 @@
         item.appendChild(copy);
       }
       messagesEl.appendChild(item);
-      if (follow) requestAnimationFrame(() => chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' }));
+      if (follow) requestAnimationFrame(() => item.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
       return item;
     }
     function appendMessage(role, content, { save = true, quickReplies = [], restaurants = [], meta = null } = {}) {
       const message = normalizeMessage({ role, content, quickReplies, restaurants, meta });
       if (!message) return null;
-      const shouldFollow = isNearConversationBottom();
+      const shouldFollow = role === 'assistant' || isNearConversationBottom();
+      if (role === 'user') messagesEl.querySelectorAll('.answer-chips, .menu-cards, .menu-more, .action-chips').forEach(group => { group.hidden = true; });
       chatMessages = [...chatMessages, message];
       const item = renderMessage(message, '', shouldFollow);
       if (save) saveConversation();
@@ -1708,9 +1756,11 @@
       return item;
     }
     function renderConversation() {
+      clearComparisonTray();
       messagesEl.innerHTML = '';
       chatMessages.forEach(message => renderMessage(message));
-      requestAnimationFrame(() => { chatScrollArea.scrollTop = chatScrollArea.scrollHeight; });
+      const lastAI = messagesEl.querySelector('.message.ai:last-child');
+      requestAnimationFrame(() => lastAI?.scrollIntoView({ block: 'start' }));
     }
     function saveConversation() {
       if (!currentId) return;
@@ -1818,7 +1868,7 @@
       activeRequestController = null;
       const status = messagesEl.querySelector('.message.status');
       if (status) status.remove();
-      if (generating && showMessage) appendMessage('assistant', '답변 생성을 중단했습니다. 질문을 다듬어 다시 보내 주세요.');
+      if (generating && showMessage) appendMessage('assistant', '답변 생성을 멈췄어요. 다시 편하게 물어봐 주세요.');
       if (generating) setGenerating(false);
     }
     function showRequestError(request) {
@@ -1841,7 +1891,7 @@
       bubble.append(text, retry);
       item.append(avatar, bubble);
       messagesEl.appendChild(item);
-      if (shouldFollow) chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' });
+      item.scrollIntoView({ block: 'start', behavior: 'auto' });
     }
     async function generateAnswer(request) {
       setGenerating(true);
@@ -1850,14 +1900,11 @@
       const shouldFollow = isNearConversationBottom();
       const status = document.createElement('div');
       status.className = 'message ai status';
-      status.innerHTML = '<img class="ai-avatar" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI"><div class="ai-bubble"><span class="thinking-dots"><i></i><i></i><i></i></span><span>질문의 뜻을 파악하고 있어요</span></div>';
+      status.innerHTML = '<img class="ai-avatar" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI"><div class="ai-bubble" role="status"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>생각하는 중</span></div>';
       messagesEl.appendChild(status);
       const label = status.querySelector('.ai-bubble > span:last-child');
-      generationTimers = [
-        setTimeout(() => label.textContent = '관련 자료와 핵심 근거를 확인하고 있어요', 650),
-        setTimeout(() => label.textContent = '확인한 내용으로 답변을 작성하고 있어요', 1350)
-      ];
-      if (shouldFollow) chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' });
+      generationTimers = [];
+      status.scrollIntoView({ block: 'start', behavior: 'auto' });
       try {
         const answer = await requestAssistant(request, controller.signal);
         if (controller.signal.aborted) return;
@@ -2000,7 +2047,7 @@
       status.className = 'message ai status location-status';
       status.innerHTML = '<img class="ai-avatar" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI"><div class="ai-bubble"><span class="thinking-dots"><i></i><i></i><i></i></span><span>현재 위치를 확인하고 있어요</span></div>';
       messagesEl.appendChild(status);
-      chatScrollArea.scrollTo({ top: chatScrollArea.scrollHeight, behavior: 'smooth' });
+      status.scrollIntoView({ block: 'start', behavior: 'auto' });
       try {
         // Start both coordinate requests immediately inside the user's click gesture.
         // Some embedded browsers stop delivering a position when permission probing is awaited first.
@@ -2059,7 +2106,7 @@
       if (['지역 바꾸기', '음식 바꾸기', '메뉴 바꾸기', '조건 바꾸기'].includes(question)) { openSearchPicker(question === '지역 바꾸기' ? 'region' : question === '조건 바꾸기' ? null : 'food'); return; }
       if (question === '비교하기') {
         const cards = [...comparisonTray.values()].slice(0, 3);
-        if (cards.length >= 2) ask(cards.map(card => card.name).join('랑 ') + ' 비교해줘', { compareCards: cards });
+        if (cards.length >= 2) ask(comparisonMessage(cards), { compareCards: cards });
         else runPlugin(4);
         return;
       }

@@ -13,7 +13,7 @@ import {
 } from "./response-modes.js";
 import { withParticle } from "./korean.js";
 import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
-import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy } from "./conversation-copy.js";
+import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy, compactMenuCopy } from "./conversation-copy.js";
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION } from "./search-axes.js";
 
 const INDEX_HTML = __INDEX_HTML__;
@@ -907,10 +907,10 @@ async function modeAResponse(analysis, state, env, messages = []) {
         const response = await withTurnDeadline(signal => fetch("https://api.openai.com/v1/responses", {
           signal, method: "POST", headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
           body: JSON.stringify({ model: env.OPENAI_MODEL || "gpt-5-mini", store: false, max_output_tokens: 650, reasoning: { effort: "minimal" },
-            instructions: `${STYLE_RULES}\n사용자가 말한 날씨·기분·동행·시간대·이전 선택을 반영해 아래 허용 메뉴 중 서로 다른 family 3개를 직접 고른다. 실제 날씨를 모르면 상상하지 않는다. 메뉴의 description은 음식 설명 한 줄, reason은 사용자 말에 연결한 한 줄이다. 질문은 쓰지 않는다.\n허용 메뉴: ${JSON.stringify(allowed)}\n이전 선택: ${JSON.stringify(state.aProposed)}\n식사 시간: ${state.slots.meal_time || '미정'}${retry ? '\n직전 출력에 금지어 또는 격식체가 있었다. 자연스러운 해요체로 다시 작성한다.' : ''}`,
+            instructions: `${STYLE_RULES}\n사용자가 말한 날씨·기분·동행·시간대·이전 선택을 반영해 아래 허용 메뉴 중 서로 다른 family 3개를 직접 고른다. 실제 날씨를 모르면 상상하지 않는다. 메뉴의 description은 22자 이내 음식 설명 한 줄, reason은 30자 이내 해요체 한 줄이다. reason은 설명을 되풀이하지 말고 연결 근거가 없으면 빈 문자열로 둔다. 질문은 쓰지 않는다.\n허용 메뉴: ${JSON.stringify(allowed)}\n이전 선택: ${JSON.stringify(state.aProposed)}\n식사 시간: ${state.slots.meal_time || '미정'}${retry ? '\n직전 출력에 금지어 또는 격식체가 있었다. 자연스러운 해요체로 다시 작성한다.' : ''}`,
             input: messages, text: { format: { type: "json_schema", name: "inchelin_menu_choices", strict: true,
               schema: { type: "object", properties: { intro: { type: "string", description: "사용자가 말한 상황을 받아주는 해요체 한 문장" }, menus: { type: "array", minItems: 3, maxItems: 3, items: {
-                type: "object", properties: { menu: { type: "string", enum: allowed.map(item => item.menu) }, description: { type: "string" }, reason: { type: "string" } }, required: ["menu", "description", "reason"], additionalProperties: false
+                type: "object", properties: { menu: { type: "string", enum: allowed.map(item => item.menu) }, description: { type: "string", maxLength: 22 }, reason: { type: "string", maxLength: 30 } }, required: ["menu", "description", "reason"], additionalProperties: false
               } } }, required: ["intro", "menus"], additionalProperties: false } } }
           })
         }), 6500);
@@ -920,7 +920,7 @@ async function modeAResponse(analysis, state, env, messages = []) {
       const menus = result?.menus;
       if (Array.isArray(menus) && menus.length === 3 && new Set(menus.map(item => item.menu)).size === 3
         && new Set(menus.map(item => allowed.find(entry => entry.menu === item.menu)?.family)).size === 3
-        && menus.every(item => allowed.some(entry => entry.menu === item.menu) && typeof item.description === 'string' && item.description.length > 0 && item.description.length <= 80 && typeof item.reason === 'string' && item.reason.length > 0 && item.reason.length <= 100)) {
+        && menus.every(item => allowed.some(entry => entry.menu === item.menu) && typeof item.description === 'string' && item.description.length > 0 && item.description.length <= 80 && typeof item.reason === 'string' && item.reason.length <= 100)) {
         candidates = menus.map(item => ({ menu: item.menu, direction: item.description, reason: item.reason }));
         menuIntro = typeof result.intro === 'string' ? result.intro : '';
       }
@@ -928,6 +928,7 @@ async function modeAResponse(analysis, state, env, messages = []) {
   }
   const source = candidates ? 'model' : 'fallback';
   candidates ||= chooseModeACandidates(analysis, state);
+  candidates = candidates.map(compactMenuCopy);
   const suggestions = candidates.map(candidate => `${candidate.menu}|${candidate.direction} — ${candidate.reason}`);
   if (candidates.length) suggestions.push("다른 메뉴 보기");
   const message = candidates.length ? `오늘은 서로 다른 방향의 메뉴 ${candidates.length}가지로 좁혀봤어요.\n\n마음에 드는 메뉴를 말씀해 주시면 더 구체적으로 이어가거나 원하는 지역의 식당도 찾아드릴 수 있어요.` : "이 대화에서 준비된 메뉴 후보를 모두 보여드렸어요. 새로운 취향이나 식사 시간대를 알려주세요.";
@@ -997,16 +998,16 @@ function modeDFollowupResponse(analysis, state, latest = "", hasCoordinates = fa
       const nextState = updateStateAfterResponse(state, { mode: "D", questionSlot: null, showCards: false }, {});
       return chatResponse("비교할 식당이 두 곳 이상 있어야 해요. 먼저 식당을 찾아드릴게요.", [], [], { responseModeState: nextState, mode: "D" });
     }
+    let hasMissing = false;
     const lines = cards.map(({ card, position }) => {
-      const facts = [`음식 종류: ${card.category || "아직 알 수 없어요"}`, `주소: ${card.address || "아직 알 수 없어요"}`];
-      if (hasCoordinates && card.distanceMeters !== null && Number.isFinite(card.distanceMeters)) facts.push(`직선거리: ${Math.round(card.distanceMeters)}m`);
-      const status = { active: "영업 중으로 확인됨", temporarily_closed: "임시 휴업으로 확인됨", permanently_closed: "폐업으로 확인됨" }[card.businessStatus];
-      if (status) facts.push(`영업 여부: ${status}`);
-      if (card.openingHours) facts.push(`영업시간: ${card.openingHours}`);
+      const floor = card.address?.match(/(?:지하\s*\d+|B\s*\d+|\d+)\s*층/i)?.[0];
+      const region = card.regionLabel || cardArea({ address: card.address });
+      const facts = [['음식 종류', card.foodLabel || card.category], ['지역', region], ['주소', card.address], ['층', floor]]
+        .filter(([, value]) => { if (!value) hasMissing = true; return Boolean(value); }).map(([label, value]) => `${label}: ${value}`);
       return `${position}번 **${card.name}**\n${facts.map(fact => `- ${fact}`).join("\n")}`;
     });
     const nextState = updateStateAfterResponse(state, { mode: "D", questionSlot: null, showCards: false }, {});
-    return chatResponse(`식당들을 나란히 살펴볼게요.\n\n${lines.join("\n\n")}\n\n지금 알 수 있는 정보만으로는 어느 쪽이 더 낫다고 하기 어려워요. 위치나 메뉴 취향을 알려주시면 더 좁혀드릴게요.`, [], [], { responseModeState: nextState, mode: "D", variant: "compare" });
+    return chatResponse(`식당들을 나란히 살펴볼게요.\n\n${lines.join("\n\n")}${hasMissing ? '\n\n일부 항목은 확인된 정보가 없어요.' : ''}\n\n지금 알 수 있는 정보만으로는 어느 쪽이 더 낫다고 하기 어려워요.`, [], [], { responseModeState: nextState, mode: "D", variant: "compare" });
   }
   const target = responseStateCardTarget(analysis, state);
   if (!target) {
@@ -2262,6 +2263,12 @@ async function handleChat(request, env) {
   }
   // Known service questions are resolved before link research and model routing.
   const serviceState = normalizeResponseState(context.responseModeState || { lastCards: recentRestaurants, shownPlaces: recentRestaurants });
+  if (/^상관\s*없어요[.!]?$/.test(latestUserMessage.trim()) && serviceState.pendingQuestionSlot) {
+    const slot = serviceState.pendingQuestionSlot;
+    const nextState = normalizeResponseState({ ...serviceState, pendingQuestionSlot: null, askedSlots: [...serviceState.askedSlots, slot] });
+    const label = { region: '지역', menu: '메뉴', sub_menu: '세부 메뉴', sub_region: '세부 지역', companion: '동행' }[slot] || '그 조건';
+    return json(chatResponse(`좋아요, ${label} 조건은 열어둘게요.${['region', 'menu'].includes(slot) ? ' 찾고 싶은 지역이나 음식이 떠오르면 말씀해 주세요.' : ' 지금 고른 곳을 편하게 살펴보세요.'}`, [], nextState.lastCards.map(card => ({ ...card, dataSource: createRestaurantProvider(env).source })), { mode: nextState.lastCards.length ? 'D' : 'B', variant: 'preference_skip', responseModeState: nextState }));
+  }
   const serviceAnalysis = fallbackResponseModeAnalysis(messages, serviceState);
   if (serviceAnalysis.intent === "service" && decideMode(serviceAnalysis, serviceState).mode === "GENERAL") {
     return json(generalModeResponse(serviceAnalysis, serviceState, createRestaurantProvider(env).source, latestUserMessage));
