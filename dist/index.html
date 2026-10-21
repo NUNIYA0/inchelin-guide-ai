@@ -316,8 +316,8 @@
     .menu-choice .quick-reply-description { font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
     .menu-choice .quick-reply-description, .menu-choice .quick-reply-reason { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .menu-choice:active { transform: scale(.985); background: #eee; border-color: #888; }
-    .history-inactive .quick-reply, .history-inactive .restaurant-card, .history-inactive .meal-chip { opacity: .5; }
-    .history-inactive .quick-reply, .history-inactive .restaurant-map-link, .history-inactive .meal-chip { cursor: default; pointer-events: none; }
+    .history-inactive .quick-reply, .history-inactive .meal-chip { opacity: .5; }
+    .history-inactive .quick-reply, .history-inactive .meal-chip { cursor: default; pointer-events: none; }
     .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 2px solid #222; background: #f7f7f7; color: #111; }
     .history-check { color: #111; font-size: 16px; font-weight: 700; margin-left: 6px; }
     .alternative-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
@@ -861,6 +861,16 @@
     @media (min-width:768px) {
       .restaurant-list, .quick-replies.menu-cards { grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; align-items:stretch; }
     }
+    @media (max-width:767px) {
+      .restaurant-list { grid-auto-rows:auto; }
+      .restaurant-card { height:auto; min-height:0; max-height:none; padding:12px 14px; }
+      .restaurant-title-link.restaurant-map-link { height:22px; min-height:22px; }
+      .restaurant-title-link h3 { -webkit-line-clamp:1; max-height:22px; white-space:nowrap; text-overflow:ellipsis; display:block; }
+      .restaurant-condition-chips { height:18px; min-height:18px; margin-top:4px; flex-wrap:nowrap; overflow:hidden; }
+      .restaurant-category { font-size:11px; line-height:18px; }
+      .restaurant-address { display:block; -webkit-line-clamp:1; height:28px; max-height:28px; line-height:28px; margin-top:4px; padding-right:106px; white-space:nowrap; text-overflow:ellipsis; }
+      .restaurant-detail-area { position:absolute; right:8px; bottom:1px; width:auto; padding:0; margin:0; }
+    }
   </style>
 </head>
 <body>
@@ -1038,6 +1048,7 @@
 
   <div class="toast" id="toast" role="status"></div>
 
+  <script src="assets/naver-map.js"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1252,7 +1263,8 @@
       if (!dataSource || (dataSource === 'inchelin' && restaurant.isRegisteredInInchelin !== true)) return null;
       if (dataSource === 'naver' && Number(restaurant.validationVersion || 0) < 2) return null;
       const id = String(restaurant.id || '').trim();
-      const name = String(restaurant.name || '').trim();
+      if (/[<>�\r\n\t]|https?:\/\//i.test(String(restaurant.name||''))) return null;
+      const name = globalThis.InchelinMapLinks.cleanName(restaurant.name);
       const address = String(restaurant.address || '').trim();
       const categoryValue = String(restaurant.category || '').trim();
       if (!id || !name || !address || (dataSource === 'naver' && !categoryValue)) return null;
@@ -1287,8 +1299,8 @@
         menuPrice: restaurant.menuPrice ?? null,
         parking: restaurant.parking ?? null,
         naverPlaceId: naverPlace.placeId,
-        naverPlaceUrl: naverPlace.url,
-        naverLink: naverPlace.url,
+        naverPlaceUrl: globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
+        naverLink: globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
         isRegisteredInInchelin: dataSource === 'inchelin',
         dataSource
       };
@@ -1865,7 +1877,7 @@
             const check = document.createElement('span'); check.className = 'history-check'; check.appendChild(uiIcon('check')); card.appendChild(check);
           }
         });
-        group.querySelectorAll('.quick-reply, .restaurant-map-link, .meal-chip, .related-question').forEach(button => {
+        group.querySelectorAll('.quick-reply, .meal-chip, .related-question').forEach(button => {
           if (button.disabled) return;
           const label = button.historyLabel || button.textContent;
           const selected = label && (content === button.historyMessage || content.includes(label)) && !/다른 메뉴|다른 곳|조건 바꾸기/.test(label);

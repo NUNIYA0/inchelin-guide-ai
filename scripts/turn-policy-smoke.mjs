@@ -41,7 +41,9 @@ export async function testTurnPolicy(runCase) {
   assert.equal(refined.body.restaurants.length, 3);
   assert.ok(refined.calls.some(call => call.href.includes('/search/v1/local') && new URL(call.href).searchParams.get('query').includes('회식')));
   assert.equal(questions(refined.body), 0);
-  assert.match(refined.body.message, /회식으로 가시는군요/);
+  assert.match(refined.body.meta.turnPolicy.intro, /회식 자리로 강남역 삼겹살집 3곳을 골라봤어요/);
+  assert.equal(refined.body.meta.turnPolicy.intro.split(/[.!?]+/).filter(Boolean).length,1);
+  assert.equal((refined.body.meta.turnPolicy.intro.match(/회식/g)||[]).length,1);
   assert.deepEqual(refined.body.meta.turnPolicy.actionChips, ['다른 곳 보기', '조건 바꾸기']);
   boundedCopy(refined.body);
   // 3. Explicit fast path never adds a question, even when a slot could refine.

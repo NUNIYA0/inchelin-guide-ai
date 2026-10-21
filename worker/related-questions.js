@@ -120,8 +120,8 @@ export function relatedTemplates(state,intent,context={}) {
   const situations=['회식하기 좋은 곳으로 다시 찾아줘','가족과 함께 먹을 곳으로 찾아줘','혼자 먹을 곳으로 다시 찾아줘'].filter(text=>!context.pending_question?.slot || context.pending_question.slot!=='companion');
   const search=[regions[0],foods[0],situations[0],...regions.slice(1),...foods.slice(1),...situations.slice(1)].filter(Boolean);
   const menu=[`다른 ${state.menuCategory||'한식'} 메뉴도 보여줘`,'중식으로 먹을 메뉴를 골라줘',`${food} 먹을 곳도 같이 찾아줘`];
-  const details=state.lastCards.slice(0,3).flatMap(card=>[`${card.name} 자세히 알려줘`,`${card.name} 상세 정보도 알려줘`]);
-  const comparisons=state.lastCards.length>=2?[`${state.lastCards[0].name}랑 ${state.lastCards[1].name} 비교해줘`]:[];
+  const details=state.lastCards.slice(0,3).flatMap((card,i)=>[`${card.name} 자세히 알려줘`,`${card.name} 상세 정보도 알려줘`,`${['첫 번째','두 번째','세 번째'][i]} 식당 상세 정보도 알려줘`]);
+  const comparisons=state.lastCards.length>=2?[`${state.lastCards[0].name}랑 ${state.lastCards[1].name} 비교해줘`,'첫 번째랑 두 번째 식당 비교해줘']:[];
   if (['service','general'].includes(intent)) return [...SERVICE_TEXTS];
   if(intent==='out_of_scope') return ['오늘 뭐 먹을지 같이 골라줘'];
   if(intent==='menu_trouble') return [...menu,...search,...SERVICE_TEXTS];
@@ -146,10 +146,15 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
     const options={state,parentIntent,classify,history:(payload.messages||[]).filter(item=>item.role==='user').map(item=>item.content),pendingSlot:context.pending_question?.slot};
     const limit=meta.answer_plan?.includes('question')&&meta.turnPolicy?.questionText?2:3;
     let searches=0;
+    const attempted=new Set(),axisAttempts=new Map();
     const chips=[...(response.suggestions||[]),...(meta.turnPolicy?.actionChips||[])].join(' ');
-    for (const candidate of [...proposed.map(item=>({text:typeof item==='string'?item:item?.text,source:'model'})),...relatedTemplates(state,parentIntent,context).map(text=>({text,source:'template'}))]) {
-      const validated=validateRelated(candidate.text,options);
-      if(!validated || selected.some(item=>item.axis===validated.axis || item.key===validated.key))continue;
+    const priorities=['region','food','companion','detail','compare'];
+    const candidates=[...proposed.map(item=>({text:typeof item==='string'?item:item?.text,source:'model'})),...relatedTemplates(state,parentIntent,context).map(text=>({text,source:'template'}))]
+      .map(candidate=>({...candidate,validated:validateRelated(candidate.text,options)})).filter(candidate=>candidate.validated);
+    if(['place_search','condition_change','followup'].includes(parentIntent))candidates.sort((a,b)=>priorities.indexOf(a.validated.axis)-priorities.indexOf(b.validated.axis));
+    for (const candidate of candidates) {
+      const validated=candidate.validated;
+      if(selected.some(item=>item.axis===validated.axis || item.key===validated.key))continue;
       if(['place_search','condition_change','followup'].includes(parentIntent) && validated.axis==='compare'
         && (!selected.some(item=>['region','food','companion'].includes(item.axis)) || state.lastCards.length<2))continue;
       if(validated.axis==='menu_batch' && /다른 메뉴/.test(chips) || validated.axis==='more' && /다른 곳/.test(chips))continue;
@@ -157,7 +162,9 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
         if(!state.slots.region && !response.restaurants?.length)continue;
         const region=mentionedSearchRegion(validated.text)||state.slots.region;
         const food=foodIn(validated.text)||state.slots.menu||state.slots.food_type;
-        if(!SEARCH_REGIONS.includes(region)||!food||searches++>=3)continue;
+        const key=region+':'+food+':'+(/다른.{0,3}(?:곳|식당)/.test(validated.text)?'unseen':'any');
+        if(!SEARCH_REGIONS.includes(region)||!food||attempted.has(key)||searches>=6||(axisAttempts.get(validated.axis)||0)>=2)continue;
+        attempted.add(key);searches++;axisAttempts.set(validated.axis,(axisAttempts.get(validated.axis)||0)+1);
         if(!await preflight({region,food,text:validated.text,state,response}))continue;
       }
       selected.push({...validated,source:candidate.source});if(selected.length>=limit)break;

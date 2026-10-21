@@ -19,6 +19,7 @@ import { testRelatedQuestions } from './related-questions-smoke.mjs';
 import { testChatInterface } from './chat-interface-smoke.mjs';
 import { testWelcomeFirstSearch } from './welcome-first-search-smoke.mjs';
 import { testRelatedContext } from './related-context-smoke.mjs';
+import { testV130 } from './v130-regression-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -2140,6 +2141,7 @@ assert.match(
 
 await testTurnPolicy(runCase);
 await testConversationUI(runCase);
+await testV130(runCase);
 await testSearchAxes(runCase);
 await testAISearchPolicy(runCase);
 await testConversationCopyRegression(runCase);

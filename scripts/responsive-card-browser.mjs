@@ -25,7 +25,7 @@ try {
     const host=document.getElementById('fixture');host.append(renderRestaurantCards(cards));
     const menu=document.createElement('div');menu.className='quick-replies menu-cards';menu.innerHTML=cards.map((c,i)=>'<button class="quick-reply menu-choice"><span class="quick-reply-title">'+['국밥','제육볶음','냉면'][i]+'</span><span class="quick-reply-description">한 끼로 골라볼 메뉴</span><span class="quick-reply-reason">따뜻하게 먹어봐요</span></button>').join('');host.append(menu);
     const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}};
-    const capture=()=>({places:[...document.querySelectorAll('.restaurant-card')].map(rect),menus:[...menu.children].map(rect),columns:getComputedStyle(document.querySelector('.restaurant-list')).gridTemplateColumns.split(' ').length,menuColumns:getComputedStyle(menu).gridTemplateColumns.split(' ').length,clipped:[...document.querySelectorAll('.restaurant-title-link h3,.restaurant-address')].every(n=>getComputedStyle(n).overflow==='hidden'&&getComputedStyle(n).webkitLineClamp==='2'),overflow:document.documentElement.scrollWidth>innerWidth,viewport:innerWidth});
+    const capture=()=>({places:[...document.querySelectorAll('.restaurant-card')].map(rect),menus:[...menu.children].map(rect),columns:getComputedStyle(document.querySelector('.restaurant-list')).gridTemplateColumns.split(' ').length,menuColumns:getComputedStyle(menu).gridTemplateColumns.split(' ').length,clipped:[...document.querySelectorAll('.restaurant-title-link h3,.restaurant-address')].every(n=>getComputedStyle(n).overflow==='hidden'&&getComputedStyle(n).webkitLineClamp===(innerWidth<768?'1':'2')),overflow:document.documentElement.scrollWidth>innerWidth,viewport:innerWidth});
     const result=capture();host.replaceChild(renderRestaurantCards(cards.slice(0,2)),host.firstChild);result.two=capture().places;host.replaceChild(renderRestaurantCards(cards.slice(0,1)),host.firstChild);result.one=capture().places;document.getElementById('report').textContent=JSON.stringify(result);
   </script>`, 'utf8');
   const browser = process.env.CARD_TEST_BROWSER || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -38,7 +38,8 @@ try {
     const match=run.stdout.match(/<pre id="report">([^<]+)<\/pre>/);assert.ok(match,'browser generated measurements');
     const r=JSON.parse(match[1]);assert.equal(r.viewport,width);
     const columns=width>=768?3:1;assert.equal(r.columns,columns);assert.equal(r.menuColumns,columns);
-    for(const set of [r.places,r.menus])assert.ok(set.every(n=>Math.abs(n.h-set[0].h)<1),'equal card heights');
+    for(const set of [r.places,r.menus])if(width>=768)assert.ok(set.every(n=>Math.abs(n.h-set[0].h)<1),'desktop equal card heights');
+    if(width<768)assert.ok(r.places.every(n=>n.h>=100&&n.h<=110),'mobile compact cards are 100–110px with one-line title/chips/address');
     assert.ok(r.clipped);assert.equal(r.overflow,false);
     assert.ok(Math.abs(r.one[0].w-r.places[0].w)<1);assert.ok(Math.abs(r.two[0].w-r.places[0].w)<1);
     console.log(width+'px: '+columns+' columns, equal heights, no horizontal overflow, 1–2 results retain width.');

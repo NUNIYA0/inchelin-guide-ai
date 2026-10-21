@@ -117,7 +117,8 @@ export function applyTurnPolicy(response, payload = {}) {
   const oldOpenings = [...recent, ...state.previousOpenings];
   const candidateText = value => {
     const valueText = text(value);
-    if (!valueText || FORBIDDEN_COPY.test(valueText) || /[?？]|맛있|인기|평점|별점|최고|저렴|조용|주차|단체석|영업|분위기|예약|적합|도보|차량|좌석|앉기|편한|룸|모임.*많이/.test(valueText)) return null;
+    if (!valueText || FORBIDDEN_COPY.test(valueText) || /선택했어요|[?？]|맛있|인기|평점|별점|최고|저렴|조용|주차|단체석|영업|분위기|예약|적합|도보|차량|좌석|앉기|편한|룸|모임.*많이/.test(valueText)) return null;
+    if(count && state.slots.companion && (!valueText.includes(state.slots.companion)||!valueText.includes(area)||!valueText.includes(food)||!valueText.includes(count+'곳'))) return null;
     if (!/(?:요|죠)[.!。]?$/.test(valueText) || plan.stage === 'ready' && /새로 말씀|다시|바꿔|변경/.test(valueText)) return null;
     if (/\d/.test(valueText.replace(new RegExp(count + '곳', 'g'), '').replace(state.slots.companion || '\u0000', ''))) return null;
     if ((valueText.match(/[.!。]/g) || []).length > 1 || /\d+곳/.test(valueText) && !valueText.includes(count + '곳')) return null;
@@ -128,7 +129,13 @@ export function applyTurnPolicy(response, payload = {}) {
     }
     return valueText.replace(/[.!。]+$/, '');
   };
-  const defaultStarts = count ? [
+  const occasion=/혼자|혼밥/.test(state.slots.companion||'')?'혼밥 메뉴로':/가족/.test(state.slots.companion||'')?'가족 식사로':`${state.slots.companion} 자리로`;
+  const defaultStarts = count && state.slots.companion ? [
+    `${occasion} ${area} ${food}집 ${count}곳을 골라봤어요`,
+    `${area} ${food}집 ${count}곳을 ${occasion} 골라봤어요`,
+    `${food}집 ${count}곳을 ${area}에서 ${occasion} 골라봤어요`,
+    `이번에는 ${occasion} ${area} ${food}집 ${count}곳을 살펴봤어요`,
+  ] : count ? [
     `${area}에서 ${state.slots.companion ? state.slots.companion + ' 자리로 ' : ''}${food} 먹을 곳 ${count}곳을 골라봤어요`,
     `${food} 드시고 싶으시군요, ${area}에서${state.slots.companion ? ' ' + state.slots.companion + ' 자리로' : ''} ${count}곳 골라봤어요`,
     `이번에는 ${area}에서 ${state.slots.companion ? state.slots.companion + '으로 ' : ''}${food} 먹을 곳 ${count}곳을 살펴봤어요`,
@@ -151,6 +158,7 @@ export function applyTurnPolicy(response, payload = {}) {
       : !state.slots.region ? '동네를 알려주시면 먹을 곳도 찾아드릴게요' : '먹고 싶은 메뉴부터 골라봐요';
   const generatedReason = candidateText(proposal?.reason);
   if (generatedReason) reason = generatedReason;
+  if(count && state.slots.companion) reason='';
   if (repeatsCopySentences(`${summary}. ${reason}.`)) {
     const acknowledgment = reason.includes(',') ? reason.split(',')[0].trim() : '';
     reason = acknowledgment && !repeatsCopySentences(`${summary}. ${acknowledgment}.`) ? acknowledgment : '';

@@ -11,7 +11,7 @@ export async function testRelatedContext(runCase){
   const payload={messages:[{role:'user',content:'강남에서 삼겹살 먹을래'}]};
   const context=relatedContext(response,payload);assert.equal(context.utterance,payload.messages[0].content);assert.equal(context.intent,'place_search');assert.equal(context.slots.menu,'삼겹살');assert.deepEqual(context.cards,cards);assert.equal(context.pending_question.slot,'companion');assert.ok(context.askedSlots.includes('companion'));
   const filtered=await applyRelatedQuestions(response,payload,classify,async()=>true);
-  assert.ok(filtered.meta.relatedQuestions.length<=2);assert.ok(filtered.meta.relatedQuestions.some(item=>item.axis==='detail'));assert.ok(filtered.meta.relatedQuestions.every(item=>!item.text.includes('회식')&&!item.axis.startsWith('service_')));
+  assert.equal(filtered.meta.relatedQuestions.length,2);assert.deepEqual(filtered.meta.relatedQuestions.map(item=>item.axis),['region','food']);assert.ok(filtered.meta.relatedQuestions.every(item=>!item.text.includes('회식')&&!item.axis.startsWith('service_')));
   const blocked=validateRelated('회식으로 역삼에서 삼겹살 찾아줘',{state,parentIntent:'place_search',classify,pendingSlot:'companion'});assert.equal(blocked,null,'pending companion wins over a mixed region proposal');
   assert.ok(RELATED_AXES.place_search.includes('detail'));assert.ok(!RELATED_AXES.place_search.includes('service_regions'));
   // Three real generation rounds with different slots: syntax pattern, not just wording/value, must change.

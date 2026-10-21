@@ -18,6 +18,7 @@ import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion,
 import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGION_ANSWERS, AUTO_MENU } from './answer-plan.js';
 import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
 import { applyRelatedQuestions, confirmedCombination, relatedContext } from './related-questions.js';
+import './naver-map.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -1698,7 +1699,9 @@ async function handleNaverPlaceMatch(request, env) {
 }
 
 function sanitizeNaverPlace(item) {
-  const name = stripSearchMarkup(item?.title);
+  const rawName=stripSearchMarkup(item?.title);
+  if(/[�\r\n\t]|https?:\/\//i.test(rawName))return null;
+  const name = globalThis.InchelinMapLinks.cleanName(rawName);
   const address = safeText(item?.roadAddress || item?.address, 300);
   if (!name || !address) return null;
   const mapX = safeText(String(item?.mapx || ""), 40);
@@ -2122,11 +2125,6 @@ function temporaryRecommendedBy(place) {
   return TEMPORARY_RECOMMENDERS[hash % TEMPORARY_RECOMMENDERS.length];
 }
 
-function naverMapSearchUrl(name, address) {
-  const query = safeText(`${name || ""} ${address || ""}`.replace(/\s+/g, " ").trim(), 300);
-  return query ? `https://map.naver.com/p/search/${encodeURIComponent(query)}` : "";
-}
-
 function factualRecommendationReason(place, source, userText, locationName = "") {
   return groundedCardReason({ name: safeText(factValue(place, 'current_name') || place.name, 160),
     category: simplifiedRestaurantCategory(place.registered_data?.rawCategory || place.registered_data?.category),
@@ -2160,6 +2158,8 @@ function restaurantCard(place, source, userText = "", locationName = "") {
     firstPresent(factValue(place, "naver_place_url"), registered.naverPlaceUrl, registered.naverLink, registered.naver_place_url),
     firstPresent(factValue(place, "naver_place_id"), registered.naverPlaceId, registered.naver_place_id)
   );
+  const mapUrl = globalThis.InchelinMapLinks.mapLink({name:restaurantName,url:placeDetails.url || registered.officialLink,
+    placeId:placeDetails.placeId,longitude:registered.longitude,latitude:registered.latitude});
   return {
     validationVersion: 2,
     id: place.id,
@@ -2186,8 +2186,8 @@ function restaurantCard(place, source, userText = "", locationName = "") {
     distanceMeters: place.distance_meters !== null && place.distance_meters !== undefined && Number.isFinite(Number(place.distance_meters)) ? Number(place.distance_meters) : null,
     recommendationReason: factualRecommendationReason(place, source, userText, locationName),
     naverPlaceId: placeDetails.placeId || null,
-    naverPlaceUrl: placeDetails.url || (source === "naver" ? naverMapSearchUrl(restaurantName, address) : null),
-    naverLink: placeDetails.url || (source === "naver" ? naverMapSearchUrl(restaurantName, address) : null),
+    naverPlaceUrl: placeDetails.url || (source === "naver" ? mapUrl : null),
+    naverLink: placeDetails.url || (source === "naver" ? mapUrl : null),
     isRegisteredInInchelin: source === "inchelin",
     dataSource: source,
   };

@@ -78,7 +78,7 @@ export async function testConversationUI(runCase) {
   assert.equal(noEvidence.body.restaurants.length, 3);
   assert.ok(noEvidence.body.restaurants.every(item => item.recommendationReason === ''));
   const contextual = await runCase({ message: '강남역에서 삼겹살 회식할 거야', env, naverResponse: { items }, aiResponse: { ...clean, turn_text: { summary: '회식이라면 강남역 삼겹살집을 함께 골라볼게요.', reason: '' } } });
-  assert.ok(contextual.body.message.startsWith('회식이라면 강남역 삼겹살집을 함께 골라볼게요.'));
+  assert.match(contextual.body.meta.turnPolicy.intro,/회식.*강남역.*삼겹살.*3곳.*골라봤어요/);
   assert.doesNotMatch(failed.body.message, /먼저 식당 \d+곳을 찾았어요/);
   assert.match(lastCall.body.instructions, /fact_reason_options|웨이팅|이유를 만들지/);
 
@@ -206,7 +206,9 @@ export async function testConversationUI(runCase) {
   assert.equal(ofClass(menuNode,'history-check').length,1);
   assert.match(ofClass(menuNode,'history-selected')[0].textContent,/국밥/);assert.ok(nodes(ofClass(menuNode,'history-selected')[0]).some(node=>node.attributes.href==='#i-check'));
   assert.ok(ofClass(message,'quick-reply').every(button=>button.disabled));
-  assert.ok(ofClass(message,'restaurant-map-link').every(button=>button.disabled));
+  assert.ok(ofClass(message,'restaurant-map-link').every(button=>!button.disabled && !button.attributes['aria-disabled']),'historical detail and compare stay active');
+  assert.ok(ofClass(message,'restaurant-title-link').filter(button=>button.tag==='a').every(link=>link.href),'historical anchors keep their destinations');
+  const historyCompare=ofClass(message,'restaurant-compare')[0];const beforeHistoryToggle=historyCompare.attributes['aria-pressed'];historyCompare.click();assert.notEqual(historyCompare.attributes['aria-pressed'],beforeHistoryToggle,'old compare button still toggles');historyCompare.click();assert.equal(historyCompare.attributes['aria-pressed'],beforeHistoryToggle);
   assert.equal(ofClass(message,'restaurant-card').length,3,'old restaurant cards remain');
   const sentBefore = sent.length; choice.click();
   assert.equal(sent.length,sentBefore,'disabled old choices cannot send a new request');
@@ -331,6 +333,7 @@ export async function testConversationUI(runCase) {
     assert.match(responsiveCards,/\.restaurant-detail-area \{[^}]*margin-top:auto/,'bottom action aligns across stretched cards');
   }
   assert.match(responsiveCards,/\.quick-replies.menu-cards \.menu-choice \{ min-width:0; width:100%; height:100%; box-sizing:border-box/);
+  assert.match(responsiveCards,/@media \(max-width:767px\) \{[^]*?\.restaurant-card \{ height:auto; min-height:0/);
   console.log('v129 responsive card DOM/CSS: 1024/768 three columns; 767/390/360 one column; fixed tracks for 1–2 cards, stretch/equal-row height, two-line clipping, separate compare hit area passed (browser pixels not checked).');
   console.log('Conversation copy/card/menu mocked regressions passed.');
 }
