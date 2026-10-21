@@ -50,9 +50,9 @@ export function testMealToolsUI() {
     byText(dialog, '삭제').click();
     assert.equal(dialog.querySelectorAll('input').length, 2);
     assert.ok(dialog.querySelectorAll('button').filter(node => node.textContent === '삭제').every(node => node.disabled));
-    for (let i = 2; i < 8; i += 1) byText(dialog, '＋ 후보 추가').click();
+    for (let i = 2; i < 8; i += 1) byText(dialog, '후보 추가').click();
     assert.equal(dialog.querySelectorAll('input').length, 8);
-    assert.equal(byText(dialog, '＋ 후보 추가').disabled, true);
+    assert.equal(byText(dialog, '후보 추가').disabled, true);
     byText(dialog, '돌림판 돌리기').click();
     assert.equal(byText(dialog, '돌림판 돌리기').disabled, true, 'empty options disable the sheet action');
     dialog.querySelectorAll('input').forEach((input, i) => { input.value = `메뉴${i}`; input.emit('input'); });
@@ -71,10 +71,10 @@ export function testMealToolsUI() {
     assert.equal(dialog.querySelectorAll('input').length, 8);
     dialog.querySelectorAll('input').forEach((input, i) => { input.value = `메뉴${i}`; input.emit('input'); });
     byText(dialog, '사다리 시작').click();
-    assert.equal(dialog.querySelectorAll('button').filter(node => /번 →/.test(node.textContent)).length, 8);
+    assert.equal(dialog.querySelectorAll('button').filter(node => /번:/.test(node.textContent)).length, 8);
     assert.ok(dialog.textContent.includes(GAME_NOTICE));
-    dialog.querySelectorAll('button').find(node => /^1번 →/.test(node.textContent)).click();
-    assert.match(sent.at(-1)[0], /^사다리게임 결과: 1번 → 메뉴\d/);
+    dialog.querySelectorAll('button').find(node => /^1번:/.test(node.textContent)).click();
+    assert.match(sent.at(-1)[0], /^사다리게임 결과: 1번: 메뉴\d/);
     reduced = false;
     triggers[1].click(); byText(dialog, '돌림판 돌리기').click();
     assert.equal(byText(dialog, '돌림판 돌리기').disabled, true);

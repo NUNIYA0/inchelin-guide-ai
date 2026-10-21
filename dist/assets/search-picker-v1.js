@@ -1,4 +1,4 @@
-import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
+import { createBottomSheet, sheetIcon } from './bottom-sheet-v1.js?v=127';
 import { SEARCH_FOODS, SEARCH_REGIONS, searchMessage, validSearchRegion } from './search-axes-data-v1.js?v=124';
 
 // Shared two-axis controls for plugin sheets and result-condition editing, not the home screen.
@@ -38,10 +38,11 @@ export function mountSearchPicker({ home, getSlots, send, locate, isBusy, onOpen
           const choice = button(menu, () => { food = menu; details.querySelectorAll('button').forEach(item => item.setAttribute('aria-pressed', String(item === choice))); update(); });
           return choice;
         })); update();
-      }); node.dataset.value = category.value; foods.append(node);
+      }); node.dataset.value = category.value; node.append(sheetIcon('utensils'));node.setAttribute('aria-label',category.name);foods.append(node);
     });
-    SEARCH_REGIONS.forEach(value => { const node = button(value, () => { region = value; current = false; input.value = value; update(); }); node.dataset.value = value; regions.append(node); });
+    SEARCH_REGIONS.forEach(value => { const node = button(value, () => { region = value; current = false; input.value = value; update(); }); node.dataset.value = value;node.append(sheetIcon('pin'));node.setAttribute('aria-label',value); regions.append(node); });
     const location = button('현재 위치', () => { current = true; region = ''; input.value = ''; update(); }); location.dataset.value = '현재 위치';
+    location.append(sheetIcon('locate'));location.setAttribute('aria-label','현재 위치 연결');
     const manual = button('직접 입력', () => { input.hidden = false; input.focus(); });
     regions.append(location, manual); input.hidden = true;
     input.addEventListener('input', () => { region = input.value.trim(); current = false; update(); });

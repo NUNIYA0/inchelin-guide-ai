@@ -1,4 +1,4 @@
-import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
+import { createBottomSheet, sheetIcon } from './bottom-sheet-v1.js?v=127';
 import { SEARCH_REGIONS } from './search-axes-data-v1.js?v=124';
 // These tools collect messages/slots only. Response modes stay in the existing pipeline.
 export const PLUGIN_IDS = [1, 2, 3, 4, 5];
@@ -78,9 +78,10 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
       const chip = button(value, () => {
         if (selected.has(value)) selected.delete(value); else selected.add(value);
         chip.setAttribute('aria-pressed', String(selected.has(value)));
+        chip.selectionIcon.setAttribute('style',selected.has(value)?'':'display:none');
         complete.disabled = !selected.size;
       });
-      chip.setAttribute('aria-pressed', String(selected.has(value))); chips.append(chip);
+      chip.setAttribute('aria-pressed', String(selected.has(value)));chip.selectionIcon=sheetIcon('check');chip.selectionIcon.setAttribute('style',selected.has(value)?'':'display:none');chip.append(chip.selectionIcon);chip.setAttribute('aria-label',value); chips.append(chip);
       });
     }
     sheetUI.setActions(complete);

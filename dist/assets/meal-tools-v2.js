@@ -1,4 +1,4 @@
-import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
+import { createBottomSheet, sheetIcon } from './bottom-sheet-v1.js?v=127';
 export const CATEGORY_MENUS = [
   { name: '한식', menus: ['국밥', '김치찌개', '냉면'] },
   { name: '중식', menus: ['마라탕', '마라샹궈'] },
@@ -64,7 +64,7 @@ export function makeLadder(count, menus, random = secureRandomInt) {
 }
 
 export function resultMessage(kind, menu, person = null) {
-  return `${kind === 'wheel' ? '돌림판' : '사다리게임'} 결과: ${person ? `${person}번 → ` : ''}${menu}\n${GAME_NOTICE}`;
+  return `${kind === 'wheel' ? '돌림판' : '사다리게임'} 결과: ${person ? `${person}번: ` : ''}${menu}\n${GAME_NOTICE}`;
 }
 
 export function categoryRequest(menu) {
@@ -115,7 +115,7 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
       editor.append(row);
     });
     if (kind === 'wheel') {
-      const add = button('＋ 후보 추가', () => { candidates.push(''); invalidate(); renderEditor(); editor.querySelector('input:last-of-type')?.focus(); });
+      const add = button('후보 추가', () => { candidates.push(''); invalidate(); renderEditor(); editor.querySelector('input:last-of-type')?.focus(); });add.append(sheetIcon('plus'));add.setAttribute('aria-label','후보 추가');
       add.disabled = candidates.length >= 8; editor.append(add);
     }
     if (run) run.disabled = candidates.length < 2 || candidates.some(value => !value.trim());
@@ -186,7 +186,7 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     complete(() => {
       result.replaceChildren(el('p', '대화로 이어갈 결과를 선택해 주세요.', 'meal-result-title'), el('p', GAME_NOTICE, 'meal-muted'));
       const choices = el('div', '', 'meal-chips');
-      ladder.paths.forEach(path => choices.append(button(`${path.person}번 → ${path.menu}`, () => send(resultMessage('ladder', path.menu, path.person)))));
+      ladder.paths.forEach(path => {const choice=button(`${path.person}번: ${path.menu}`, () => send(resultMessage('ladder', path.menu, path.person)));choice.append(sheetIcon('arrow-right'));choice.setAttribute('aria-label',`${path.person}번 ${path.menu} 선택`);choices.append(choice);});
       result.append(choices);
     }, 1000);
   }

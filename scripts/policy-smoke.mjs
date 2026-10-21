@@ -1803,7 +1803,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.match(indexHtml, /\.sheet-body[^}]*padding: 0 16px 16px/);
   assert.match(indexHtml, /\.bottom-sheet \.primary-action[^}]*height: 48px/);
   assert.match(indexHtml, /safe-area-inset-bottom/);
-  assert.match(indexHtml, /aria-pressed="true"\]::before \{ content: "✓ "/);
+  assert.match(indexHtml, /id="i-check"/);
 }
 // Five working tools (retired latest-information entry removed), then the two games.
 {
@@ -2064,7 +2064,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.throws(() => makeLadder(9, Array(9).fill("냉면")));
   assert.throws(() => makeLadder(2, ["냉면", ""]));
   assert.equal(resultMessage("wheel", "냉면"), `돌림판 결과: 냉면\n${GAME_NOTICE}`);
-  assert.equal(resultMessage("ladder", "국밥", 2), `사다리게임 결과: 2번 → 국밥\n${GAME_NOTICE}`);
+  assert.equal(resultMessage("ladder", "국밥", 2), `사다리게임 결과: 2번: 국밥\n${GAME_NOTICE}`);
   assert.ok(indexHtml.includes('data-meal-tool="category"'));
   assert.equal(wheelLabel("아주긴크림파스타메뉴", 8), "아주긴…");
   assert.equal(Array.from(wheelLabel("🍕🍜🍚🍖🍔", 8)).length, 4);

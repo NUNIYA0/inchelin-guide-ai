@@ -65,7 +65,7 @@ export async function testChatInterface(runCase) {
     const answerRequests=new WeakMap(); const normalizeMessage=value=>value;
     const isNearConversationBottom=()=>false,resizeInput=()=>{},showRequestError=()=>{},renderMessage=(message)=>{const node=document.createElement('div');messagesEl.appendChild(node);return node;};
     const appendMessage=()=>{throw Error('replacement must not append');};
-    ${fn('setGenerating')}${fn('stopGeneration')}${fn('generateAnswer')}
+    ${html.match(/    function iconHTML[^\n]+/)[0]}${fn('setGenerating')}${fn('stopGeneration')}${fn('generateAnswer')}
     return {generateAnswer,stopGeneration,get messages(){return chatMessages;},get busy(){return generating;}};
   `)({createElement:()=>new Node()},host,()=>new Promise(resolve=>{resolveAnswer=resolve;}),selector=>elements[selector.slice(1)],()=>{},()=>{saved++;},message);
   const pending=generation.generateAnswer({messages:[{role:'user',content:'홍대 냉면 찾아줘'}]},{replaceMessage:message});

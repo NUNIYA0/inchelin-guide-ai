@@ -505,7 +505,7 @@
     .plan-billing { min-height: 34px; margin: 0; color: #666; font-size: 11px; line-height: 1.5; }
     .plan-copy { min-height: 55px; margin: 8px 0 14px; color: #555; font-size: 12px; line-height: 1.55; }
     .plan-card ul { margin: 0 0 18px; padding: 16px 0 0; border-top: 1px solid #e7e7e7; list-style: none; color: #555; font-size: 12px; line-height: 2.1; }
-    .plan-card li::before { content: "✓"; margin-right: 8px; color: #666; font-weight: 600; }
+    .plan-card li::before { content: ""; margin-right: 8px; color: #666; font-weight: 600; }
     .plan-check { display: none; }
     .plan-card-action { width: 100%; height: 40px; margin-top: auto; display: grid; place-items: center; border: 1px solid #dedede; border-radius: 9px; font-size: 13px; font-weight: 500; }
     .plan-card.selected .plan-card-action { background: #111; color: #fff; border-color: #111; }
@@ -592,7 +592,7 @@
     .bottom-sheet .primary-action:disabled { background: #ddd; color: #666; cursor: default; }
     .bottom-sheet .meal-muted { font-size: 14px; color: #555; line-height: 1.5; }
     .bottom-sheet .meal-chip { min-height: 44px; font: 400 14px/1.5 system-ui, sans-serif; }
-    .bottom-sheet .meal-chip[aria-pressed="true"]::before { content: "✓ "; }
+    .bottom-sheet .meal-chip[aria-pressed="true"]::before { content: none; }
     .bottom-sheet .meal-chips { gap: 8px; }
     .bottom-sheet .plugin-compare-row { min-height: 56px; }
     .bottom-sheet .plugin-compare-row:has(input:checked) { background: #f2f2f2; border-radius: 8px; }
@@ -774,26 +774,102 @@
     .live-reveal .ai-bubble > :nth-child(n+4) { animation-delay: .21s; }
     @keyframes answer-arrive { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
     @media (prefers-reduced-motion: reduce) { .live-reveal .ai-bubble > *, .thinking-dots i { animation: none; } }
+    /* v127: compact cards and one icon language, scoped to conversation UI. */
+    .ui-icon { width:20px; height:20px; flex:0 0 20px; fill:none; stroke:currentColor; stroke-width:1.75; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle; pointer-events:none; }
+    button:has(> .ui-icon), a:has(> .ui-icon) { align-items:center; gap:6px; }
+    button > .ui-icon, .meal-chip > .ui-icon, .comparison-submit > .ui-icon { order:-1; }
+    .message.ai { display:grid; grid-template-columns:24px minmax(0,1fr); column-gap:10px; align-items:start; }
+    .message.ai > .ai-avatar { display:block; width:24px; height:24px; grid-column:1; grid-row:1; margin-top:2px; }
+    .message.ai > .ai-bubble { grid-column:2; grid-row:1; }
+    .restaurant-list { gap:10px; }
+    .restaurant-card { position:relative; box-sizing:border-box; height:110px; max-height:110px; padding:14px; border-radius:14px; }
+    .restaurant-card-content { display:block; padding:0; }
+    .restaurant-title-link.restaurant-map-link { display:flex; justify-content:space-between; gap:8px; width:100%; min-height:22px; height:22px; padding:0; border:0; border-radius:0; background:transparent; text-align:left; text-decoration:none; }
+    .restaurant-title-link h3 { min-width:0; margin:0; font:600 16px/22px system-ui,sans-serif; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .restaurant-title-link .ui-icon { order:1; width:18px; height:18px; flex-basis:18px; }
+    .restaurant-condition-chips { flex-wrap:nowrap; gap:6px; height:18px; margin:4px 0 0; overflow:hidden; }
+    .restaurant-category { max-width:65%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; padding:0 6px; font:400 11px/18px system-ui,sans-serif; }
+    .restaurant-address { height:28px; line-height:28px; margin:4px 0 0; padding-right:106px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .restaurant-detail-area { position:absolute; right:8px; bottom:1px; display:flex; width:auto; padding:0; gap:0; }
+    .restaurant-compare.restaurant-map-link { min-height:40px; height:40px; padding:0 6px; border:0; background:transparent; color:#555; font:400 12px/1.3 system-ui,sans-serif; }
+    .restaurant-compare .ui-icon { width:16px; height:16px; flex-basis:16px; }
+    .restaurant-compare.restaurant-map-link[aria-pressed="true"] { color:#111; background:transparent; }
+    .restaurant-media { position:absolute; width:40px; height:40px; top:14px; right:36px; }
+    .restaurant-card:has(.restaurant-media) .restaurant-title-link h3 { padding-right:46px; }
+    .restaurant-detail-area:has(.restaurant-detail-fallback) { inset:0; z-index:2; background:#fff; overflow:auto; padding:8px; }
+    .restaurant-detail-fallback { width:100%; font-size:12px; }
+    .answer-actions { margin-top:12px; margin-bottom:8px; }
+    .answer-action { width:40px; height:40px; color:#666; }
+    .answer-action .ui-icon { width:20px; height:20px; }
+    .related-arrow { width:28px; height:28px; flex-basis:28px; border:1px solid #ccc; }
+    .answer-chips .quick-reply-chip { border:1px solid #111; background:#fff; color:#111; }
+    .answer-chips .skip-chip { border-color:#aaa; color:#666; }
+    .action-chips { border-top:0; padding-top:0; }
+    .action-chips .quick-reply-chip { border:1px solid #ccc; background:transparent; font-size:12px; color:#666; }
+    .action-chips .quick-reply-title { font-size:12px; }
+    .result-conditions { gap:6px; margin:0 0 8px; }
+    .result-conditions .meal-chip { min-height:26px; padding:2px 8px; font-size:12px; background:#fafafa; border-color:#e8e8e8; }
+    .result-conditions .ui-icon { width:14px; height:14px; flex-basis:14px; }
+    .turn-question { display:flex; align-items:center; gap:6px; }
+    .turn-question .ui-icon { order:-1; width:18px; height:18px; }
+    .quick-reply-arrow .ui-icon { width:18px; height:18px; }
+    .comparison-items .ui-icon { order:1; width:16px; height:16px; }
+    .comparison-item, .comparison-submit, .start-btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+    .composer-jump-row { display:none; height:52px; padding-bottom:12px; justify-content:flex-end; }
+    .composer-jump-row:has(.conversation-bottom:not([hidden])) { display:flex; }
+    .conversation-bottom { position:static; z-index:1; width:40px; height:40px; display:grid; place-items:center; margin-left:auto; border-radius:50%; background:#fff; box-shadow:0 2px 10px #0002; }
+    .conversation-bottom[hidden] { display:none; }
+    .chat-dock { z-index:25; }
+    .messages { padding-bottom:calc(var(--dock-height, 180px) + 24px); }
+    .history-check { display:inline-flex; align-items:center; }
+    .history-check .ui-icon { width:16px; height:16px; }
+    .meal-chip[aria-pressed="true"]::before { content:none; }
   </style>
 </head>
 <body>
+  <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
+    <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+    <symbol id="i-chevron-right" viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></symbol>
+    <symbol id="i-compare-add" viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="4"/><path d="M12 8.5v7M8.5 12h7"/></symbol>
+    <symbol id="i-compare" viewBox="0 0 24 24"><path d="M8 5h11M8 5l3-3M8 5l3 3M16 19H5M16 19l-3-3M16 19l-3 3"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M15 9V6.5A2.5 2.5 0 0 0 12.5 4h-6A2.5 2.5 0 0 0 4 6.5v6A2.5 2.5 0 0 0 6.5 15H9"/></symbol>
+    <symbol id="i-image" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="14" rx="3"/><circle cx="9" cy="10" r="1.6"/><path d="M5 17l4.5-4.5 3 3 2.5-2.5L20 17"/></symbol>
+    <symbol id="i-locate" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.5"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></symbol>
+    <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+    <symbol id="i-new-chat" viewBox="0 0 24 24"><path d="M12 5H7a3 3 0 0 0-3 3v9a3 3 0 0 0 3 3h9a3 3 0 0 0 3-3v-5M18.5 3.5a1.8 1.8 0 0 1 2.5 2.5L12 15l-3.5 1 1-3.5z"/></symbol>
+    <symbol id="i-people" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M3.5 19a5.5 5.5 0 0 1 11 0M16 5.5a3 3 0 0 1 0 5.5M17.5 14a5.5 5.5 0 0 1 3 5"/></symbol>
+    <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-6.5-5.6-6.5-11A6.5 6.5 0 0 1 12 3.5 6.5 6.5 0 0 1 18.5 10c0 5.4-6.5 11-6.5 11z"/><circle cx="12" cy="10" r="2.4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-regenerate" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 0-14.5-4.5L4 8M4 4v4h4M4 13a8 8 0 0 0 14.5 4.5L20 16M20 20v-4h-4"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 24 24"><path d="M4 12a8 8 0 1 0 2.6-5.9M4 4.5V9h4.5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></symbol>
+    <symbol id="i-send" viewBox="0 0 24 24"><path d="M12 19V5M12 5l-6 6M12 5l6 6"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 15V4M8 8l4-4 4 4M5 12v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></symbol>
+    <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></symbol>
+    <symbol id="i-stop" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2" fill="currentColor" stroke="none"/></symbol>
+    <symbol id="i-utensils" viewBox="0 0 24 24"><path d="M7 3v7a2 2 0 0 0 2 2v9M5 3v6M9 3v6M17 21V3c-2.2 1.2-3.5 3.8-3.5 7 0 1.6.9 2.5 2 2.5H17"/></symbol>
+  </svg>
   <div class="app">
     <nav class="rail" aria-label="주 메뉴">
-      <button class="brand" id="sidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><img class="brand-logo" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI" /></button>
+      <button class="brand" id="sidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button>
       <div class="rail-nav">
         <button class="icon-btn" id="aboutRail" aria-label="Inchelin Guide AI 소개" title="Inchelin Guide AI 소개"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /></button>
-        <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><img class="nav-icon" src="assets/intro-icon.png" alt="" /></button>
+        <button class="icon-btn active" id="newChatRail" aria-label="새 채팅" title="새 채팅"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg></button>
         <button class="icon-btn" id="guideRail" aria-label="사용 설명서" title="사용 설명서"><img class="nav-icon" src="assets/guide-icon.png" alt="" /></button>
       </div>
       <div class="rail-bottom" id="railBottomMenu" aria-label="계정 메뉴"></div>
     </nav>
 
     <aside class="sidebar" id="sidebar" aria-hidden="true">
-      <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg viewBox="0 0 24 24" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" stroke-width="1.6"/><path d="M15 4v16" stroke-width="1.6"/></svg></button></div>
+      <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button></div>
       <button class="new-chat" id="aboutSide"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /><span>Inchelin Guide AI 소개</span></button>
-      <button class="new-chat" id="newChatSide"><img class="nav-icon" src="assets/intro-icon.png" alt="" /><span>새 채팅</span></button>
+      <button class="new-chat" id="newChatSide" aria-label="새 채팅"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg><span>새 채팅</span></button>
       <button class="new-chat" id="guideSide"><img class="nav-icon" src="assets/guide-icon.png" alt="" /><span>사용 설명서</span></button>
-      <div class="history-label">최근 대화</div>
+      <div class="history-label"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg> 최근 대화</div>
       <div class="history-list" id="historyList"></div>
       <div class="sidebar-foot" id="sidebarAccountArea"></div>
     </aside>
@@ -806,17 +882,17 @@
     <main class="main" id="main">
       <header class="mobile-header" aria-label="모바일 상단 메뉴">
         <div class="mobile-header-left">
-          <button class="icon-btn mobile-menu" id="mobileSidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none"><path d="M4 7h16M4 12h16M4 17h16" stroke-width="1.7" stroke-linecap="round" /></svg></button>
+          <button class="icon-btn mobile-menu" id="mobileSidebarToggle" aria-label="사이드바 펼치기" aria-expanded="false"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button>
           <span class="mobile-brand"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span>
         </div>
         <div class="mobile-header-actions">
-          <button class="share-action mobile-share-action" id="mobileShareButton" type="button" aria-label="대화 공유하기" hidden><svg viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8h14v-8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button class="start-btn mobile-start" id="mobileStartButton">시작하기</button>
+          <button class="share-action mobile-share-action" id="mobileShareButton" type="button" aria-label="대화 공유하기" hidden><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg></button>
+          <button class="start-btn mobile-start" id="mobileStartButton" aria-label="시작하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg>시작하기</button>
         </div>
       </header>
       <header class="topbar">
-        <button class="share-action" id="shareButton" type="button" hidden><svg viewBox="0 0 24 24" fill="none"><path d="M12 15V3m0 0L8 7m4-4 4 4M5 11v8h14v-8" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span>공유하기</span></button>
-        <button class="start-btn" id="startButton">시작하기</button>
+        <button class="share-action" id="shareButton" type="button" hidden aria-label="공유하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg><span>공유하기</span></button>
+        <button class="start-btn" id="startButton" aria-label="시작하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg>시작하기</button>
       </header>
 
       <section class="workspace">
@@ -825,8 +901,8 @@
           <form class="composer" id="welcomeForm">
             <textarea id="welcomeInput" aria-label="질문 입력" placeholder="먹고 싶은 메뉴나 분위기를 편하게 말해보세요" rows="1"></textarea>
             <div class="composer-actions">
-              <button class="icon-btn plus task-trigger" type="button" aria-label="추가 메뉴" aria-expanded="false">＋</button>
-              <button class="send" id="welcomeSend" type="submit" aria-label="질문 보내기" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button class="icon-btn plus task-trigger" type="button" aria-label="추가 메뉴" aria-expanded="false"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
+              <button class="send" id="welcomeSend" type="submit" aria-label="질문 보내기" disabled><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-send"/></svg></button>
             </div>
           </form>
           <div class="suggestions" id="suggestions" aria-label="추천 질문"></div>
@@ -839,18 +915,18 @@
           </div>
           <div class="chat-dock" id="chatDock"><div class="chat-dock-inner">
           <section class="comparison-tray" id="comparisonTray" aria-label="비교 트레이" hidden></section>
+          <div class="composer-jump-row"><button id="conversationBottom" class="conversation-bottom" type="button" aria-label="맨 아래로" hidden><svg class="ui-icon" aria-hidden="true"><use href="#i-arrow-down"/></svg></button></div>
           <form class="composer chat-composer" id="chatForm">
             <textarea id="chatInput" aria-label="후속 질문 입력" placeholder="후속 질문을 입력하세요" rows="1"></textarea>
             <div class="composer-actions">
-              <button class="icon-btn plus task-trigger" type="button" aria-label="추가 메뉴" aria-expanded="false">＋</button>
-              <button class="send" id="chatSend" type="submit" aria-label="질문 보내기" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+              <button class="icon-btn plus task-trigger" type="button" aria-label="추가 메뉴" aria-expanded="false"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg></button>
+              <button class="send" id="chatSend" type="submit" aria-label="질문 보내기" disabled><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-send"/></svg></button>
             </div>
           </form>
           <div class="disclaimer">AI 답변은 참고용이며 중요한 결정 전에는 원문과 전문가 확인이 필요합니다.</div>
           </div></div>
         </div>
 
-        <button id="conversationBottom" class="conversation-bottom" type="button" aria-label="맨 아래로" hidden>↓</button>
 
         <div class="guide-panel" id="guidePanel">
           <h1 style="margin-bottom:12px">메뉴부터 맛집까지, 함께 찾아볼까요?</h1>
@@ -865,19 +941,19 @@
         <button role="menuitem" id="releaseButton"><span class="menu-icon">◴</span>업데이트 소식</button>
       </div>
       <div class="task-menu" id="taskMenu" role="menu">
-        <button data-meal-tool="category" role="menuitem"><span aria-hidden="true">▦</span>카테고리로 찾기</button>
-        <button id="photoButton" role="menuitem"><span>▧</span>사진 업로드</button>
-        <button id="pluginButton" role="menuitem"><span>✣</span>플러그인</button>
+        <button data-meal-tool="category" role="menuitem" aria-label="카테고리로 찾기"><svg class="ui-icon" aria-hidden="true"><use href="#i-utensils"/></svg>카테고리로 찾기</button>
+        <button id="photoButton" role="menuitem" aria-label="사진 업로드"><svg class="ui-icon" aria-hidden="true"><use href="#i-image"/></svg>사진 업로드</button>
+        <button id="pluginButton" role="menuitem" aria-label="플러그인"><svg class="ui-icon" aria-hidden="true"><use href="#i-menu"/></svg>플러그인</button>
       </div>
       <input type="file" id="fileInput" accept="image/*" hidden />
     </main>
   </div>
 
-  <div class="overlay" id="aboutOverlay"><section class="dialog about-dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기">×</button><div class="about-shell"><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">인슐랭가이드 AI 소개</h2><div class="about-copy"><div class="about-intro"><p><strong>인슐랭 가이드</strong>는 보험(Insurance)과 미슐랭 가이드(Michelin Guide)를 더한 이름입니다.</p><p>보험인과 고객이 함께 <strong>좋은 맛집을 발견하고 공유하는 맛집 앱</strong>입니다.</p></div><section class="about-story" aria-labelledby="aboutRoleTitle"><h3 id="aboutRoleTitle">인슐랭가이드 AI가 하는 일</h3><p>식사 상황과 취향을 이해해 <strong>메뉴 선택부터 실제 음식점 탐색까지</strong> 이어주는 실행형 AI 맛집 가이드입니다.</p><p>막연한 고민은 선택하기 쉽게 좁혀주고, 지역이 정해지면 실제 검색 결과와 확인된 근거로 방문할 곳을 찾아드립니다.</p></section><section class="about-story" aria-labelledby="aboutStoryTitle"><h3 id="aboutStoryTitle">우리가 인슐랭 가이드를 만든 이유</h3><p>맛있는 한 끼는 평범한 하루를 조금 더 즐겁게 만들어줍니다.</p><p>전국의 보험인과 고객이 좋았던 맛집을 함께 공유하고, 누구나 좋은 한 끼를 쉽게 만날 수 있도록 인슐랭 가이드를 시작했습니다.</p></section><p class="about-vision"><span>맛집을 고를 때 믿고 찾을 수 있는</span><strong>‘맛집 앱의 보험’이 되겠습니다.</strong></p></div></div></section></div>
+  <div class="overlay" id="aboutOverlay"><section class="dialog about-dialog" role="dialog" aria-modal="true" aria-labelledby="aboutTitle"><button class="dialog-close" data-close="aboutOverlay" aria-label="닫기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button><div class="about-shell"><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="aboutTitle">인슐랭가이드 AI 소개</h2><div class="about-copy"><div class="about-intro"><p><strong>인슐랭 가이드</strong>는 보험(Insurance)과 미슐랭 가이드(Michelin Guide)를 더한 이름입니다.</p><p>보험인과 고객이 함께 <strong>좋은 맛집을 발견하고 공유하는 맛집 앱</strong>입니다.</p></div><section class="about-story" aria-labelledby="aboutRoleTitle"><h3 id="aboutRoleTitle">인슐랭가이드 AI가 하는 일</h3><p>식사 상황과 취향을 이해해 <strong>메뉴 선택부터 실제 음식점 탐색까지</strong> 이어주는 실행형 AI 맛집 가이드입니다.</p><p>막연한 고민은 선택하기 쉽게 좁혀주고, 지역이 정해지면 실제 검색 결과와 확인된 근거로 방문할 곳을 찾아드립니다.</p></section><section class="about-story" aria-labelledby="aboutStoryTitle"><h3 id="aboutStoryTitle">우리가 인슐랭 가이드를 만든 이유</h3><p>맛있는 한 끼는 평범한 하루를 조금 더 즐겁게 만들어줍니다.</p><p>전국의 보험인과 고객이 좋았던 맛집을 함께 공유하고, 누구나 좋은 한 끼를 쉽게 만날 수 있도록 인슐랭 가이드를 시작했습니다.</p></section><p class="about-vision"><span>맛집을 고를 때 믿고 찾을 수 있는</span><strong>‘맛집 앱의 보험’이 되겠습니다.</strong></p></div></div></section></div>
 
-  <div class="overlay" id="shareOverlay"><section class="dialog share-dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle"><button class="dialog-close" data-close="shareOverlay" aria-label="닫기">×</button><h2 id="shareTitle">이 대화 공유하기</h2><p class="share-dialog-copy">현재 대화 내용을 다른 사람과 공유할 수 있어요. 위치 좌표와 로그인 정보는 공유 내용에서 제외됩니다.</p><div id="shareCreateView"><button class="primary-action" id="createShareLinkButton" type="button" style="width:100%">공유 링크 만들기</button></div><div class="share-link-result" id="shareLinkResult" hidden><div class="share-link-row"><input class="share-link-output" id="shareLinkOutput" type="text" readonly aria-label="공유 링크"><button class="share-copy-button" id="copyShareLinkButton" type="button">링크 복사</button></div></div></section></div>
+  <div class="overlay" id="shareOverlay"><section class="dialog share-dialog" role="dialog" aria-modal="true" aria-labelledby="shareTitle"><button class="dialog-close" data-close="shareOverlay" aria-label="닫기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button><h2 id="shareTitle">이 대화 공유하기</h2><p class="share-dialog-copy">현재 대화 내용을 다른 사람과 공유할 수 있어요. 위치 좌표와 로그인 정보는 공유 내용에서 제외됩니다.</p><div id="shareCreateView"><button class="primary-action" id="createShareLinkButton" type="button" style="width:100%">공유 링크 만들기</button></div><div class="share-link-result" id="shareLinkResult" hidden><div class="share-link-row"><input class="share-link-output" id="shareLinkOutput" type="text" readonly aria-label="공유 링크"><button class="share-copy-button" id="copyShareLinkButton" type="button">링크 복사</button></div></div></section></div>
 
-  <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기">×</button>
+  <div class="overlay" id="authOverlay"><section class="dialog auth-dialog" id="authDialog" role="dialog" aria-modal="true" aria-labelledby="authTitle"><button class="dialog-close" data-close="authOverlay" aria-label="닫기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button>
     <div class="auth-view" id="loginView">
       <h2 id="authTitle">로그인 또는 회원가입</h2><p class="dialog-sub">로그인하면 채팅을 저장하고, 다음에도 이어서 질문할 수 있어요. Inchelin Guide AI의 다양한 플러그인도 함께 이용해 보세요.</p>
       <form class="auth-form" id="authForm"><label>이메일 또는 휴대전화 번호<input type="text" autocomplete="username" placeholder="아이디를 입력해 주세요" required /></label><label>비밀번호<input type="password" autocomplete="current-password" placeholder="비밀번호를 입력해 주세요" required /></label><button class="primary-action" type="submit">로그인</button></form>
@@ -888,9 +964,9 @@
       <button class="auth-back" type="button" data-auth-back="profile">‹ 계정으로</button><h2>요금플랜</h2><p class="dialog-sub">사용량과 기능을 비교해 나에게 맞는 플랜을 선택하세요.</p>
       <div class="billing-toggle" id="billingToggle"><button class="active" type="button" data-billing="monthly">월간</button><button type="button" data-billing="annual">연간</button></div>
       <div class="plan-grid" id="planGrid">
-        <button class="plan-card" type="button" data-plan="Free"><span class="plan-check">✓</span><h3>Free</h3><div class="plan-price-row"><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-billing">결제 정보 없이 이용</p><p class="plan-copy">맛있는 한 끼를 부담 없이 찾아보세요.</p><ul><li>기본 AI 사용량 제공</li><li>맛집 검색과 추천</li><li>채팅 기록 저장</li></ul><span class="plan-card-action">Free 선택</span></button>
-        <button class="plan-card" type="button" data-plan="Pro"><span class="plan-check">✓</span><h3>Pro</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩9,900" data-annual="₩8,250">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩99,000 결제">매월 결제</p><p class="plan-copy">맛집을 자주 찾는다면 더 넉넉하게 이용하세요.</p><ul><li>Free의 모든 기능</li><li>Free보다 넉넉한 AI 사용량</li><li>대화형 맛집 탐색</li></ul><span class="plan-card-action">Pro 선택</span></button>
-        <button class="plan-card" type="button" data-plan="Max"><span class="plan-check">✓</span><h3>Max</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩29,000" data-annual="₩24,167">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩290,000 결제">매월 결제</p><p class="plan-copy">여러 지역과 메뉴를 충분히 살펴보세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>자유로운 조건 변경과 재추천</li></ul><span class="plan-card-action">Max 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Free" aria-label="Free 플랜 선택"><span class="plan-check"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></span><h3>Free</h3><div class="plan-price-row"><span class="plan-price">₩0</span> <span class="plan-unit">무료</span></div><p class="plan-billing">결제 정보 없이 이용</p><p class="plan-copy">맛있는 한 끼를 부담 없이 찾아보세요.</p><ul><li>기본 AI 사용량 제공</li><li>맛집 검색과 추천</li><li>채팅 기록 저장</li></ul><span class="plan-card-action">Free 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Pro" aria-label="Pro 플랜 선택"><span class="plan-check"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></span><h3>Pro</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩9,900" data-annual="₩8,250">₩9,900</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩99,000 결제">매월 결제</p><p class="plan-copy">맛집을 자주 찾는다면 더 넉넉하게 이용하세요.</p><ul><li>Free의 모든 기능</li><li>Free보다 넉넉한 AI 사용량</li><li>대화형 맛집 탐색</li></ul><span class="plan-card-action">Pro 선택</span></button>
+        <button class="plan-card" type="button" data-plan="Max" aria-label="Max 플랜 선택"><span class="plan-check"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></span><h3>Max</h3><div class="plan-price-row"><span class="plan-price" data-monthly="₩29,000" data-annual="₩24,167">₩29,000</span> <span class="plan-unit">/월</span></div><p class="plan-billing" data-monthly="매월 결제" data-annual="연 ₩290,000 결제">매월 결제</p><p class="plan-copy">여러 지역과 메뉴를 충분히 살펴보세요.</p><ul><li>Pro의 모든 기능</li><li>가장 넉넉한 AI 사용량</li><li>자유로운 조건 변경과 재추천</li></ul><span class="plan-card-action">Max 선택</span></button>
       </div><p class="plan-note">모든 플랜에는 사용량 한도가 있으며, 플랜에 따라 제공량이 다릅니다.</p><button class="signup-continue" id="planContinue" type="button" disabled>플랜을 선택해 주세요</button>
     </div>
     <div class="auth-view" id="verifyView" hidden>
@@ -912,16 +988,16 @@
       <button class="auth-back" id="legalBack" type="button">‹ &nbsp;가입 정보로 돌아가기</button><h2 id="legalTitle">이용약관</h2><div class="legal-copy" id="legalCopy"></div>
     </div>
     <div class="auth-view verification-view" id="successView" hidden>
-      <div class="success-mark">✓</div><h2>회원가입이 완료됐어요</h2><p class="dialog-sub">이제 선택한 플랜으로 시작할 수 있어요.<br />다음에도 <b id="successContact"></b> 계정으로 로그인해 이어서 이용하세요.</p><div class="selected-plan"><span id="successPlanLabel">Free · 무료</span></div><button class="primary-action" id="startAfterSignup" type="button" style="width:100%">채팅 시작하기</button><button class="secondary-action" type="button" data-auth-back="profile">계정 보기</button>
+      <div class="success-mark"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-check"/></svg></div><h2>회원가입이 완료됐어요</h2><p class="dialog-sub">이제 선택한 플랜으로 시작할 수 있어요.<br />다음에도 <b id="successContact"></b> 계정으로 로그인해 이어서 이용하세요.</p><div class="selected-plan"><span id="successPlanLabel">Free · 무료</span></div><button class="primary-action" id="startAfterSignup" type="button" style="width:100%">채팅 시작하기</button><button class="secondary-action" type="button" data-auth-back="profile">계정 보기</button>
     </div>
     <div class="auth-view" id="profileView" hidden>
       <h2>계정 / 프로필</h2><p class="dialog-sub">로그인한 계정과 현재 플랜을 확인할 수 있어요.</p><div class="selected-plan"><span id="profileName">사용자</span><b id="profilePlan">Free 플랜</b></div><button class="primary-action" id="profilePlanButton" type="button" style="width:100%">요금플랜 보기</button><button class="secondary-action" id="logoutButton" type="button">로그아웃</button>
     </div>
   </section></div>
 
-  <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기">×</button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">맛집 탐색에 필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">전체</button><button class="filter-btn" data-filter="explore">탐색</button><button class="filter-btn" data-filter="recommend">추천·비교</button><button class="filter-btn" data-filter="data">정보</button><button class="filter-btn" data-filter="fun">재미</button></div><div class="plugin-sections" id="pluginGrid"></div></section></div>
+  <div class="overlay" id="pluginOverlay"><section class="dialog wide" role="dialog" aria-modal="true" aria-labelledby="pluginTitle"><button class="dialog-close" data-close="pluginOverlay" aria-label="플러그인 닫기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button><div class="eyebrow">INCHELIN GUIDE AI</div><h2 id="pluginTitle">플러그인</h2><p class="dialog-sub">맛집 탐색에 필요한 기능을 선택하거나 자주 쓰는 도구를 고정하세요.</p><div class="plugin-head"><input class="search-input" id="pluginSearch" placeholder="플러그인 검색" /><span id="pluginCount"></span></div><div class="plugin-filters" id="pluginFilters"><button class="filter-btn active" data-filter="all">전체</button><button class="filter-btn" data-filter="explore">탐색</button><button class="filter-btn" data-filter="recommend">추천·비교</button><button class="filter-btn" data-filter="data">정보</button><button class="filter-btn" data-filter="fun">재미</button></div><div class="plugin-sections" id="pluginGrid"></div></section></div>
 
-  <div class="overlay" id="releaseOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="releaseTitle"><button class="dialog-close" data-close="releaseOverlay" aria-label="닫기">×</button><div class="eyebrow">RELEASE NOTES</div><h2 id="releaseTitle">Inchelin Guide AI 업데이트</h2><p class="dialog-sub">서비스에 반영된 기능과 개선 내용을 확인하세요.</p><article class="release-card"><div class="release-meta"><span>v1.1.0</span><span>2026.09.29</span><span class="badge">최신</span></div><h3>채팅 경험과 도구 연결 개선</h3><ul><li>추천 질문을 입력창에 미리 채워 수정할 수 있습니다.</li><li>대화 저장·이름 변경·삭제를 지원합니다.</li><li>사진 업로드와 플러그인 선택 흐름을 추가했습니다.</li></ul></article><article class="release-card"><div class="release-meta"><span>v1.0.0</span><span>2026.09.28</span></div><h3>Inchelin Guide AI 기본 화면</h3></article></section></div>
+  <div class="overlay" id="releaseOverlay"><section class="dialog" role="dialog" aria-modal="true" aria-labelledby="releaseTitle"><button class="dialog-close" data-close="releaseOverlay" aria-label="닫기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-close"/></svg></button><div class="eyebrow">RELEASE NOTES</div><h2 id="releaseTitle">Inchelin Guide AI 업데이트</h2><p class="dialog-sub">서비스에 반영된 기능과 개선 내용을 확인하세요.</p><article class="release-card"><div class="release-meta"><span>v1.1.0</span><span>2026.09.29</span><span class="badge">최신</span></div><h3>채팅 경험과 도구 연결 개선</h3><ul><li>추천 질문을 입력창에 미리 채워 수정할 수 있습니다.</li><li>대화 저장·이름 변경·삭제를 지원합니다.</li><li>사진 업로드와 플러그인 선택 흐름을 추가했습니다.</li></ul></article><article class="release-card"><div class="release-meta"><span>v1.0.0</span><span>2026.09.28</span></div><h3>Inchelin Guide AI 기본 화면</h3></article></section></div>
 
   <div class="toast" id="toast" role="status"></div>
 
@@ -942,15 +1018,15 @@
     ];
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
-      ['메뉴 탐색', '오늘 뭐 먹을지 후보를 좁혀드려요', 'explore', '메'],
-      ['상황별 추천', '회식·데이트·혼밥 등 상황에 맞춰 골라드려요', 'recommend', '상'],
-      ['지역별 찾기', '동네나 역 주변 맛집을 찾아드려요', 'explore', '지'],
-      ['등록 맛집 비교', '고른 식당들의 확인된 정보를 나란히 비교해요', 'recommend', '비'],
-      ['추천 기준·데이터 안내', '지금 연결된 검색 결과와 추천 기준을 알려드려요', 'data', 'D']
+      ['메뉴 탐색', '오늘 뭐 먹을지 후보를 좁혀드려요', 'explore', 'utensils'],
+      ['상황별 추천', '회식·데이트·혼밥 등 상황에 맞춰 골라드려요', 'recommend', 'people'],
+      ['지역별 찾기', '동네나 역 주변 맛집을 찾아드려요', 'explore', 'pin'],
+      ['등록 맛집 비교', '고른 식당들의 확인된 정보를 나란히 비교해요', 'recommend', 'compare'],
+      ['추천 기준·데이터 안내', '지금 연결된 검색 결과와 추천 기준을 알려드려요', 'data', 'search']
     ].map((p, i) => ({ id: i + 1, name: p[0], desc: p[1], type: p[2], icon: p[3] }));
     // 최신 매장 정보(id 6)는 영업시간·전화가 있는 인슐랭 DB 연결 후 복구해요.
     const PLUGIN_SECTIONS = [{ type: 'explore', title: '탐색' }, { type: 'recommend', title: '추천·비교' }, { type: 'data', title: '정보' }, { type: 'fun', title: '재미' }];
-    const FUN_PLUGINS = [{ tool: 'wheel', name: '돌림판', desc: '후보를 돌려 오늘의 메뉴를 정해요', icon: '◉' }, { tool: 'ladder', name: '사다리게임', desc: '여러 명이 함께 메뉴를 정해요', icon: '☷' }];
+    const FUN_PLUGINS = [{ tool: 'wheel', name: '돌림판', desc: '후보를 돌려 오늘의 메뉴를 정해요', icon: 'regenerate' }, { tool: 'ladder', name: '사다리게임', desc: '여러 명이 함께 메뉴를 정해요', icon: 'compare' }];
     const GUIDES = [
       ['처음 이용하기', '추천 질문을 선택하면 일반 질문과 같은 방식으로 바로 대화를 시작합니다. 직접 입력한 질문도 전송 버튼으로 이어서 물어볼 수 있습니다.'],
       ['회원가입', '시작하기 또는 로그인 버튼을 눌러 계정 화면을 열 수 있습니다. 현재 데모에서는 가입 없이 계속하기도 가능합니다.'],
@@ -968,7 +1044,7 @@
     const sidebar = $('#sidebar');
     const main = $('#main');
     if (typeof ResizeObserver !== 'undefined') new ResizeObserver(entries => {
-      document.documentElement.style.setProperty('--dock-height', Math.max(180, entries[0].target.getBoundingClientRect().height) + 'px');
+      document.documentElement.style.setProperty('--dock-height', Math.ceil(entries[0].target.getBoundingClientRect().height) + 'px');
     }).observe($('#chatDock'));
     const scrim = $('#scrim');
     const moreMenu = $('#moreMenu');
@@ -1460,11 +1536,13 @@
         if (autoFollowConversation && item?.isConnected !== false) item?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
       });
     }
-    async function copyAnswer(message) {
+    async function copyAnswer(message, button = null) {
       const cards=(message.restaurants||[]).map(card=>[card.name,card.category,card.address].filter(Boolean).join(' · '));
       const menus=(message.meta?.menuCards||[]).map(card=>[card.name,card.description,card.reason].filter(Boolean).join(' · '));
       const text=[message.content,...menus,...cards].filter(Boolean).join('\n');
-      try { await navigator.clipboard.writeText(text); showToast('답변을 복사했어요'); }
+      try { await navigator.clipboard.writeText(text); showToast('답변을 복사했어요');
+        if(button){button.textContent='';button.appendChild(uiIcon('check'));button.setAttribute('aria-label','복사됨');clearTimeout(button.copyTimer);button.copyTimer=setTimeout(()=>{button.textContent='';button.appendChild(uiIcon('copy'));button.setAttribute('aria-label','복사');},1500);}
+      }
       catch { showToast('복사하지 못했어요. 브라우저 권한을 확인해 주세요'); }
     }
     function regenerateAnswer(message) {
@@ -1644,6 +1722,14 @@
     }
     const comparisonTray = new Map();
     const comparisonButtons = new Map();
+    function uiIcon(name) {
+      const ns='http://www.w3.org/2000/svg';
+      const make=tag=>document.createElementNS?document.createElementNS(ns,tag):document.createElement(tag);
+      const svg=make('svg');svg.setAttribute('class','ui-icon');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
+      const use=make('use');use.setAttribute('href','#i-'+name);svg.appendChild(use);return svg;
+    }
+    function setIconLabel(node, name, label) { node.textContent=label;node.appendChild(uiIcon(name));node.setAttribute('aria-label',label); }
+    function iconHTML(name) { return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`; }
     function comparisonMessage(cards) {
       return cards.map((card, index) => {
         if (index === cards.length - 1) return card.name;
@@ -1653,19 +1739,19 @@
     }
     function renderComparisonTray() {
       for (const [id, buttons] of comparisonButtons) for (const button of buttons) {
-        const selected = comparisonTray.has(id); button.textContent = selected ? '✓ 담았어요' : '비교에 담기'; button.setAttribute('aria-pressed', String(selected));
+        const selected = comparisonTray.has(id); setIconLabel(button,selected?'check':'compare-add',selected?'담음':'비교에 담기'); button.setAttribute('aria-pressed', String(selected));button.setAttribute('aria-label',button.restaurantName+' '+(selected?'비교에서 빼기':'비교에 담기'));
       }
       const host = document.getElementById?.('comparisonTray');
       if (!host) return;
       host.innerHTML = ''; host.hidden = comparisonTray.size === 0;
       const items = document.createElement('div'); items.className = 'comparison-items';
       for (const card of comparisonTray.values()) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'comparison-item'; remove.textContent = card.name + ' ×';
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'comparison-item'; setIconLabel(remove,'close',card.name);
         remove.setAttribute('aria-label', card.name + ' 비교에서 빼기');
         remove.addEventListener('click', () => { comparisonTray.delete(card.id); renderComparisonTray(); }); items.appendChild(remove);
       }
       const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'comparison-submit'; compare.disabled = comparisonTray.size < 2;
-      compare.textContent = comparisonTray.size < 2 ? '1곳 더 담아 주세요' : '비교하기';
+      setIconLabel(compare,'compare',comparisonTray.size < 2 ? '1곳 더 담아 주세요' : '비교하기');compare.setAttribute('aria-label',comparisonTray.size < 2?'1곳 더 담아 주세요':'담은 식당 비교하기');
       compare.addEventListener('click', () => { const cards = [...comparisonTray.values()]; if (cards.length >= 2) ask(comparisonMessage(cards), { compareCards: cards }); });
       host.append(items, compare);
     }
@@ -1680,17 +1766,18 @@
         const content = document.createElement('div'); content.className = 'restaurant-card-content';
         const body = document.createElement('div'); body.className = 'restaurant-card-body';
         const head = document.createElement('div'); head.className = 'restaurant-card-head';
-        const title = document.createElement('h3'); title.textContent = restaurant.name; body.appendChild(title);
+        const actions = document.createElement('div'); actions.className = 'restaurant-detail-area';
+        const detail = document.createElement(restaurant.naverPlaceUrl?'a':'button');detail.className='restaurant-title-link restaurant-map-link';detail.setAttribute('aria-label',restaurant.name+' 상세보기');
+        if(restaurant.naverPlaceUrl){detail.href=restaurant.naverPlaceUrl;detail.target='_blank';detail.rel='noopener noreferrer';}
+        else{detail.type='button';detail.addEventListener('click',()=>{if(!detail.disabled)resolveRestaurantDetail(restaurant,actions);});}
+        const title = document.createElement('h3'); title.textContent = restaurant.name;detail.append(title,uiIcon('chevron-right'));body.appendChild(detail);
         head.classList.add('restaurant-condition-chips');
         if (restaurant.category) {
           const category = document.createElement('span'); category.className = 'restaurant-category'; category.textContent = restaurant.foodLabel || restaurant.category; head.appendChild(category);
         }
         if (restaurant.regionLabel) { const area = document.createElement('span'); area.className = 'restaurant-category restaurant-region'; area.textContent = restaurant.regionLabel; head.appendChild(area); }
         body.appendChild(head);
-        if (restaurant.recommendationReason) {
-          const reason = document.createElement('p'); reason.className = 'restaurant-reason'; reason.textContent = restaurant.recommendationReason; body.appendChild(reason);
-        }
-        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address; body.appendChild(address);
+        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address; address.setAttribute('title',address.textContent);body.appendChild(address);
         content.appendChild(body);
         if (restaurant.imageUrl) {
           const media = document.createElement('div'); media.className = 'restaurant-media';
@@ -1699,15 +1786,8 @@
           image.addEventListener('error', () => media.remove(), { once: true }); media.appendChild(image); content.appendChild(media);
         }
         card.appendChild(content);
-        const actions = document.createElement('div'); actions.className = 'restaurant-detail-area';
-        if (restaurant.naverPlaceUrl) {
-          const link = document.createElement('a'); link.className = 'restaurant-map-link'; link.href = restaurant.naverPlaceUrl;
-          link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '상세보기'; actions.appendChild(link);
-        } else {
-          const detail = document.createElement('button'); detail.type = 'button'; detail.className = 'restaurant-map-link'; detail.textContent = '상세보기';
-          detail.addEventListener('click', () => { if (!detail.disabled) resolveRestaurantDetail(restaurant, actions); }); actions.appendChild(detail);
-        }
-        const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-map-link';
+        const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-compare restaurant-map-link';
+        compare.restaurantName=restaurant.name;
         if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());
         comparisonButtons.get(restaurant.id).add(compare);
         compare.addEventListener('click', () => {
@@ -1745,7 +1825,7 @@
           const ordinal = [/(?:첫\s*번째|처음|1\s*번째)/,/(?:두\s*번째|2\s*번째)/,/(?:세\s*번째|3\s*번째)/][index];
           if (!card.historyMarked && (card.historyLabel && content.includes(card.historyLabel) || ordinal?.test(content))) {
             card.historyMarked = true; card.classList.add('history-selected');
-            const check = document.createElement('span'); check.className = 'history-check'; check.textContent = '✓'; card.appendChild(check);
+            const check = document.createElement('span'); check.className = 'history-check'; check.appendChild(uiIcon('check')); card.appendChild(check);
           }
         });
         group.querySelectorAll('.quick-reply, .restaurant-map-link, .meal-chip, .related-question').forEach(button => {
@@ -1756,7 +1836,7 @@
           if (button.tagName === 'A') button.removeAttribute('href');
           if (selected) {
             button.classList.add('history-selected'); button.setAttribute('aria-pressed','true');
-            const check = document.createElement('span'); check.className = 'history-check'; check.textContent = '✓'; button.appendChild(check);
+            const check = document.createElement('span'); check.className = 'history-check'; check.appendChild(uiIcon('check')); button.appendChild(check);
           }
         });
       });
@@ -1767,6 +1847,7 @@
       if (message.role === 'user') retirePriorChoices(message.content);
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
+      item.chatRole=message.role;
       const copy = document.createElement('div');
       copy.className = 'message-copy';
       appendLimitedMarkdown(copy, message.meta?.turnPolicy?.intro || message.content);
@@ -1775,13 +1856,19 @@
         avatar.className = 'ai-avatar';
         avatar.src = 'assets/inchelin-guide-logo.png';
         avatar.alt = 'Inchelin Guide AI';
+        item.appendChild(avatar);
         const bubble = document.createElement('div');
         bubble.className = 'ai-bubble';
-        if (allowed('text') && message.meta?.searchConditions) {
+        const conditionKey=message.meta?.searchConditions?JSON.stringify(message.meta.searchConditions):'';
+        const priorAI=[...messagesEl.children].filter(node=>node.chatRole==='assistant');
+        const previousAI=extra.includes('regenerated')?priorAI.at(-2):priorAI.at(-1);
+        item.responseConditionKey=conditionKey;
+        if (allowed('text') && conditionKey && conditionKey !== previousAI?.responseConditionKey) {
           const conditions = document.createElement('div'); conditions.className = 'result-conditions'; conditions.setAttribute('aria-label', '현재 검색 조건');
           for (const [axis, label] of [['region', message.meta.searchConditions.region], ['food', message.meta.searchConditions.food]]) {
             if (!label) continue;
             const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'meal-chip'; chip.textContent = label; chip.setAttribute('aria-label', (axis === 'region' ? '지역 바꾸기: ' : '음식 바꾸기: ') + label);
+            chip.appendChild(uiIcon(axis==='region'?'pin':'utensils'));
             chip.addEventListener('click', () => { if (!chip.disabled) openSearchPicker(axis); }); conditions.appendChild(chip);
           }
           bubble.appendChild(conditions);
@@ -1828,6 +1915,7 @@
             title.className = 'quick-reply-title';
             title.textContent = card.title;
             button.appendChild(title);
+            if(answerLayout==='region')button.appendChild(uiIcon(card.title==='현재 위치 연결'?'locate':card.title==='직접 입력'?'search':'pin'));
             if (card.description && !actionReply) {
               const description = document.createElement('span');
               description.className = 'quick-reply-description';
@@ -1843,7 +1931,7 @@
               const arrow = document.createElement('span');
               arrow.className = 'quick-reply-arrow';
               arrow.setAttribute('aria-hidden', 'true');
-              arrow.textContent = '›';
+              arrow.appendChild(uiIcon('chevron-right'));
               button.appendChild(arrow);
             }
             button.addEventListener('click', () => {
@@ -1867,6 +1955,7 @@
         if (isMenuTurn && allowed('notice')) { const hint = document.createElement('p'); hint.className = 'menu-hint' + (message.meta?.notice ? ' turn-notice' : ''); hint.textContent = message.meta?.notice || message.meta?.turnPolicy?.menuHint || '끌리는 메뉴를 고르거나 먹고 싶은 걸 말해 주세요'; bubble.appendChild(hint); }
         if (allowed('question') && message.meta?.turnPolicy?.questionText) {
           const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
+          if(message.meta.turnPolicy.next_question?.slot==='companion')question.appendChild(uiIcon('people'));
         }
         for (const group of [answerTop, answerTiles, answerBottom]) if (group.children.length) answers.appendChild(group);
         if (allowed('chips') && answers.children.length) bubble.appendChild(answers);
@@ -1880,13 +1969,18 @@
           });
           bubble.appendChild(alternatives);
         }
+        const answerActions=document.createElement('div'); answerActions.className='answer-actions'; answerActions.setAttribute('aria-label','답변 도구');
+        for(const [label,icon] of [['복사','copy'],['다시 생성','regenerate']]) {
+          const button=document.createElement('button');button.type='button';button.className='answer-action';button.setAttribute('aria-label',label);button.setAttribute('title',label);button.appendChild(uiIcon(icon));button.addEventListener('click',()=>icon==='copy'?copyAnswer(message,button):regenerateAnswer(message));answerActions.appendChild(button);
+        }
+        bubble.appendChild(answerActions);
         if (allowed('related_questions') && message.meta?.relatedQuestions?.length) {
           const related=document.createElement('section');related.className='related-questions';related.setAttribute('aria-label','연관 질문');
           const label=document.createElement('p');label.className='related-label';label.textContent='이어서 물어볼 수 있어요';related.appendChild(label);
           message.meta.relatedQuestions.slice(0,3).forEach(choice=>{
             const button=document.createElement('button');button.type='button';button.className='related-question';button.setAttribute('aria-label',choice.text);button.historyLabel=choice.text;button.historyMessage=choice.text;
             const text=document.createElement('span');text.className='related-text';text.textContent=choice.text;
-            const arrow=document.createElement('span');arrow.className='related-arrow';arrow.textContent='→';arrow.setAttribute('aria-hidden','true');
+            const arrow=document.createElement('span');arrow.className='related-arrow';arrow.appendChild(uiIcon('arrow-right'));arrow.setAttribute('aria-hidden','true');
             button.append(text,arrow);button.addEventListener('click',()=>{if(!button.disabled)routeQuestion(choice.text);});related.appendChild(button);
           });bubble.appendChild(related);
         }
@@ -1894,15 +1988,11 @@
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
           message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '다른 곳 보기', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label === '다른 곳도 보여줘' ? '다른 곳 보기' : label;
+            button.setAttribute('aria-label',button.textContent);if(label==='조건 바꾸기')button.appendChild(uiIcon('sliders'));
             button.addEventListener('click', () => { if (!button.disabled) routeQuestion(label === '다른 곳 보기' ? '다른 곳도 보여줘' : label); }); actions.appendChild(button);
           });
           bubble.appendChild(actions);
         }
-        const actions=document.createElement('div'); actions.className='answer-actions'; actions.setAttribute('aria-label','답변 도구');
-        for(const [label,icon,action] of [['복사','⧉',()=>copyAnswer(message)],['다시 생성','↻',()=>regenerateAnswer(message)]]) {
-          const button=document.createElement('button');button.type='button';button.className='answer-action';button.setAttribute('aria-label',label);button.setAttribute('title',label);button.textContent=icon;button.addEventListener('click',action);actions.appendChild(button);
-        }
-        bubble.appendChild(actions);
         item.appendChild(bubble);
       } else {
         item.appendChild(copy);
@@ -1950,7 +2040,7 @@
       closeHistoryMenu();
       const list = $('#historyList');
       if (!histories.length) { list.innerHTML = '<div class="history-empty">아직 대화가 없습니다.</div>'; return; }
-      list.innerHTML = histories.map(h => `<div class="history-row"><button class="history-item" data-open-history="${h.id}">${escapeHTML(h.title)}</button><button class="history-more" data-history-menu="${h.id}" aria-label="${escapeHTML(h.title)} 대화 관리" aria-haspopup="menu" aria-expanded="false">···</button></div>`).join('');
+      list.innerHTML = histories.map(h => `<div class="history-row"><button class="history-item" data-open-history="${h.id}">${escapeHTML(h.title)}</button><button class="history-more" data-history-menu="${h.id}" aria-label="${escapeHTML(h.title)} 대화 관리" aria-haspopup="menu" aria-expanded="false">${iconHTML('menu')}</button></div>`).join('');
     }
     function openHistory(id) {
       const history = histories.find(h => h.id === id);
@@ -2018,11 +2108,11 @@
       if (value) {
         button.disabled = false;
         button.setAttribute('aria-label', '답변 생성 멈추기');
-        button.innerHTML = '<span class="stop-icon"></span>';
+        button.innerHTML = iconHTML('stop');
         $('#chatInput').disabled = false;
       } else {
         button.setAttribute('aria-label', '질문 보내기');
-        button.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+        button.innerHTML = iconHTML('send');
         $('#chatInput').disabled = false;
         resizeInput($('#chatInput'));
       }
@@ -2053,7 +2143,7 @@
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'retry-button';
-      retry.textContent = '다시 시도';
+      setIconLabel(retry,'retry','다시 시도');retry.setAttribute('aria-label','다시 시도');
       retry.addEventListener('click', () => { item.remove(); generateAnswer(request); });
       bubble.append(text, retry);
       item.append(avatar, bubble);
@@ -2091,7 +2181,7 @@
           const old = messagesEl.querySelector('.message.ai:last-child');
           const replacement=normalizeMessage({role:'assistant',content:answer.content,quickReplies:answer.quickReplies,restaurants:answer.restaurants,meta:answer.meta});
           chatMessages[chatMessages.length-1]=replacement;
-          const item=renderMessage(replacement,'live-reveal',autoFollowConversation);
+          const item=renderMessage(replacement,'live-reveal regenerated',autoFollowConversation);
           old?.remove(); answerRequests.set(replacement,request); saveConversation();
         } else {
           appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants, meta: answer.meta });
@@ -2395,14 +2485,15 @@
       if (window.innerWidth <= 768) setSidebar(false);
     }
     function renderPlugins() {
+      const iconHTML = name => `<svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`;
       const term = $('#pluginSearch').value.trim().toLowerCase();
       const items = PLUGINS.filter(p => (activeFilter === 'all' || p.type === activeFilter) && `${p.name} ${p.desc}`.toLowerCase().includes(term));
       const games = FUN_PLUGINS.filter(p => (activeFilter === 'all' || activeFilter === 'fun') && `${p.name} ${p.desc}`.toLowerCase().includes(term));
       $('#pluginCount').textContent = `${items.length + games.length}개 항목`;
       $('#pluginGrid').innerHTML = PLUGIN_SECTIONS.map(section => {
         const cards = section.type === 'fun'
-          ? games.map(p => `<button class="plugin-card" type="button" data-meal-tool="${p.tool}"><span class="plugin-icon" aria-hidden="true">${p.icon}</span><span class="plugin-text"><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><span aria-hidden="true">›</span></button>`).join('')
-          : items.filter(p => p.type === section.type).map(p => `<div class="plugin-card" data-plugin="${p.id}" role="button" tabindex="0" aria-label="${p.name}"><span class="plugin-icon">${p.icon}</span><span class="plugin-text"><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><button class="pin-btn ${pinned.includes(p.id) ? 'pinned' : ''}" data-pin="${p.id}" aria-pressed="${pinned.includes(p.id)}" aria-label="${p.name} 고정">${pinned.includes(p.id) ? '★' : '☆'}</button></div>`).join('');
+          ? games.map(p => `<button class="plugin-card" type="button" data-meal-tool="${p.tool}" aria-label="${p.name}"><span class="plugin-icon" aria-hidden="true">${iconHTML(p.icon)}</span><span class="plugin-text"><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><span aria-hidden="true">${iconHTML('chevron-right')}</span></button>`).join('')
+          : items.filter(p => p.type === section.type).map(p => `<div class="plugin-card" data-plugin="${p.id}" role="button" tabindex="0" aria-label="${p.name}"><span class="plugin-icon">${iconHTML(p.icon)}</span><span class="plugin-text"><span class="plugin-name">${p.name}</span><span class="plugin-desc">${p.desc}</span></span><button class="pin-btn ${pinned.includes(p.id) ? 'pinned' : ''}" data-pin="${p.id}" aria-pressed="${pinned.includes(p.id)}" aria-label="${p.name} 고정">${iconHTML(pinned.includes(p.id) ? 'check' : 'pin')}</button></div>`).join('');
         return cards ? `<section class="plugin-section" data-plugin-section="${section.type}" aria-labelledby="plugin-section-${section.type}"><h3 id="plugin-section-${section.type}">${section.title}</h3><div class="plugin-grid">${cards}</div></section>` : '';
       }).join('') || '<p class="meal-muted">검색 결과가 없어요.</p>';
     }
@@ -2569,7 +2660,7 @@
     }
     function setFieldSuccess(id, text = '') {
       const field = document.getElementById(id);
-      field.textContent = text ? `✓ ${text}` : '';
+      field.textContent = text || ''; if(text)field.appendChild(uiIcon('check'));
       field.classList.toggle('success', Boolean(text));
       field.classList.toggle('show', Boolean(text));
     }
@@ -2735,13 +2826,13 @@
     renderPlugins();
     let searchPicker = null;
     function openSearchPicker(axis) { if (searchPicker) searchPicker.open(axis); else showToast('선택기를 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); }
-    import('/assets/search-picker-v1.js?v=124').then(({ mountSearchPicker }) => {
+    import('/assets/search-picker-v1.js?v=127').then(({ mountSearchPicker }) => {
       searchPicker = mountSearchPicker({ getSlots: () => pluginState().slots,
         send: message => { currentLocationCoords = null; ask(message); }, locate: message => requestCurrentLocation(message),
         isBusy: () => generating || locationRequestInFlight,
         onOpen: () => { closeOverlay('pluginOverlay'); taskMenu.classList.remove('open'); } });
     }).catch(() => showToast('음식·지역 선택기를 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/plugin-actions-v1.js?v=124').then(({ mountPluginActions }) => {
+    import('/assets/plugin-actions-v1.js?v=127').then(({ mountPluginActions }) => {
       let storage;
       try { storage = window.localStorage; } catch (_) { /* 브라우저 저장소가 막혀도 도구를 이용해요. */ }
       pluginActions = mountPluginActions({
@@ -2758,7 +2849,7 @@
         }
       });
     }).catch(() => showToast('플러그인을 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/meal-tools-v2.js?v=117').then(({ mountMealTools }) => {
+    import('/assets/meal-tools-v2.js?v=127').then(({ mountMealTools }) => {
       mountMealTools({ openSearch: openSearchPicker, getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), onOpen: () => { closeOverlay('pluginOverlay'); return chatView.classList.contains('active') ? $('#chatForm .task-trigger') : $('#welcomeForm .task-trigger'); }, source: 'naver' });
     }).catch(() => {
       document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });

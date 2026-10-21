@@ -150,7 +150,7 @@ export async function testConversationUI(runCase) {
   const message = renderer.renderMessage({ role: 'assistant', content: first.body.message, restaurants: first.body.restaurants, quickReplies: first.body.suggestions, meta: first.body.meta });
   const bubble = ofClass(message, 'ai-bubble')[0];
   const tools=ofClass(message,'answer-action');assert.deepEqual(tools.map(button=>button.attributes['aria-label']),['복사','다시 생성']);tools.forEach(button=>button.click());assert.deepEqual(answerActions.map(item=>item[0]),['copy','regenerate']);
-  assert.equal(ofClass(message,'ai-avatar').length,0,'AI text has no avatar or speech balloon');
+  assert.equal(ofClass(message,'ai-avatar').length,1,'small identity logo returns beside the first line');
   const conditions = ofClass(message, 'result-conditions')[0];
   assert.deepEqual(conditions.children.map(node => node.textContent), ['강남역', '삼겹살']);
   conditions.children[0].click(); conditions.children[1].click();
@@ -204,7 +204,7 @@ export async function testConversationUI(runCase) {
   assert.ok(ofClass(menuNode, 'menu-choice').every(button=>button.disabled));
   assert.equal(ofClass(menuNode,'history-selected').length,1);
   assert.equal(ofClass(menuNode,'history-check').length,1);
-  assert.match(ofClass(menuNode,'history-selected')[0].textContent,/국밥.*✓/);
+  assert.match(ofClass(menuNode,'history-selected')[0].textContent,/국밥/);assert.ok(nodes(ofClass(menuNode,'history-selected')[0]).some(node=>node.attributes.href==='#i-check'));
   assert.ok(ofClass(message,'quick-reply').every(button=>button.disabled));
   assert.ok(ofClass(message,'restaurant-map-link').every(button=>button.disabled));
   assert.equal(ofClass(message,'restaurant-card').length,3,'old restaurant cards remain');
@@ -214,7 +214,7 @@ export async function testConversationUI(runCase) {
   const nextQuestion = renderer.renderMessage({role:'assistant',content:first.body.message,restaurants:first.body.restaurants,quickReplies:first.body.suggestions,meta:first.body.meta});
   renderer.renderMessage({role:'user',content:'회식이에요'});
   assert.equal(ofClass(nextQuestion,'history-selected').length,1);
-  assert.match(ofClass(nextQuestion,'history-selected')[0].textContent,/회식.*✓/);
+  assert.match(ofClass(nextQuestion,'history-selected')[0].textContent,/회식/);assert.ok(nodes(ofClass(nextQuestion,'history-selected')[0]).some(node=>node.attributes.href==='#i-check'));
   assert.equal(ofClass(menuNode,'history-selected').length,1,'a later answer cannot change historical selection');
   const sparse = await runCase({message:'강남역에서 삼겹살 먹을 곳 찾아줘',env,naverResponse:{items:items.slice(0,1)}});
   const alternativesNode=renderer.renderMessage({role:'assistant',content:sparse.body.message,restaurants:sparse.body.restaurants,quickReplies:sparse.body.suggestions,meta:sparse.body.meta});
@@ -268,5 +268,37 @@ export async function testConversationUI(runCase) {
   assert.ok(schema.properties.inchelin_core.properties.imageUrl);
   assert.ok(!schema.properties.inchelin_core.required.includes('imageUrl'));
   assert.ok(first.calls.every(call => !call.href.includes('/search/image')));
+  // v127 compact interface contracts, exercised against the real renderer.
+  const ordered=renderer.renderMessage({role:'assistant',content:'강남에서 골라봤어요.',restaurants:first.body.restaurants,quickReplies:['혼자','회식'],meta:{...first.body.meta,answer_plan:['text','place_cards','source','question','chips','related_questions'],relatedQuestions:[{text:'홍대에서도 삼겹살 먹을 곳 찾아줘'}],turnPolicy:{...first.body.meta.turnPolicy,intro:'강남에서 골라봤어요.',questionText:'누구와 가세요?',actionChips:['다른 곳 보기','조건 바꾸기']}}});
+  const orderedBubble=ofClass(ordered,'ai-bubble')[0],order=orderedBubble.children.map(node=>node.className.split(' '));
+  const position=cls=>order.findIndex(classes=>classes.includes(cls));
+  assert.ok(position('message-copy')<position('restaurant-group'));assert.ok(position('restaurant-group')<position('turn-question'));
+  assert.ok(position('answer-chips')<position('answer-actions'));assert.ok(position('answer-actions')<position('related-questions'));assert.ok(position('related-questions')<position('action-chips'));
+  assert.equal(ofClass(ordered,'restaurant-title-link').length,3);assert.equal(ofClass(ordered,'restaurant-compare').length,3);
+  assert.ok(ofClass(ordered,'restaurant-title-link').every(node=>node.attributes['aria-label'].includes('상세보기')));
+  assert.ok(!nodes(ordered).some(node=>node.tag==='button'&&node.text==='상세보기'),'large standalone detail action removed');
+  const add=ofClass(ordered,'restaurant-compare')[0];add.click();assert.equal(add.attributes['aria-pressed'],'true');assert.equal(add.textContent,'담음');assert.ok(nodes(add).some(node=>node.attributes.href==='#i-check'));add.click();assert.equal(add.attributes['aria-pressed'],'false');assert.equal(add.textContent,'비교에 담기');
+  const duplicate=renderer.renderMessage({role:'assistant',content:'다시 골라봤어요.',meta:{...first.body.meta,answer_plan:['text']}});
+  assert.equal(ofClass(duplicate,'result-conditions').length,0,'same conditions as immediately previous AI response are omitted');
+  const changed=renderer.renderMessage({role:'assistant',content:'홍대에서 골라봤어요.',meta:{...first.body.meta,searchConditions:{region:'홍대',food:'삼겹살'},answer_plan:['text']}});
+  assert.equal(ofClass(changed,'result-conditions').length,1,'changed axis displays summary again');
+  for(const button of nodes(ordered).filter(node=>node.tag==='button'&&nodes(node).some(child=>child.tag==='svg')))assert.ok(button.attributes['aria-label'],'icon buttons have accessible labels');
+  const fn=name=>html.match(new RegExp('    (?:async )?function '+name+'\\([^]*?\\n    \\}'))[0];
+  let timer,delay,clipboard='';
+  const copyReal=new Function('document','navigator','setTimeout','clearTimeout','showToast',fn('uiIcon')+fn('copyAnswer')+';return copyAnswer;')(document,{clipboard:{writeText:async text=>{clipboard=text;}}},(action,ms)=>{timer=action;delay=ms;return 1;},()=>{},()=>{});
+  const copyButton=new Node('button');await copyReal({content:'답변이에요.',restaurants:[{name:'테스트 식당',address:'주소'}]},copyButton);
+  assert.equal(delay,1500);assert.match(clipboard,/테스트 식당/);assert.equal(copyButton.attributes['aria-label'],'복사됨');assert.ok(nodes(copyButton).some(node=>node.attributes.href==='#i-check'));timer();assert.equal(copyButton.attributes['aria-label'],'복사');assert.ok(nodes(copyButton).some(node=>node.attributes.href==='#i-copy'));
+  assert.equal((html.match(/<symbol id="i-/g)||[]).length,24);
+  assert.doesNotMatch(html,/[⧉↻＋↓→›×✕✓★☆◉☷▧▦✣]/,'no Unicode icon glyphs in the interface');
+  for(const match of html.matchAll(/<button\b([^>]*?)>([\s\S]*?)<\/button>/g))if(match[2].includes('<svg'))assert.match(match[1],/aria-label=/,'static SVG button aria-label');
+  assert.match(html,/\.ui-icon \{[^}]*stroke-width:1.75;[^}]*stroke-linecap:round;[^}]*stroke-linejoin:round/);
+  assert.match(html,/\.restaurant-card \{ position:relative;[^}]*height:110px; max-height:110px; padding:14px/);
+  assert.match(html,/\.restaurant-address \{[^}]*white-space:nowrap; overflow:hidden; text-overflow:ellipsis/);
+  assert.match(html,/\.message\.ai > \.ai-avatar \{[^}]*width:24px; height:24px/);
+  assert.match(html,/\.composer-jump-row \{ display:none; height:52px; padding-bottom:12px; justify-content:flex-end/);
+  assert.match(html,/\.conversation-bottom \{ position:static; z-index:1; width:40px; height:40px/);
+  assert.ok(html.indexOf('id="comparisonTray"')<html.indexOf('id="conversationBottom"'));assert.ok(html.indexOf('id="conversationBottom"')<html.indexOf('id="chatForm"'));
+  for(const width of [360,390]){const content=width-32-34,cardInterior=content-28;assert.ok(cardInterior-106>80);assert.ok(22+4+18+4+28+28<=110,'content line budget fits 110px CSS card');}
+  console.log('v127 compact UI: header details/compare toggle, 24px identity, full block order, copy check 1500ms, condition dedupe, 24 SVG symbols/aria/no glyphs, reserved jump row, 360/390 DOM/CSS passed (pixels not checked).');
   console.log('Conversation copy/card/menu mocked regressions passed.');
 }
