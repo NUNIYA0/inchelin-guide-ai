@@ -1,9 +1,16 @@
+import { withParticle } from './korean.js';
 // Supported quick-entry regions. These aliases describe address areas, not walking radii.
 export const SEARCH_REGIONS = ['강남', '강남역', '역삼', '홍대', '성수', '종로', '여의도'];
+// Address-area neighbors, not proximity or walking-distance guarantees.
+export const ADJACENT_REGIONS = {
+  강남: ['역삼', '논현'], 강남역: ['역삼', '논현'], 역삼: ['강남역', '논현'],
+  홍대: ['합정', '상수'], 성수: ['뚝섬', '서울숲'], 종로: ['안국', '을지로'], 여의도: ['영등포', '당산'],
+};
 export const REGION_NORMALIZATION = {
   강남역: ['강남역'], 강남: ['강남구', '강남'], 역삼: ['역삼역', '역삼1동', '역삼2동', '역삼동', '역삼'],
   홍대: ['홍대입구역', '홍대입구', '홍대', '서교동', '동교동'], 성수: ['성수동1가', '성수동2가', '성수동', '성수역', '성수'],
   종로: ['종로구', '종로1가', '종로2가', '종로3가', '종로4가', '종로5가', '종로6가', '종로'], 여의도: ['여의도역', '여의도동', '여의도'],
+  ...Object.fromEntries(['논현','합정','상수','뚝섬','서울숲','안국','을지로','영등포','당산'].map(area=>[area,[area+'역',area+'동',area]])),
 };
 export function normalizeSearchRegion(value) {
   const text = String(value || '').trim();
@@ -17,15 +24,15 @@ export function mentionedSearchRegion(text) {
   return matches.sort((a, b) => b.at - a.at || b.alias.length - a.alias.length)[0]?.region || '';
 }
 export const FOOD_HIERARCHY = [
-  { food_type: '고기', menus: ['삼겹살', '갈비', '곱창', '불고기', '제육볶음'], aliases: ['고깃집', '고기', '구이', '육류'] },
+  { food_type: '고기', menus: ['삼겹살', '갈비', '곱창', '불고기', '제육볶음', '목살', '닭갈비'], aliases: ['고깃집', '고기', '구이', '육류'] },
   { food_type: '국밥·찌개', menus: ['국밥', '순두부찌개', '김치찌개', '찌개', '전골', '곰탕', '설렁탕'], aliases: ['국밥·찌개', '찌개/국밥', '국물 있는 거', '국물'] },
   { food_type: '면', menus: ['냉면', '칼국수', '비빔국수', '메밀국수', '쌀국수', '라멘', '우동', '국수'], aliases: ['면', '면요리'] },
   { food_type: '한식', menus: ['비빔밥', '덮밥', '불고기덮밥', '죽', '만두'], aliases: ['한식'] },
   { food_type: '일식', menus: ['돈까스', '돈가스', '초밥', '스시', '가츠동', '카레'], aliases: ['일식', '일본식'] },
-  { food_type: '중식', menus: ['마라탕', '마라샹궈', '짬뽕', '탕수육', '볶음밥'], aliases: ['중식', '중국식'] },
-  { food_type: '양식', menus: ['파스타', '피자', '스테이크', '햄버거', '버거'], aliases: ['양식'] },
-  { food_type: '분식', menus: ['떡볶이', '김밥'], aliases: ['분식'] },
-  { food_type: '카페', menus: ['디저트', '베이커리', '샌드위치'], aliases: ['카페', '커피', '빵'] },
+  { food_type: '중식', menus: ['마라탕', '마라샹궈', '짬뽕', '탕수육', '볶음밥', '짜장면', '군만두'], aliases: ['중식', '중국식'] },
+  { food_type: '양식', menus: ['파스타', '피자', '스테이크', '햄버거', '버거', '리소토', '라자냐'], aliases: ['양식'] },
+  { food_type: '분식', menus: ['떡볶이', '김밥', '라볶이', '튀김', '어묵'], aliases: ['분식'] },
+  { food_type: '카페', menus: ['디저트', '베이커리', '샌드위치', '토스트', '크로플', '팬케이크'], aliases: ['카페', '커피', '빵'] },
   { food_type: '샐러드·포케', menus: ['샐러드', '포케'], aliases: [] },
   { food_type: '치킨', menus: ['치킨', '닭발'], aliases: [] },
   { food_type: '해산물', menus: ['해산물', '횟집'], aliases: [] },
@@ -43,7 +50,7 @@ export function normalizeFoodAxis(value) {
   return broad ? { food_type: broad.food_type, menu: null } : null;
 }
 export const REGION_ALIASES = {
-  강남: ['강남', '강남구'], 강남역: ['강남역', '역삼동', '서초동', '강남대로'],
+  강남: ['강남', '강남구'], 강남역: ['강남역', '역삼동', '서초동', '강남대로'], 논현: ['논현','논현동'],
   역삼: ['역삼', '역삼동'], 홍대: ['홍대', '서교동', '동교동'],
   성수: ['성수', '성수동'], 종로: ['종로', '종로구'], 여의도: ['여의도', '여의도동'],
   합정: ['합정', '합정동'], 상수: ['상수', '상수동'], 뚝섬: ['뚝섬', '성수동1가'], 서울숲: ['서울숲', '성수동1가'],
@@ -86,9 +93,9 @@ export function cardArea(card, region = '') {
   return String(card.address || '').match(/[가-힣]+(?:동|읍|면)(?=\s|\d|$)/)?.[0] || '';
 }
 export function nearbySuggestions(region, food) {
-  const adjacent = { 강남: ['역삼', '강남역'], 강남역: ['역삼', '강남'], 역삼: ['강남역', '강남'], 홍대: ['성수', '종로'], 성수: ['홍대', '종로'], 종로: ['홍대', '성수'], 여의도: ['종로', '홍대'] }[region] || [];
+  const adjacent = ADJACENT_REGIONS[region] || [];
   const category = SEARCH_FOODS.find(item => item.value === food || item.menus.includes(food));
-  const similar = category?.menus.filter(menu => menu !== food).slice(0, 2) || [];
+  const similar = ({ 국밥:['설렁탕','곰탕'], 설렁탕:['곰탕','국밥'], 곰탕:['설렁탕','국밥'], 냉면:['메밀국수','비빔국수'] })[food] || category?.menus.filter(menu => menu !== food).slice(0, 2) || [];
   return [...adjacent.slice(0, 2).map(value => ({ label: `${value}에서 찾기`, message: searchMessage({ region: value, food }) })),
-    ...similar.map(value => ({ label: `${value}로 바꾸기`, message: searchMessage({ region, food: value }) }))];
+    ...similar.map(value => ({ label: `${withParticle(value,'으로/로')} 바꾸기`, message: searchMessage({ region, food: value }) }))];
 }

@@ -316,6 +316,11 @@
     .menu-choice .quick-reply-description { font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
     .menu-choice .quick-reply-description, .menu-choice .quick-reply-reason { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .menu-choice:active { transform: scale(.985); background: #eee; border-color: #888; }
+    .history-inactive .quick-reply, .history-inactive .restaurant-card, .history-inactive .meal-chip { opacity: .5; }
+    .history-inactive .quick-reply, .history-inactive .restaurant-map-link, .history-inactive .meal-chip { cursor: default; pointer-events: none; }
+    .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 2px solid #222; background: #f7f7f7; }
+    .history-check { color: #111; font-size: 16px; font-weight: 700; margin-left: 6px; }
+    .alternative-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .menu-hint { margin: 8px 0 0; font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
     .menu-choice .quick-reply-arrow { grid-row: 1 / span 3; }
     .restaurant-map-link:hover { background: #f7f7f7; }
@@ -1580,6 +1585,7 @@
       list.setAttribute('aria-label', '맛집 목록');
       restaurants.slice(0, 3).forEach(restaurant => {
         const card = document.createElement('article'); card.className = 'restaurant-card';
+        card.historyLabel = restaurant.name;
         const content = document.createElement('div'); content.className = 'restaurant-card-content';
         const body = document.createElement('div'); body.className = 'restaurant-card-body';
         const head = document.createElement('div'); head.className = 'restaurant-card-head';
@@ -1608,12 +1614,13 @@
           link.target = '_blank'; link.rel = 'noopener noreferrer'; link.textContent = '상세보기'; actions.appendChild(link);
         } else {
           const detail = document.createElement('button'); detail.type = 'button'; detail.className = 'restaurant-map-link'; detail.textContent = '상세보기';
-          detail.addEventListener('click', () => resolveRestaurantDetail(restaurant, actions)); actions.appendChild(detail);
+          detail.addEventListener('click', () => { if (!detail.disabled) resolveRestaurantDetail(restaurant, actions); }); actions.appendChild(detail);
         }
         const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-map-link';
         if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());
         comparisonButtons.get(restaurant.id).add(compare);
         compare.addEventListener('click', () => {
+          if (compare.disabled) return;
           if (comparisonTray.has(restaurant.id)) comparisonTray.delete(restaurant.id);
           else if (comparisonTray.size < 3) comparisonTray.set(restaurant.id, restaurant);
           else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
@@ -1634,10 +1641,37 @@
       const description = separator >= 0 ? raw.slice(separator + 1).trim() : '';
       return { title, description, prompt: title || raw };
     }
+    // Replayed user messages reconstruct history state after reload/share, without
+    // mutating or deleting the recorded assistant cards and chip groups.
+    function retirePriorChoices(content) {
+      messagesEl.querySelectorAll('.menu-cards, .restaurant-group, .answer-chips, .menu-more, .action-chips, .alternative-chips, .result-conditions').forEach(group => {
+        if (group.historyRetired) return;
+        group.historyRetired = true;
+        group.classList.add('history-inactive');
+        group.querySelectorAll('.restaurant-card').forEach((card,index)=> {
+          const ordinal = [/(?:첫\s*번째|처음|1\s*번째)/,/(?:두\s*번째|2\s*번째)/,/(?:세\s*번째|3\s*번째)/][index];
+          if (!card.historyMarked && (card.historyLabel && content.includes(card.historyLabel) || ordinal?.test(content))) {
+            card.historyMarked = true; card.classList.add('history-selected');
+            const check = document.createElement('span'); check.className = 'history-check'; check.textContent = '✓'; card.appendChild(check);
+          }
+        });
+        group.querySelectorAll('.quick-reply, .restaurant-map-link, .meal-chip').forEach(button => {
+          if (button.disabled) return;
+          const label = button.historyLabel || button.textContent;
+          const selected = label && (content === button.historyMessage || content.includes(label)) && !/다른 메뉴|다른 곳|조건 바꾸기/.test(label);
+          button.disabled = true; button.setAttribute('aria-disabled','true'); button.setAttribute('tabindex','-1');
+          if (button.tagName === 'A') button.removeAttribute('href');
+          if (selected) {
+            button.classList.add('history-selected'); button.setAttribute('aria-pressed','true');
+            const check = document.createElement('span'); check.className = 'history-check'; check.textContent = '✓'; button.appendChild(check);
+          }
+        });
+      });
+    }
     function renderMessage(message, extra = '', follow = false) {
       const answerPlan = new Set(Array.isArray(message.meta?.answer_plan) ? message.meta.answer_plan : ['text']);
       const allowed = block => answerPlan.has(block);
-      if (message.role === 'user') messagesEl.querySelectorAll('.answer-chips, .menu-cards, .menu-more, .action-chips').forEach(group => { group.hidden = true; });
+      if (message.role === 'user') retirePriorChoices(message.content);
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
       const copy = document.createElement('div');
@@ -1655,7 +1689,7 @@
           for (const [axis, label] of [['region', message.meta.searchConditions.region], ['food', message.meta.searchConditions.food]]) {
             if (!label) continue;
             const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'meal-chip'; chip.textContent = label; chip.setAttribute('aria-label', (axis === 'region' ? '지역 바꾸기: ' : '음식 바꾸기: ') + label);
-            chip.addEventListener('click', () => openSearchPicker(axis)); conditions.appendChild(chip);
+            chip.addEventListener('click', () => { if (!chip.disabled) openSearchPicker(axis); }); conditions.appendChild(chip);
           }
           bubble.appendChild(conditions);
         }
@@ -1668,7 +1702,7 @@
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
         const menus = document.createElement('div'); menus.className = 'quick-replies menu-cards';
         const menuActions = document.createElement('div'); menuActions.className = 'quick-replies quick-replies-followup action-chips';
-        const displayReplies = [...(allowed('chips') ? message.quickReplies || [] : []), ...(isMenuTurn ? message.meta.menuCards.slice(0,3).map(card=>`${card.name}|${card.description}`) : [])];
+        const displayReplies = [...(allowed('chips') ? (message.quickReplies || []).filter(reply=>!isMenuTurn || !reply.includes('|')) : []), ...(isMenuTurn ? message.meta.menuCards.slice(0,3).map(card=>`${card.name}|${card.description}`) : [])];
         const visibleQuickReplies = [...new Set(displayReplies)].filter(reply => {
           const card = quickReplyCard(reply);
           if (['비교하기', '메뉴 탐색'].includes(card.title)) return false;
@@ -1688,6 +1722,8 @@
             button.className = `quick-reply${followupChip ? ' quick-reply-chip' : actionReply ? ' quick-reply-action' : ''}`;
             if (card.title === '다른 메뉴 보기') button.classList.add('menu-more');
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
+            button.historyLabel = card.title;
+            button.historyMessage = message.meta?.turnPolicy?.next_question?.chips?.find(choice=>choice.label === card.title)?.message;
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
             title.textContent = card.title;
@@ -1711,6 +1747,7 @@
               button.appendChild(arrow);
             }
             button.addEventListener('click', () => {
+              if (button.disabled) return;
               const isCuisineCategory = /^(?:한식|중식|일식|양식|분식)$/.test(card.title);
               if (card.description && !isCuisineCategory && !isCurrentLocationIntent(card.title) && !/^(?:지역 직접 입력|직접 입력|지역 정하기)$/.test(card.title)) {
                 chooseMenuCard(card.title);
@@ -1731,11 +1768,20 @@
         }
         if (allowed('chips') && answers.children.length) bubble.appendChild(answers);
         if (allowed('chips') && menuActions.children.length) bubble.appendChild(menuActions);
+        if (allowed('chips') && message.meta?.turnPolicy?.expansionChoices?.length) {
+          const alternatives = document.createElement('div'); alternatives.className = 'quick-replies quick-replies-followup alternative-chips'; alternatives.setAttribute('aria-label','다른 지역과 비슷한 메뉴');
+          message.meta.turnPolicy.expansionChoices.forEach(choice => {
+            const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = choice.label;
+            button.historyLabel = choice.label; button.historyMessage = choice.message;
+            button.addEventListener('click',()=> { if (!button.disabled) routeQuestion(choice.message); }); alternatives.appendChild(button);
+          });
+          bubble.appendChild(alternatives);
+        }
         if (allowed('chips') && message.meta?.turnPolicy?.actionChips?.length) {
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
           message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label;
-            button.addEventListener('click', () => { const choice = message.meta?.turnPolicy?.expansionChoices?.find(item => item.label === label); routeQuestion(choice?.message || label); }); actions.appendChild(button);
+            button.addEventListener('click', () => { if (!button.disabled) routeQuestion(label); }); actions.appendChild(button);
           });
           bubble.appendChild(actions);
         }
@@ -1751,7 +1797,6 @@
       const message = normalizeMessage({ role, content, quickReplies, restaurants, meta });
       if (!message) return null;
       const shouldFollow = role === 'assistant' || isNearConversationBottom();
-      if (role === 'user') messagesEl.querySelectorAll('.answer-chips, .menu-cards, .menu-more, .action-chips').forEach(group => { group.hidden = true; });
       chatMessages = [...chatMessages, message];
       const item = renderMessage(message, '', shouldFollow);
       if (save) saveConversation();
@@ -2172,7 +2217,7 @@
       if (!useCoordinates) currentLocationCoords = null;
       const state = pluginState();
       state.slots = { ...state.slots, region, use_current_location: useCoordinates, menu: null, food_type: null };
-      Object.assign(state, { lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null, aCandidates: [], aProposed: [], pendingQuestionSlot: 'menu_category', askedSlots:[], questionCount:0, consecutiveQuestions:0, noResults: false });
+      Object.assign(state, { lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null, aCandidates: [], aProposed: [], menuCategory:null, regionFlexible:false, pendingQuestionSlot: 'menu_category', askedSlots:[], questionCount:0, consecutiveQuestions:0, noResults: false });
       ask(useCoordinates ? '내 주변에서 먹을 곳 찾아줘' : region + '에서 먹을 곳 찾아줘', { responseState: state, alreadyAdded: !label });
     }
     function selectPluginSituations(patch, message) {

@@ -99,6 +99,8 @@ export function emptyResponseState() {
     pendingQuestionSlot: null,
     aCandidates: [],
     aProposed: [],
+    menuCategory: null,
+    regionFlexible: false,
     noResults: false,
     stage: "exploring",
     askedSlots: [],
@@ -160,6 +162,8 @@ export function normalizeResponseState(value = {}) {
     aCandidates: Array.isArray(value.aCandidates || value.a_candidates) ? (value.aCandidates || value.a_candidates).map(String).filter(Boolean).slice(0, 12) : [],
     aProposed: Array.isArray(value.aProposed || value.a_proposed) ? [...new Set((value.aProposed || value.a_proposed).map(String).filter(Boolean))].slice(0, 80) : [],
     noResults: value.noResults === true || value.no_results === true,
+    menuCategory: MENU_CATEGORIES[value.menuCategory] ? value.menuCategory : null,
+    regionFlexible: value.regionFlexible === true,
     stage: ["exploring", "narrowing", "ready", "refining", "menu_category_asked", "menu_options_shown", "region_asked"].includes(value.stage) ? value.stage : "exploring",
     askedSlots: Array.isArray(value.askedSlots) ? [...new Set(value.askedSlots)].filter(slot => ["menu_category", "menu", "region", "companion", "sub_menu", "sub_region", "clarify"].includes(slot)) : [],
     consecutiveQuestions: Math.min(2, Math.max(0, Number(value.consecutiveQuestions) || 0)),
@@ -330,6 +334,14 @@ export const MODE_A_POOL = [
   ["불고기", "달큰한 양념과 고기", "밥과 함께 먹고 싶을 때 골라요", "불고기", ["점심", "저녁"]],
   ["마라탕", "얼얼한 국물 한 그릇", "재료를 골라 따뜻하게 먹어요", "마라탕", ["점심", "저녁"]],
   ["김치찌개", "김치와 따뜻한 국물", "밥과 함께 든든하게 먹어요", "김치찌개", ["점심"]],
+  ...[
+    ['짜장면','소스에 비벼 먹는 면'], ['군만두','바삭하게 구운 만두'], ['가츠동','튀김을 올린 덮밥'], ['라멘','국물과 면 한 그릇'],
+    ['리소토','소스와 익힌 쌀'], ['햄버거','빵과 패티 한 끼'], ['라자냐','겹겹이 쌓은 면 요리'],
+    ['라볶이','떡과 라면 한 접시'], ['튀김','바삭한 간식 한 접시'], ['어묵','따뜻한 국물과 어묵'],
+    ['곱창','구워 먹는 고기 요리'], ['목살','취향대로 굽는 고기'], ['닭갈비','양념과 닭고기 요리'],
+    ['메밀국수','메밀 향을 즐기는 면'], ['비빔국수','양념에 비비는 국수'], ['곰탕','밥을 곁들이는 국물'], ['설렁탕','고기와 국물 한 그릇'],
+    ['토스트','구운 빵 한 끼'], ['크로플','구운 반죽과 토핑'], ['팬케이크','부드러운 반죽 한 접시'],
+  ].map(([menu,direction])=>[menu,direction,'식감과 곁들임을 골라 즐겨봐요',menu === '튀김' ? '분식튀김' : menu,['점심']]),
 ].map(([menu, direction, reason, family, times]) => ({ menu, direction, reason, family, times }));
 
 export function chooseModeACandidates(analysisValue, stateValue) {
@@ -341,7 +353,7 @@ export function chooseModeACandidates(analysisValue, stateValue) {
   const used = new Set(state.aProposed.map(String));
   const selected = [];
   const meal = state.slots.meal_time || analysis.slots.meal_time || "";
-  const category = !state.slots.menu && MENU_CATEGORIES[state.slots.food_type];
+  const category = !state.slots.menu && MENU_CATEGORIES[state.menuCategory || state.slots.food_type];
   const eligible = category ? pool.filter(item => category.includes(item[1])) : pool;
   const ranked = eligible.filter((item, index) => !used.has(item[1]) && eligible.findIndex(other => other[1] === item[1]) === index).map(item => {
     const entry = MODE_A_POOL.find(candidate => candidate.menu === item[1]);

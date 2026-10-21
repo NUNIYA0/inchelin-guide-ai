@@ -12,6 +12,7 @@ import { testAISearchPolicy } from "./ai-search-policy-smoke.mjs";
 import { testConversationCopyRegression } from "./conversation-copy-regression-smoke.mjs";
 import { testConversationUsability } from "./conversation-usability-smoke.mjs";
 import { testAnswerPlan } from './answer-plan-smoke.mjs';
+import { testHistoryAlternatives } from './history-alternatives-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -46,7 +47,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
       return new Response(linkHtml, { status: 200, headers: { "content-type": "text/html" } });
     }
     if (href.includes("/search/v1/blog")) return Response.json(blogResponse || { items: [] });
-    if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(naverResponse, { status: naverStatus });
+    if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(typeof naverResponse === 'function' ? naverResponse(new URL(href).searchParams.get('query')) : naverResponse, { status: naverStatus });
     if (href.includes("openapi.naver.com/v1/search/image")) return Response.json(imageResponse || { items: [] });
     if (href.endsWith("/v1/chat/completions")) {
       return Response.json({ choices: [{ message: { content: webResearchResponse } }] });
@@ -1526,7 +1527,7 @@ for (const message of ["삼겹살 먹고 싶어", "파스타 먹고 싶어", "�
   const result = await runCase({ message, env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" } });
   if (message.includes('한식')) {
     assert.equal(result.body.meta.mode,'A'); assert.equal(result.body.meta.menuCards.length,3);
-    assert.deepEqual(result.body.meta.answer_plan,['text','menu_cards','notice']); continue;
+    assert.deepEqual(result.body.meta.answer_plan,['text','menu_cards','notice','chips']); continue;
   }
   assert.equal(result.body.meta.mode, "B");
   const menuAnswer = result.body.message.split("\n\n")[0];
@@ -2138,4 +2139,5 @@ await testAISearchPolicy(runCase);
 await testConversationCopyRegression(runCase);
 await testConversationUsability(runCase);
 await testAnswerPlan();
+await testHistoryAlternatives(runCase);
 console.log("Inchelin data policy smoke tests passed.");

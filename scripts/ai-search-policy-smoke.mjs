@@ -75,7 +75,7 @@ export async function testAISearchPolicy(runCase) {
   assert.equal(explore.body.meta.mode, 'A'); assert.equal(explore.body.meta.menuCards.length, 3);
   assert.equal(explore.body.meta.responseModeState.slots.region, '홍대');
   // ⑦ Unsupported spoken regions are not searched and do not generate expansion promises.
-  for (const region of ['부산', '판교', '울릉도', '신림', '합정']) {
+  for (const region of ['부산', '판교', '울릉도', '신림']) {
     const result = await runCase({ message: `${region}에서 냉면 먹을 곳 찾아줘`, env });
     assert.equal(result.body.meta.unsupportedRegion, region);
     assert.deepEqual(result.body.suggestions, SEARCH_REGIONS);

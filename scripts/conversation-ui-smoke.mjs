@@ -86,7 +86,7 @@ export async function testConversationUI(runCase) {
   const html = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
   const renderSource = html.slice(html.indexOf('    const comparisonTray = new Map();'), html.indexOf('    function appendMessage('));
   class Node {
-    constructor(tag) { this.tag = tag; this.children = []; this.events = {}; this.attributes = {}; this.className = ''; this.classList = { add: name => { this.className += ' ' + name; } }; }
+    constructor(tag) { this.tag = tag; this.tagName = tag.toUpperCase(); this.children = []; this.events = {}; this.attributes = {}; this.className = ''; this.classList = { add: name => { this.className += ' ' + name; } }; }
     appendChild(node) { this.children.push(node); node.parent = this; return node; }
     append(...nodes) { nodes.forEach(node => this.appendChild(node)); }
     set innerHTML(value) { this.children = []; }
@@ -94,6 +94,7 @@ export async function testConversationUI(runCase) {
     set textContent(value) { this.text = value; this.children = []; }
     get textContent() { return (this.text || '') + this.children.map(node => node.textContent).join(' '); }
     setAttribute(key, value) { this.attributes[key] = value; }
+    removeAttribute(key) { delete this.attributes[key]; delete this[key]; }
     addEventListener(type, handler) { this.events[type] = handler; }
     click() { this.events.click?.(); }
     remove() { this.parent.children = this.parent.children.filter(node => node !== this); }
@@ -163,7 +164,7 @@ export async function testConversationUI(runCase) {
   assert.equal(ofClass(menuNode, 'quick-reply-reason').length, 3);
   const choice = ofClass(menuNode, 'menu-choice')[0]; choice.click();
   assert.equal(sent.at(-1)[0], '국밥 먹고 싶어요');
-  assert.equal(ofClass(menuNode, 'menu-more').length, 0, 'menu-options plan has no chips block');
+  assert.equal(ofClass(menuNode, 'menu-more').length, 1, 'menu options always include their pale more-menu chip');
   // Two representative display envelopes per each of the eleven table rows.
   const table = [
     ['menu_trouble',{}],['menu_trouble',{food_type:'한식'}],['place_search',{region:'강남',menu:'국밥'}],
@@ -194,9 +195,45 @@ export async function testConversationUI(runCase) {
   assert.doesNotMatch(ofClass(message, 'action-chips')[0].textContent, /비교하기|메뉴 탐색/);
   assert.equal(ofClass(group, 'restaurant-source').length, 1);
   assert.ok(nodes(group).indexOf(ofClass(group, 'restaurant-source')[0]) > nodes(group).indexOf(ofClass(group, 'restaurant-list')[0]));
-  renderer.renderMessage({ role: 'user', content: '회식이에요' });
-  assert.equal(ofClass(message, 'answer-chips')[0].hidden, true, 'answered question choices disappear on next user turn');
-  assert.equal(ofClass(menuNode, 'menu-cards')[0].hidden, true);
+  renderer.renderMessage({ role: 'user', content: '국밥 먹고 싶어요' });
+  assert.notEqual(ofClass(message, 'answer-chips')[0].hidden, true, 'history is retained');
+  assert.notEqual(ofClass(menuNode, 'menu-cards')[0].hidden, true);
+  assert.equal(ofClass(menuNode, 'menu-choice').length, 3);
+  assert.ok(ofClass(menuNode, 'menu-choice').every(button=>button.disabled));
+  assert.equal(ofClass(menuNode,'history-selected').length,1);
+  assert.equal(ofClass(menuNode,'history-check').length,1);
+  assert.match(ofClass(menuNode,'history-selected')[0].textContent,/국밥.*✓/);
+  assert.ok(ofClass(message,'quick-reply').every(button=>button.disabled));
+  assert.ok(ofClass(message,'restaurant-map-link').every(button=>button.disabled));
+  assert.equal(ofClass(message,'restaurant-card').length,3,'old restaurant cards remain');
+  const sentBefore = sent.length; choice.click();
+  assert.equal(sent.length,sentBefore,'disabled old choices cannot send a new request');
+  // Newest choices stay live; earlier selections remain unchanged after later turns.
+  const nextQuestion = renderer.renderMessage({role:'assistant',content:first.body.message,restaurants:first.body.restaurants,quickReplies:first.body.suggestions,meta:first.body.meta});
+  renderer.renderMessage({role:'user',content:'회식이에요'});
+  assert.equal(ofClass(nextQuestion,'history-selected').length,1);
+  assert.match(ofClass(nextQuestion,'history-selected')[0].textContent,/회식.*✓/);
+  assert.equal(ofClass(menuNode,'history-selected').length,1,'a later answer cannot change historical selection');
+  const sparse = await runCase({message:'강남역에서 삼겹살 먹을 곳 찾아줘',env,naverResponse:{items:items.slice(0,1)}});
+  const alternativesNode=renderer.renderMessage({role:'assistant',content:sparse.body.message,restaurants:sparse.body.restaurants,quickReplies:sparse.body.suggestions,meta:sparse.body.meta});
+  const alternatives=ofClass(alternativesNode,'alternative-chips')[0];
+  assert.equal(alternatives.children.length,sparse.body.meta.turnPolicy.expansionChoices.length);
+  alternatives.children[0].click();
+  assert.equal(sent.at(-1)[0],sparse.body.meta.turnPolicy.expansionChoices[0].message,'alternative sends a natural-language request');
+  renderer.renderMessage({role:'user',content:'첫 번째 집 알려줘'});
+  assert.equal(ofClass(alternativesNode,'restaurant-card').length,1);
+  assert.equal(ofClass(alternativesNode,'restaurant-card')[0].className.includes('history-selected'),true);
+  assert.ok(alternatives.children.every(button=>button.disabled));
+  const beforeDisabledClick=sent.length;alternatives.children[0].click();assert.equal(sent.length,beforeDisabledClick);
+  // Replaying stored assistant/user messages reconstructs state without saving DOM.
+  host.innerHTML='';
+  const replay=renderer.renderMessage({role:'assistant',content:menu.body.message,restaurants:[],quickReplies:menu.body.suggestions,meta:menu.body.meta});
+  const replayMore=ofClass(replay,'menu-more')[0];replayMore.click();assert.equal(sent.at(-1)[0],'다른 메뉴 보기');
+  renderer.renderMessage({role:'user',content:'국밥 먹고 싶어요'});
+  assert.equal(ofClass(replay,'menu-choice').length,3);
+  assert.equal(ofClass(replay,'history-check').length,1);
+  assert.ok(ofClass(replay,'menu-choice').every(button=>button.disabled));
+  assert.equal(replayMore.disabled,true);
   assert.match(html, /\.menu-choice \.quick-reply-title \{ font: 700 17px/);
   assert.match(html, /\.quick-reply-reason \{[^}]*font-size: 14px; font-weight: 400/);
   assert.match(html, /\.chat-scroll-area \{[^}]*overflow: visible/);

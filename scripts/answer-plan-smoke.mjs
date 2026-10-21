@@ -25,7 +25,7 @@ export async function testAnswerPlan() {
     assert.deepEqual(first.suggestions,['한식','중식','일식','양식','분식','제가 골라드릴까요?']);assert.match(first.message,/끌리는 쪽 있으세요/);
     assert.equal(first.meta.responseModeState.stage,'menu_category_asked');assert.equal(calls.length,0);
     const kind=await run('한식으로 골라줘',first.meta.responseModeState);
-    assert.deepEqual(kind.meta.answer_plan,['text','menu_cards','notice']);assert.equal(kind.meta.menuCards.length,3);
+    assert.deepEqual(kind.meta.answer_plan,['text','menu_cards','notice','chips']);assert.equal(kind.meta.menuCards.length,3);
     assert.ok(kind.meta.menuCards.every(item=>MENU_CATEGORIES.한식.includes(item.name)));assert.equal(kind.meta.responseModeState.stage,'menu_options_shown');
     const auto=await run('제가 골라드릴까요?',first.meta.responseModeState);
     assert.equal(auto.meta.menuCards.length,3);assert.equal(new Set(auto.meta.menuCards.map(x=>x.name)).size,3);
@@ -33,7 +33,7 @@ export async function testAnswerPlan() {
     for(const failure of ['status','timeout']) { failMenu=failure;const failed=await run('중식으로 골라줘');assert.equal(failed.meta.menuCards.length,3);assert.equal(failed.meta.menuSelectionSource,'fallback');assert.ok(failed.meta.menuCards.every(item=>MENU_CATEGORIES.중식.includes(item.name))); } failMenu=null;
     const selected=await run('국밥 먹을래',kind.meta.responseModeState);
     assert.equal(selected.meta.responseModeState.stage,'region_asked');assert.match(selected.message,/지금 어디세요/);
-    assert.deepEqual(selected.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','직접 입력','상관없어요']);
+    assert.deepEqual(selected.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','직접 입력']);
     const found=await run('강남이에요',selected.meta.responseModeState);
     assert.equal(found.restaurants.length,3);assert.match(found.meta.turnPolicy.questionText,/누구와/);
     assert.deepEqual(found.meta.answer_plan,['text','place_cards','source','question','chips']);
@@ -58,7 +58,7 @@ export async function testAnswerPlan() {
     // plus malicious surplus data to prove the response envelope drops it.
     const table=[
       ['menu_trouble',{},['오늘 뭐 먹지','저녁 메뉴 고민돼'],['text','question','chips']],
-      ['menu_trouble',{food_type:'한식'},['한식으로 골라줘','한식 먹고 싶은데'],['text','menu_cards','notice']],
+      ['menu_trouble',{food_type:'한식'},['한식으로 골라줘','한식 먹고 싶은데'],['text','menu_cards','notice','chips']],
       ['place_search',{region:'강남',menu:'국밥'},['강남 국밥 찾아줘','강남에서 국밥 먹을 곳 추천해줘'],['text','place_cards','source','question','chips']],
       ['place_search',{menu:'냉면'},['냉면집 찾아줘','냉면 먹을 곳 추천해줘'],['text','question','chips']],
       ['followup',{region:'강남',menu:'국밥'},['다른 곳 보여줘','첫 번째 집 주차돼?'],['text','place_cards','source']],

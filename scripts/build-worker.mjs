@@ -36,7 +36,9 @@ await mkdir(join(hostingOutputRoot, ".openai"), { recursive: true });
 
 const html = await readFile(join(root, "dist", "index.html"), "utf8");
 const searchAxes = await readFile(join(root, "worker", "search-axes.js"), "utf8");
+const korean = await readFile(join(root, "worker", "korean.js"), "utf8");
 await writeFile(join(root, "dist", "assets", "search-axes-data-v1.js"), searchAxes);
+await writeFile(join(root, "dist", "assets", "korean.js"), korean);
 const assetsRoot = join(root, "dist", "assets");
 const assets = {};
 for (const path of await walk(assetsRoot)) {
@@ -51,7 +53,6 @@ const template = await readFile(join(root, "worker", "index.template.js"), "utf8
 const responseModes = await readFile(join(root, "worker", "response-modes.js"), "utf8");
 const turnPolicy = await readFile(join(root, "worker", "turn-policy.js"), "utf8");
 const conversationCopy = await readFile(join(root, "worker", "conversation-copy.js"), "utf8");
-const korean = await readFile(join(root, "worker", "korean.js"), "utf8");
 const answerPlan = await readFile(join(root, 'worker', 'answer-plan.js'), 'utf8');
 const serviceFaq = JSON.parse(await readFile(join(root, "data", "service-faq.json"), "utf8"));
 const worker = template
