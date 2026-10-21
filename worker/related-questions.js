@@ -9,8 +9,22 @@ export const RELATED_INTENTS = ['place_search','condition_change','followup','co
 // and named-place details, in addition to the five common routing intents.
 const TABLE_INTENTS = {menu_trouble:['menu_trouble','place_search'],food_talk:['menu_trouble','food_talk','place_search'],compare:['specific_place','followup'],specific_place:['specific_place','followup'],service:['menu_trouble'],general:['menu_trouble'],out_of_scope:['menu_trouble']};
 const UNSUPPORTED = /영업|몇\s*시|전화|평점|별점|가격|예산|얼마|웨이팅|대기|분위기|조용|주차|단체석|인기|맛있|맛집\s*순위|예약/;
-const SERVICE_TEXTS = ['추천은 어떤 기준으로 하나요?','오늘 뭐 먹을지 같이 골라주세요','어떤 지역에서 식당을 찾을 수 있나요?','현재 위치로 식당을 찾을 수 있나요?'];
+const SERVICE_TEXTS = ['추천은 어떤 기준으로 해?','오늘 뭐 먹을지 같이 골라줘','어떤 지역에서 식당을 찾을 수 있어?','현재 위치로 식당을 찾을 수 있어?'];
 const compact = text=>String(text||'').replace(/[\s.,?!？~]/g,'');
+// Bounded, short-lived result cache: no user messages, coordinates or credentials.
+const searchCache=new Map();
+export function clearRelatedSearchCache(){searchCache.clear();}
+export async function confirmedCombination(key,search,timeoutMs=700){
+  const cached=searchCache.get(key);
+  if(cached && cached.expires>Date.now())return cached.found;
+  let timer;
+  try {
+    const found=await Promise.race([Promise.resolve().then(search),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),timeoutMs);})]);
+    if(searchCache.size>=150)searchCache.delete(searchCache.keys().next().value);
+    searchCache.set(key,{found:found===true,expires:Date.now()+(found?180000:15000)});
+    return found===true;
+  }catch{return false;}finally{clearTimeout(timer);}
+}
 function foodIn(text) {
   const parsed=normalizeFoodAxis(text)?.menu;
   return isMainDish(parsed)?parsed:MAIN_DISHES.filter(item=>text.includes(item.name)).sort((a,b)=>text.lastIndexOf(b.name)-text.lastIndexOf(a.name)||b.name.length-a.name.length)[0]?.name||'';
@@ -52,12 +66,12 @@ function axisAndKey(text,analysis,state) {
 export function validateRelated(textValue,{state,parentIntent,classify,history=[],pendingSlot=null}) {
   const text=typeof textValue==='string'?textValue.trim():'';
   if ([...text].length<12 || [...text].length>30 || /[\r\n]/.test(text) || (text.match(/[?？]/g)||[]).length>1 || /[.!。].+/.test(text)) return null;
-  if (!/(?:요|주세요)[.!?？]?$/.test(text) || FORBIDDEN_COPY.test(text) || UNSUPPORTED.test(text) || SIDE_FOOD.test(text)) return null;
+  if (!/(?:줘|어|야|해|까|래|있지)[.!?？]?$/.test(text) || /주세요|해\s*주세|같이\s*찾아주세/.test(text) || FORBIDDEN_COPY.test(text) || UNSUPPORTED.test(text) || SIDE_FOOD.test(text)) return null;
   const region=mentionedSearchRegion(text);
-  if (region && ![...SEARCH_REGIONS,...Object.values(ADJACENT_REGIONS).flat()].includes(region)) return null;
+  if (region && !SEARCH_REGIONS.includes(region)) return null;
   const analysis=classify(text,state);
   if (!analysis || ![...RELATED_INTENTS,...(TABLE_INTENTS[parentIntent]||[])].includes(analysis.intent) || analysis.confidence<.6) return null;
-  if(analysis.slots?.region && ![...SEARCH_REGIONS,...Object.values(ADJACENT_REGIONS).flat()].includes(normalizeSearchRegion(analysis.slots.region)))return null;
+  if(analysis.slots?.region && !SEARCH_REGIONS.includes(normalizeSearchRegion(analysis.slots.region)))return null;
   if (parentIntent==='out_of_scope' && !/오늘.*메뉴.*골라|오늘.*뭐.*먹/.test(text)) return null;
   const explicitFood=normalizeFoodAxis(text)?.menu;
   if (explicitFood && !isMainDish(explicitFood)) return null;
@@ -70,21 +84,21 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
 }
 export function relatedTemplates(state,intent) {
   const food=isMainDish(state.slots.menu)?state.slots.menu:state.aCandidates.find(isMainDish)||'국밥';
-  const region=state.slots.region||'강남',other=ADJACENT_REGIONS[region]||['강남','홍대','성수'];
+  const region=state.slots.region||'강남',other=[...new Set([...(ADJACENT_REGIONS[region]||[]),...SEARCH_REGIONS])].filter(area=>area!==region && SEARCH_REGIONS.includes(area));
   const similar=({국밥:['설렁탕','곰탕','냉면'],삼겹살:['갈비','불고기','국밥'],냉면:['메밀국수','칼국수','국밥']})[food]||['국밥','냉면','삼겹살'];
-  const search=[...other.map(area=>`${area}에서도 ${food} 먹을 곳 찾아주세요`),...similar.filter(name=>name!==food).map(name=>`${food} 말고 ${name} 먹을 곳 알려주세요`), '회식하기 좋은 곳으로 다시 찾아주세요','같은 조건으로 다른 곳도 보여주세요'];
-  const menu=[`다른 ${state.menuCategory||'한식'} 메뉴도 함께 보여주세요`,'중식으로 먹을 메뉴를 함께 골라주세요',`${food} 먹을 곳도 같이 찾아주세요`];
-  const details=state.lastCards.slice(0,3).map(card=>`${card.name} 상세 정보도 알려주세요`);
-  const comparisons=state.lastCards.length>=2?[`${state.lastCards[0].name}랑 ${state.lastCards[1].name} 비교해주세요`]:[];
+  const search=[...other.map(area=>`${area}에서도 ${food} 먹을 곳 찾아줘`),...similar.filter(name=>name!==food).map(name=>`${food} 말고 ${name} 먹을 곳 찾아줘`), '회식하기 좋은 곳으로 다시 찾아줘','같은 조건으로 다른 곳도 보여줘'];
+  const menu=[`다른 ${state.menuCategory||'한식'} 메뉴도 보여줘`,'중식으로 먹을 메뉴를 골라줘',`${food} 먹을 곳도 같이 찾아줘`];
+  const details=state.lastCards.slice(0,3).map(card=>`${card.name} 상세 정보도 알려줘`);
+  const comparisons=state.lastCards.length>=2?[`${state.lastCards[0].name}랑 ${state.lastCards[1].name} 비교해줘`]:[];
   if (['service','general'].includes(intent)) return [...SERVICE_TEXTS];
-  if(intent==='out_of_scope') return ['오늘 먹을 메뉴를 함께 골라주세요','오늘 뭐 먹을지 같이 골라주세요','오늘 먹을 메뉴 세 가지 골라주세요'];
+  if(intent==='out_of_scope') return ['오늘 뭐 먹을지 같이 골라줘'];
   if(intent==='menu_trouble') return [...menu,...search,...SERVICE_TEXTS];
-  if(intent==='compare') return [...details,...comparisons,...search,...SERVICE_TEXTS];
-  if(intent==='specific_place') return [`${region}에서 ${food}집 다른 곳도 찾아주세요`,'상세보기는 어떻게 이용하나요?',...details,...search,...SERVICE_TEXTS];
-  if(intent==='food_talk') return [`${food} 먹을 곳도 같이 찾아주세요`,`${food} 먹는 법도 조금 더 알려주세요`,...menu,...SERVICE_TEXTS];
+  if(intent==='compare') return [...details,...comparisons,...SERVICE_TEXTS];
+  if(intent==='specific_place') return [`${region}에서 ${food}집 다른 곳도 찾아줘`,'상세보기는 어떻게 이용하는 거야?',...details,...search,...SERVICE_TEXTS];
+  if(intent==='food_talk') return [`${food} 먹을 곳도 같이 찾아줘`,`${food} 먹는 법도 조금 더 알려줘`,...menu,...SERVICE_TEXTS];
   return [...search,...comparisons,...SERVICE_TEXTS];
 }
-export function applyRelatedQuestions(response,payload,classify) {
+export async function applyRelatedQuestions(response,payload,classify,preflight=async()=>false) {
   const meta={...(response.meta||{})};
   const state=normalizeResponseState(meta.responseModeState||payload.context?.responseModeState||{});
   const parentIntent=meta.analysis?.intent||meta.intent||'general';
@@ -97,9 +111,19 @@ export function applyRelatedQuestions(response,payload,classify) {
   const selected=[];
   if(relatedAllowed({...response,meta}) && state.shownSuggestions.length<1000) {
     const options={state,parentIntent,classify,history:(payload.messages||[]).filter(item=>item.role==='user').map(item=>item.content),pendingSlot:meta.turnPolicy?.next_question?.slot};
+    let searches=0;
+    const chips=[...(response.suggestions||[]),...(meta.turnPolicy?.actionChips||[])].join(' ');
     for (const candidate of [...proposed.map(item=>({text:typeof item==='string'?item:item?.text,source:'model'})),...relatedTemplates(state,parentIntent).map(text=>({text,source:'template'}))]) {
       const validated=validateRelated(candidate.text,options);
       if(!validated || selected.some(item=>item.axis===validated.axis || item.key===validated.key))continue;
+      if(validated.axis==='menu_batch' && /다른 메뉴/.test(chips) || validated.axis==='more' && /다른 곳/.test(chips))continue;
+      if(['region','food','place','companion','more'].includes(validated.axis)) {
+        if(!state.slots.region && !response.restaurants?.length)continue;
+        const region=mentionedSearchRegion(validated.text)||state.slots.region;
+        const food=foodIn(validated.text)||state.slots.menu||state.slots.food_type;
+        if(!SEARCH_REGIONS.includes(region)||!food||searches++>=3)continue;
+        if(!await preflight({region,food,text:validated.text,state,response}))continue;
+      }
       selected.push({...validated,source:candidate.source});if(selected.length>=3)break;
     }
   }

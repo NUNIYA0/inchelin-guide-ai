@@ -2,9 +2,9 @@
   "version": 1,
   "fallback_answer": "그 부분은 아직 정확히 안내드리기 어려워요. 메뉴나 식당이 고민되시면 말씀해 주세요.",
   "items": [
-    { "id":"how_to.regions", "sub_intent":"how_to", "examples":["어떤 지역에서 식당을 찾을 수 있나요?","어떤 지역을 지원해?"], "answer":{"default":"기본 선택 지역은 강남·강남역·역삼·홍대·성수·종로·여의도예요. 결과가 적을 때는 화면에 제안된 인접 지역으로도 찾아볼 수 있어요."} },
-    { "id":"how_to.nearby", "sub_intent":"how_to", "examples":["현재 위치로 식당을 찾을 수 있나요?","내 위치로 찾을 수 있어?"], "answer":{"default":"현재 위치 연결 버튼을 누르고 브라우저 위치 권한을 허용하면 돼요. 좌표를 가져오지 못하면 지역명을 직접 입력해 주세요."} },
-    { "id":"how_to.detail", "sub_intent":"how_to", "examples":["상세보기는 어떻게 이용하나요?"], "answer":{"default":"식당 카드의 상세보기를 누르면 해당 식당을 확인할 수 있는 네이버 지도 화면으로 이어져요."} },
+    { "id":"how_to.regions", "sub_intent":"how_to", "examples":["어떤 지역에서 식당을 찾을 수 있나요?","어떤 지역을 지원해?","어떤 지역에서 식당을 찾을 수 있어?"], "answer":{"default":"기본 선택 지역은 강남·강남역·역삼·홍대·성수·종로·여의도예요. 결과가 적을 때는 화면에 제안된 인접 지역으로도 찾아볼 수 있어요."} },
+    { "id":"how_to.nearby", "sub_intent":"how_to", "examples":["현재 위치로 식당을 찾을 수 있나요?","내 위치로 찾을 수 있어?","현재 위치로 식당을 찾을 수 있어?"], "answer":{"default":"현재 위치 연결 버튼을 누르고 브라우저 위치 권한을 허용하면 돼요. 좌표를 가져오지 못하면 지역명을 직접 입력해 주세요."} },
+    { "id":"how_to.detail", "sub_intent":"how_to", "examples":["상세보기는 어떻게 이용하나요?","상세보기는 어떻게 이용하는 거야?"], "answer":{"default":"식당 카드의 상세보기를 누르면 해당 식당을 확인할 수 있는 네이버 지도 화면으로 이어져요."} },
     { "id": "about.service", "sub_intent": "about", "examples": ["인슐랭가이드가 뭐야?", "너 누구야?", "뭐 할 수 있어?"], "answer": { "default": "인슐랭가이드 AI는 식사 상황과 취향을 이해해 메뉴 선택부터 실제 음식점 탐색까지 이어주는 대화형 AI 맛집 가이드예요." } },
     { "id": "about.origin", "sub_intent": "about", "examples": ["인슐랭가이드 이름 뜻이 뭐야?"], "answer": { "default": "인슐랭 가이드는 보험(Insurance)과 미슐랭 가이드(Michelin Guide)를 더한 이름이에요." } },
     { "id": "about.creator", "sub_intent": "about", "examples": ["누가 만들었어?", "만든 곳이 어디야?"], "answer": null },

@@ -746,6 +746,34 @@
       .mobile-start { display: none; }
     }
     @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; } }
+    /* One page, one reading column; no nested conversation scroller. */
+    .chat-view, .chat-dock-inner { width: min(720px, 100%); }
+    .message { margin-bottom: 24px; font-size: 16px; line-height: 1.6; }
+    .message.ai { gap: 0; margin-bottom: 24px; font-size: 16px; line-height: 1.6; }
+    .message.user { box-sizing: border-box; max-width: 80%; font-size: 16px; line-height: 1.6; }
+    .message .ai-avatar { display: none; }
+    .turn-question { font-size: 16px; }
+    .composer, .chat-composer { display: grid; grid-template-columns: 34px minmax(0,1fr) 42px; align-items: end; gap: 8px; min-height: 52px; padding: 8px 10px; border-radius: 28px; }
+    .composer textarea { grid-column: 2; grid-row: 1; height: 26px; max-height: 128px; min-width: 0; margin: 8px 0; overflow-y: hidden; font-size: 16px; line-height: 25.6px; }
+    .composer-actions { display: contents; }
+    .composer .plus { grid-column: 1; grid-row: 1; margin-bottom: 4px; }
+    .composer .send { grid-column: 3; grid-row: 1; }
+    .chat-dock { border-top: 0; }
+    .chat-composer { position: relative; bottom: auto; }
+    .answer-actions { display: flex; gap: 4px; margin-top: 12px; }
+    .answer-action { display: grid; place-items: center; width: 40px; height: 40px; border: 0; border-radius: 10px; background: transparent; color: #666; font: 22px/1 system-ui,sans-serif; cursor: pointer; }
+    .answer-action:hover { background: #f3f3f3; color: #111; }
+    .answer-action:focus-visible, .conversation-bottom:focus-visible { outline: 2px solid #222; outline-offset: 2px; }
+    .conversation-bottom { position: fixed; z-index: 26; bottom: calc(var(--dock-height, 120px) + 12px); left: 50%; width: 44px; height: 44px; border: 1px solid #ddd; border-radius: 50%; background: #fff; color: #222; font-size: 22px; box-shadow: 0 2px 10px #0001; cursor: pointer; }
+    .conversation-bottom[hidden] { display: none; }
+    .thinking-dots { min-width: 8px; width: 8px; height: 12px; padding: 0; background: transparent; }
+    .thinking-dots i { width: 5px; height: 5px; background: #777; }
+    .live-reveal .ai-bubble > * { animation: answer-arrive .28s ease-out both; }
+    .live-reveal .ai-bubble > :nth-child(2) { animation-delay: .07s; }
+    .live-reveal .ai-bubble > :nth-child(3) { animation-delay: .14s; }
+    .live-reveal .ai-bubble > :nth-child(n+4) { animation-delay: .21s; }
+    @keyframes answer-arrive { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .live-reveal .ai-bubble > *, .thinking-dots i { animation: none; } }
   </style>
 </head>
 <body>
@@ -794,7 +822,6 @@
       <section class="workspace">
         <div class="welcome" id="welcome">
           <h1 id="welcomeTitle">맛있는 한 끼, 같이 찾아볼까요?</h1>
-          <nav class="plugin-shortcuts" id="welcomePluginShortcuts" aria-label="고정한 플러그인 바로가기" hidden></nav>
           <form class="composer" id="welcomeForm">
             <textarea id="welcomeInput" aria-label="질문 입력" placeholder="먹고 싶은 메뉴나 분위기를 편하게 말해보세요" rows="1"></textarea>
             <div class="composer-actions">
@@ -812,7 +839,6 @@
           </div>
           <div class="chat-dock" id="chatDock"><div class="chat-dock-inner">
           <section class="comparison-tray" id="comparisonTray" aria-label="비교 트레이" hidden></section>
-          <nav class="plugin-shortcuts" id="chatPluginShortcuts" aria-label="고정한 플러그인 바로가기" hidden></nav>
           <form class="composer chat-composer" id="chatForm">
             <textarea id="chatInput" aria-label="후속 질문 입력" placeholder="후속 질문을 입력하세요" rows="1"></textarea>
             <div class="composer-actions">
@@ -823,6 +849,8 @@
           <div class="disclaimer">AI 답변은 참고용이며 중요한 결정 전에는 원문과 전문가 확인이 필요합니다.</div>
           </div></div>
         </div>
+
+        <button id="conversationBottom" class="conversation-bottom" type="button" aria-label="맨 아래로" hidden>↓</button>
 
         <div class="guide-panel" id="guidePanel">
           <h1 style="margin-bottom:12px">메뉴부터 맛집까지, 함께 찾아볼까요?</h1>
@@ -1405,9 +1433,39 @@
       $('#successPlanLabel').textContent = 'Free · 무료';
       openAuth('verify');
     }
+    const answerRequests = new WeakMap();
+    let regeneratingAnswer = false;
+    let autoFollowConversation = true, previousScrollY = 0;
+    function updateConversationScroll() {
+      if (window.scrollY < previousScrollY - 8) autoFollowConversation = false;
+      else if (isNearConversationBottom()) autoFollowConversation = true;
+      previousScrollY = window.scrollY;
+      const button = document.getElementById('conversationBottom');
+      if (button) button.hidden = !chatMessages.length || (autoFollowConversation && isNearConversationBottom());
+    }
+    function followConversation(item) {
+      if (!autoFollowConversation) { const button=document.getElementById('conversationBottom'); if(button)button.hidden=false; return; }
+      requestAnimationFrame(() => {
+        if (autoFollowConversation && item?.isConnected !== false) item?.scrollIntoView({block:'start',behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
+      });
+    }
+    async function copyAnswer(message) {
+      const cards=(message.restaurants||[]).map(card=>[card.name,card.category,card.address].filter(Boolean).join(' · '));
+      const menus=(message.meta?.menuCards||[]).map(card=>[card.name,card.description,card.reason].filter(Boolean).join(' · '));
+      const text=[message.content,...menus,...cards].filter(Boolean).join('\n');
+      try { await navigator.clipboard.writeText(text); showToast('답변을 복사했어요'); }
+      catch { showToast('복사하지 못했어요. 브라우저 권한을 확인해 주세요'); }
+    }
+    function regenerateAnswer(message) {
+      const index=chatMessages.indexOf(message);
+      if(generating || index<0 || index!==chatMessages.length-1 || message.role!=='assistant') return;
+      const request=answerRequests.get(message)||buildAIRequest(chatMessages.slice(0,index));
+      generateAnswer(request,{replaceMessage:message});
+    }
     function resizeInput(el) {
       el.style.height = 'auto';
-      el.style.height = `${Math.min(el.scrollHeight, 135)}px`;
+      el.style.height = `${Math.max(26,Math.min(el.scrollHeight, 128))}px`;
+      el.style.overflowY = el.scrollHeight > 128 ? 'auto' : 'hidden';
       const send = el.closest('form').querySelector('.send');
       if (!generating || send.id !== 'chatSend') send.disabled = !el.value.trim();
     }
@@ -1432,6 +1490,7 @@
       }
     }
     function showWelcome() {
+      document.getElementById('conversationBottom').hidden = true;
       leaveSharedConversation();
       main.classList.remove('chat-mode');
       welcome.style.display = '';
@@ -1828,20 +1887,25 @@
           });
           bubble.appendChild(actions);
         }
-        item.append(avatar, bubble);
+        const actions=document.createElement('div'); actions.className='answer-actions'; actions.setAttribute('aria-label','답변 도구');
+        for(const [label,icon,action] of [['복사','⧉',()=>copyAnswer(message)],['다시 생성','↻',()=>regenerateAnswer(message)]]) {
+          const button=document.createElement('button');button.type='button';button.className='answer-action';button.setAttribute('aria-label',label);button.setAttribute('title',label);button.textContent=icon;button.addEventListener('click',action);actions.appendChild(button);
+        }
+        bubble.appendChild(actions);
+        item.appendChild(bubble);
       } else {
         item.appendChild(copy);
       }
       messagesEl.appendChild(item);
-      if (follow) requestAnimationFrame(() => item.scrollIntoView({ block: 'start', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' }));
+      if (follow) followConversation(item);
       return item;
     }
     function appendMessage(role, content, { save = true, quickReplies = [], restaurants = [], meta = null } = {}) {
       const message = normalizeMessage({ role, content, quickReplies, restaurants, meta });
       if (!message) return null;
-      const shouldFollow = role === 'assistant' || isNearConversationBottom();
+      const shouldFollow = autoFollowConversation;
       chatMessages = [...chatMessages, message];
-      const item = renderMessage(message, '', shouldFollow);
+      const item = renderMessage(message, role === 'assistant' ? 'live-reveal' : '', shouldFollow);
       if (save) saveConversation();
       updateShareVisibility();
       return item;
@@ -1944,7 +2008,7 @@
         button.disabled = false;
         button.setAttribute('aria-label', '답변 생성 멈추기');
         button.innerHTML = '<span class="stop-icon"></span>';
-        $('#chatInput').disabled = true;
+        $('#chatInput').disabled = false;
       } else {
         button.setAttribute('aria-label', '질문 보내기');
         button.innerHTML = '<svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
@@ -1959,7 +2023,8 @@
       activeRequestController = null;
       const status = messagesEl.querySelector('.message.status');
       if (status) status.remove();
-      if (generating && showMessage) appendMessage('assistant', '답변 생성을 멈췄어요. 다시 편하게 물어봐 주세요.');
+      if (generating && showMessage && !regeneratingAnswer) appendMessage('assistant', '답변 생성을 멈췄어요. 다시 편하게 물어봐 주세요.');
+      regeneratingAnswer = false;
       if (generating) setGenerating(false);
     }
     function showRequestError(request) {
@@ -1982,20 +2047,21 @@
       bubble.append(text, retry);
       item.append(avatar, bubble);
       messagesEl.appendChild(item);
-      item.scrollIntoView({ block: 'start', behavior: 'auto' });
+      if (shouldFollow) followConversation(item);
     }
-    async function generateAnswer(request) {
+    async function generateAnswer(request, { replaceMessage = null } = {}) {
+      regeneratingAnswer = Boolean(replaceMessage);
       setGenerating(true);
       activeRequestController = new AbortController();
       const controller = activeRequestController;
       const shouldFollow = isNearConversationBottom();
       const status = document.createElement('div');
       status.className = 'message ai status';
-      status.innerHTML = '<img class="ai-avatar" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI"><div class="ai-bubble" role="status"><span class="thinking-dots" aria-hidden="true"><i></i><i></i><i></i></span><span>생각하는 중</span></div>';
+      status.innerHTML = '<div class="ai-bubble" role="status"><span>생각하는 중</span><span class="thinking-dots" aria-hidden="true"><i></i></span></div>';
       messagesEl.appendChild(status);
       const label = status.querySelector('.ai-bubble > span:last-child');
       generationTimers = [];
-      status.scrollIntoView({ block: 'start', behavior: 'auto' });
+      followConversation(status);
       try {
         const answer = await requestAssistant(request, controller.signal);
         if (controller.signal.aborted) return;
@@ -2008,15 +2074,27 @@
           currentLocationName = answer.meta.responseModeState.slots.region || '';
         }
         status.remove();
-        appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants, meta: answer.meta });
+        if (replaceMessage && chatMessages.at(-1) === replaceMessage) {
+          const old = messagesEl.querySelector('.message.ai:last-child');
+          const replacement=normalizeMessage({role:'assistant',content:answer.content,quickReplies:answer.quickReplies,restaurants:answer.restaurants,meta:answer.meta});
+          chatMessages[chatMessages.length-1]=replacement;
+          const item=renderMessage(replacement,'live-reveal',autoFollowConversation);
+          old?.remove(); answerRequests.set(replacement,request); saveConversation();
+        } else {
+          appendMessage('assistant', answer.content, { quickReplies: answer.quickReplies, restaurants: answer.restaurants, meta: answer.meta });
+          answerRequests.set(chatMessages.at(-1),request);
+        }
       } catch (error) {
         status.remove();
         if (error?.name !== 'AbortError') showRequestError(request);
       } finally {
         generationTimers.forEach(clearTimeout);
         generationTimers = [];
-        if (activeRequestController === controller) activeRequestController = null;
-        if (generating) setGenerating(false);
+        if (activeRequestController === controller) {
+          activeRequestController = null;
+          regeneratingAnswer = false;
+          if (generating) setGenerating(false);
+        }
       }
     }
     function isCurrentLocationIntent(value) {
@@ -2136,9 +2214,9 @@
       locationRequestInFlight = true;
       const status = document.createElement('div');
       status.className = 'message ai status location-status';
-      status.innerHTML = '<img class="ai-avatar" src="assets/inchelin-guide-logo.png" alt="Inchelin Guide AI"><div class="ai-bubble"><span class="thinking-dots"><i></i><i></i><i></i></span><span>현재 위치를 확인하고 있어요</span></div>';
+      status.innerHTML = '<div class="ai-bubble"><span>현재 위치를 확인하고 있어요</span><span class="thinking-dots" aria-hidden="true"><i></i></span></div>';
       messagesEl.appendChild(status);
-      status.scrollIntoView({ block: 'start', behavior: 'auto' });
+      followConversation(status);
       try {
         // Start both coordinate requests immediately inside the user's click gesture.
         // Some embedded browsers stop delivering a position when permission probing is awaited first.
@@ -2229,6 +2307,7 @@
     function ask(question, { freshMenu = false, compareCards = null, responseState = null, alreadyAdded = false } = {}) {
       const value = question.trim();
       if (!value || generating) return;
+      autoFollowConversation = true;
       showChatView();
       if (!alreadyAdded) appendMessage('user', value);
       $('#welcomeInput').value = '';
@@ -2272,15 +2351,7 @@
     function renderPinnedPlugins() {
       for (const container of qsa('.plugin-shortcuts')) {
         container.replaceChildren();
-        container.hidden = !pinned.length || isSharedConversation;
-        for (const id of pinned) {
-          const plugin = PLUGINS.find(item => item.id === id);
-          if (!plugin) continue;
-          const button = document.createElement('button');
-          button.type = 'button'; button.textContent = plugin.name;
-          button.addEventListener('click', () => runPlugin(id, button));
-          container.appendChild(button);
-        }
+        container.hidden = true; // Pins remain in the plugin panel, never above the composer.
       }
     }
     function runPlugin(id, trigger) {
@@ -2316,11 +2387,16 @@
       input.addEventListener('input', () => resizeInput(input));
       input.addEventListener('keydown', event => {
         if (event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Enter' && !event.shiftKey) {
+        if (event.key === 'Enter' && !event.shiftKey && window.innerWidth > 768 && !window.matchMedia('(pointer: coarse)').matches) {
           event.preventDefault();
           input.closest('form').requestSubmit();
         }
       });
+    });
+    window.addEventListener('scroll', updateConversationScroll, {passive:true});
+    $('#conversationBottom').addEventListener('click',()=>{
+      autoFollowConversation=true;
+      window.scrollTo({top:document.documentElement.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     });
     $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); routeQuestion($('#welcomeInput').value); });
     $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else routeQuestion($('#chatInput').value); });

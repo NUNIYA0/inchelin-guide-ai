@@ -6,11 +6,15 @@ import { MENU_CATEGORIES, ANSWER_BLOCKS, applyAnswerPlan } from '../worker/answe
 import { FORBIDDEN_COPY } from '../worker/conversation-copy.js';
 import { applyRelatedQuestions, validateRelated } from '../worker/related-questions.js';
 import { withTurnDeadline } from '../worker/turn-policy.js';
+import { mentionedSearchRegion, normalizeFoodAxis } from '../worker/search-axes.js';
 
 export async function testRelatedQuestions(runCase) {
   const env={OPENAI_API_KEY:'test-key',RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub'};
   const places={items:[0,1,2].map(i=>({title:'강남국밥'+i,category:'한식>국밥',roadAddress:'서울 강남구 테스트길 '+i,mapx:'1270000000',mapy:'375000000'}))};
-  const run=(message,state={},extra={})=>runCase({message,env,context:{responseModeState:state},naverResponse:places,...extra});
+  const run=(message,state={},extra={})=>runCase({message,env,context:{responseModeState:state},naverResponse:query=>{
+    const region=mentionedSearchRegion(query)||'강남',food=normalizeFoodAxis(query)?.menu||'국밥';
+    return {items:places.items.map((item,i)=>({...item,title:region+food+i,category:'한식>'+food,roadAddress:'서울 '+region+' 테스트길 '+i}))};
+  },...extra});
   const first=await run('강남에서 국밥 먹을 곳 찾아줘');
   const state=first.body.meta.responseModeState;
   const check=(body,name,min=2)=>{
@@ -46,7 +50,7 @@ export async function testRelatedQuestions(runCase) {
   }
   const zero=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {naverResponse:{items:[]}});assert.equal(zero.body.meta.relatedQuestions.length,0);assert.ok(zero.body.meta.turnPolicy.expansionChoices.length);assert.deepEqual(zero.body.meta.turnPolicy.actionChips,[]);
   const timeout=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {generationStatus:504});check(timeout.body,'timeout fallback');assert.ok(timeout.body.meta.relatedQuestions.every(item=>item.source==='template'));
-  const proposed=[{text:'성수에서도 국밥 먹을 곳 찾아주세요'},{text:'국밥 말고 냉면 먹을 곳 알려주세요'},{text:'국밥집 영업시간도 함께 알려주세요'},{text:'삼겹살 말고 소주 마실 곳 알려주세요'}];
+  const proposed=[{text:'성수에서도 국밥 먹을 곳 찾아줘'},{text:'국밥 말고 냉면 먹을 곳 찾아줘'},{text:'국밥집 영업시간도 함께 알려줘'},{text:'삼겹살 말고 소주 마실 곳 알려줘'}];
   const model=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:proposed}});
   check(model.body,'model filtering');assert.equal(model.body.meta.relatedQuestions.filter(item=>item.source==='model').length,2,JSON.stringify(model.body.meta.relatedQuestions));
   const unknown=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:[{text:'부산에서도 국밥 먹을 곳 찾아주세요'}]}});
@@ -74,11 +78,11 @@ export async function testRelatedQuestions(runCase) {
   assert.equal(validateRelated('회식하기 좋은 곳으로 다시 찾아주세요',{state:blocked,parentIntent:'place_search',classify:()=>({intent:'condition_change',confidence:1,slots:{companion:'회식'}}),history:[]}),null);
   const pure={message:'알려드릴게요.',restaurants:[],meta:{intent:'service',answer_plan:['text'],responseModeState:{slots:{}}}};
   await assert.rejects(withTurnDeadline(()=>new Promise(()=>{}),1),/turn_timeout/);
-  const afterDeadline=applyRelatedQuestions(pure,{messages:[]},()=>({intent:'service',confidence:1,slots:{}}));
+  const afterDeadline=await applyRelatedQuestions(pure,{messages:[]},()=>({intent:'service',confidence:1,slots:{}}));
   assert.ok(afterDeadline.meta.relatedQuestions.length>=2);assert.ok(afterDeadline.meta.relatedQuestions.every(item=>item.source==='template'));
   const seen={...state,shownSuggestions:[{text:'역삼에서도 국밥 먹을 곳 찾아주세요',key:'region:역삼:국밥'}]};
   assert.equal(validateRelated('역삼 지역에서도 국밥집 찾아주세요',{state:seen,parentIntent:'place_search',classify:()=>({intent:'condition_change',confidence:1,slots:{region:'역삼',menu:'국밥'}}),history:[]}),null,'semantic duplicates are rejected across paraphrases');
-  const rejectAll=applyRelatedQuestions(pure,{messages:[]},()=>({intent:'out_of_scope',confidence:1}));assert.equal(rejectAll.meta.relatedQuestions.length,0);assert.ok(!rejectAll.meta.answer_plan.includes('related_questions'));
+  const rejectAll=await applyRelatedQuestions(pure,{messages:[]},()=>({intent:'out_of_scope',confidence:1}));assert.equal(rejectAll.meta.relatedQuestions.length,0);assert.ok(!rejectAll.meta.answer_plan.includes('related_questions'));
   assert.ok(ANSWER_BLOCKS.includes('related_questions'));
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
   assert.match(html,/\.related-question \{[^}]*min-height: 52px;[^}]*padding: 16px;[^}]*border-radius: 14px;[^}]*background: #f3f3f3;[^}]*color: #222;[^}]*15px/);

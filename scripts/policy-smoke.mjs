@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import worker from "../build/dist/server/index.js";
+import { clearRelatedSearchCache } from '../build/dist/server/related-questions.js';
 import { koreanParticle, withParticle } from "../worker/korean.js";
 import { CATEGORY_MENUS, GAME_NOTICE, secureRandomInt, autoCandidates, spinWheel, makeLadder, resultMessage, categoryRequest, normalizeOptions, wheelLabel } from "../dist/assets/meal-tools-v2.js";
 import { testMealToolsUI } from "./meal-tools-smoke.mjs";
@@ -15,6 +16,7 @@ import { testAnswerPlan } from './answer-plan-smoke.mjs';
 import { testHistoryAlternatives } from './history-alternatives-smoke.mjs';
 import { testQuestionStages } from './question-stages-smoke.mjs';
 import { testRelatedQuestions } from './related-questions-smoke.mjs';
+import { testChatInterface } from './chat-interface-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -35,6 +37,7 @@ function request(message, history = [], context = {}) {
 }
 
 async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, webResearchResponse = "웹 검색에서 동일 매장의 메뉴판과 리뷰를 확인했습니다.", aiResponse, aiResponses, menuResponses, intentAnalysis, modeIntentAnalysis, analyzerEnabled = false, expectedStatus = 200, generationStatus = 200 }) {
+  clearRelatedSearchCache(); // Independent fixtures must not reuse a different mock search dataset.
   const originalFetch = globalThis.fetch;
   const calls = [];
   let answerIndex = 0, menuIndex = 0;
@@ -1401,7 +1404,7 @@ function semanticAnalysis(overrides = {}) {
     assert.ok(!card.recommendationReason.includes(card.address));
   }
   const searchCalls = third.calls.filter(call => call.href.includes("/search/v1/local"));
-  assert.equal(searchCalls.length, 1);
+  assert.ok(searchCalls.length >= 1 && searchCalls.length <= 4, 'one main search plus at most three suggestion preflights');
   assert.equal(new URL(searchCalls[0].href).searchParams.get("query"), "역삼 삼겹살");
   assert.equal(third.calls.filter(call => call.body?.text?.format?.name === "inchelin_response_mode_analysis").length, 0);
   const fourth = await runCase({
@@ -1864,7 +1867,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.match(indexHtml, /lastCards: compareCards, focus: null/);
   assert.match(indexHtml, /selectRegionOnly: true/);
   assert.match(indexHtml, /if \(selectRegionOnly\) \{\s*selectPluginRegion\(locationName, true, false\)/);
-  assert.match(indexHtml, /button.addEventListener\('click', \(\) => runPlugin\(id, button\)\)/);
+  assert.doesNotMatch(indexHtml, /<nav class="plugin-shortcuts"/, 'no persistent chips above either input');
   assert.match(indexHtml, /pluginActions\?\.togglePin/);
   assert.doesNotMatch(indexHtml, /input.value = .*plugin.name.*기능으로/);
 }
@@ -1933,11 +1936,10 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   );
   render.render();
   for (const container of shortcutNodes) {
-    assert.deepEqual(container.children.map(button => button.textContent), ['메뉴 탐색', '지역별 찾기', '추천 기준·데이터 안내']);
-    assert.equal(container.hidden, false);
-    container.children[1].click();
+    assert.deepEqual(container.children, [], 'v125: persistent composer shortcuts are removed');
+    assert.equal(container.hidden, true);
   }
-  assert.deepEqual(executed, [3, 3], 'both welcome/chat shortcuts execute the real plugin id');
+  assert.deepEqual(executed, [], 'plugins run from the panel, not persistent composer chips');
   render.share(); render.render();
   assert.ok(shortcutNodes.every(node => node.hidden));
   render.clear(); render.render();
@@ -2144,4 +2146,5 @@ await testAnswerPlan();
 await testHistoryAlternatives(runCase);
 await testQuestionStages(runCase);
 await testRelatedQuestions(runCase);
+await testChatInterface(runCase);
 console.log("Inchelin data policy smoke tests passed.");

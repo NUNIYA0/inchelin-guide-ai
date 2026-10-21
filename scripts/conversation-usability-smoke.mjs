@@ -20,7 +20,7 @@ export async function testConversationUsability(runCase) {
     const narrow = await runCase({ message, env });
     const slot = narrow.body.meta.turnPolicy.next_question.slot;
     const skip = await runCase({ message: '상관없어요', env, naverResponse, context: { responseModeState: narrow.body.meta.responseModeState } });
-    assert.ok(skip.calls.length >= 1 && skip.calls.length <= 3, 'explicit region indifference can add two bounded neighbor searches'); assert.equal(skip.body.meta.turnPolicy.next_question, null);
+    assert.ok(skip.calls.length >= 1 && skip.calls.length <= 6, 'bounded neighbor searches plus at most three related-combination preflights'); assert.equal(skip.body.meta.turnPolicy.next_question, null);
     assert.ok(skip.body.meta.responseModeState.askedSlots.includes(slot));
     assert.doesNotMatch(skip.body.message, /[?？]/);
   }

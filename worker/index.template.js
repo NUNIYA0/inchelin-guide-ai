@@ -17,7 +17,7 @@ import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, a
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION, ADJACENT_REGIONS } from "./search-axes.js";
 import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGION_ANSWERS, AUTO_MENU } from './answer-plan.js';
 import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
-import { applyRelatedQuestions } from './related-questions.js';
+import { applyRelatedQuestions, confirmedCombination } from './related-questions.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -1823,7 +1823,7 @@ class NaverRestaurantProvider {
     this.source = "naver";
   }
 
-  async searchRestaurants({ messages, locationName, intentAnalysis }) {
+  async searchRestaurants({ messages, locationName, intentAnalysis, suggestionCheck = false }) {
     const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/local");
     const clientId = safeText(this.env.NAVER_API_HUB_CLIENT_ID, 300);
     const clientSecret = safeText(this.env.NAVER_API_HUB_CLIENT_SECRET, 300);
@@ -1839,7 +1839,7 @@ class NaverRestaurantProvider {
       return { configured: false, places: [], ambiguous: false, query, errorCode: "missing_credentials" };
     }
     try {
-      for (const candidateQuery of queries) {
+      for (const candidateQuery of (suggestionCheck ? queries.slice(0,1) : queries)) {
         const url = new URL(endpoint);
         url.searchParams.set("query", candidateQuery);
         url.searchParams.set("display", "5");
@@ -1849,7 +1849,7 @@ class NaverRestaurantProvider {
         const data = await getJsonWithTimeout(url.toString(), {
           "X-NCP-APIGW-API-KEY-ID": clientId,
           "X-NCP-APIGW-API-KEY": clientSecret,
-        });
+        }, suggestionCheck ? 650 : 6500);
         const places = (Array.isArray(data?.items) ? data.items : [])
           .map(sanitizeNaverPlace)
           .filter(Boolean)
@@ -2751,9 +2751,21 @@ export default {
         const body = await response.json();
         if (response.ok && execution.analysis && !body.meta?.analysis) body.meta = { responseModeState:execution.state, ...body.meta, analysis:execution.analysis, intent:execution.analysis.intent };
         const planned=response.ok?applyAnswerPlan(applyTurnPolicy(body,payload),payload):body;
-        const completed=response.ok?applyRelatedQuestions(planned,payload,(text,state)=>{
+        const completed=response.ok?await applyRelatedQuestions(planned,payload,(text,state)=>{
           const messages=[...(payload.messages||[]),{role:'user',content:text}];
           return prioritizeSearchAxes(fallbackResponseModeAnalysis(messages,state),messages,state);
+        },async({region,food,text,state})=>{
+          const provider=createRestaurantProvider(env);
+          const messages=[{role:'user',content:region+'에서 '+food+' 먹을 곳 찾아줘'}];
+          const intentAnalysis={location:region,foodCategory:food,foodPreference:'',otherConditions:[],needsRestaurantSearch:true};
+          const valid=place=>validateRestaurantCandidate(place,{messages,intentAnalysis,source:provider.source,locationName:region});
+          const excluded=/다른.{0,3}(?:곳|식당)/.test(text)?new Set(state.shownPlaceIds):new Set();
+          if((planned.restaurants||[]).some(place=>!excluded.has(place.id)&&valid(place)))return true;
+          // Existing validated results can answer the current combination without another lookup.
+          return confirmedCombination(provider.source+':'+region+':'+food+':'+[...excluded].sort().join(','),async()=>{
+            const result=await provider.searchRestaurants({messages,locationName:region,intentAnalysis,suggestionCheck:true});
+            return result.places.some(place=>!excluded.has(place.id)&&valid(place));
+          });
         }):planned;
         return json(finalizeConversationCopy(completed),response.status);
       } catch (error) {

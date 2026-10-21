@@ -13,7 +13,7 @@ export async function testConversationUI(runCase) {
   assert.equal(first.calls.filter(call => call.body?.text?.format?.name === 'inchelin_chat_response').length, 2, 'style is regenerated exactly once');
   assert.doesNotMatch(first.body.message, FORBIDDEN_COPY);
   assert.equal(first.body.restaurants.length, 3);
-  const lastCall = first.calls.at(-1);
+  const lastCall = first.calls.filter(call=>call.body?.instructions).at(-1);
   assert.ok(lastCall.body.instructions.includes(STYLE_RULES));
   assert.match(lastCall.body.instructions, /한 번 다시/);
   const failed = await runCase({ message: '강남역에서 삼겹살 먹을건데', env, naverResponse: { items }, aiResponses: [dirty, dirty] });
@@ -80,7 +80,7 @@ export async function testConversationUI(runCase) {
   const contextual = await runCase({ message: '강남역에서 삼겹살 회식할 거야', env, naverResponse: { items }, aiResponse: { ...clean, turn_text: { summary: '회식이라면 강남역 삼겹살집을 함께 골라볼게요.', reason: '' } } });
   assert.ok(contextual.body.message.startsWith('회식이라면 강남역 삼겹살집을 함께 골라볼게요.'));
   assert.doesNotMatch(failed.body.message, /먼저 식당 \d+곳을 찾았어요/);
-  assert.match(first.calls.at(-1).body.instructions, /fact_reason_options|웨이팅|이유를 만들지/);
+  assert.match(lastCall.body.instructions, /fact_reason_options|웨이팅|이유를 만들지/);
 
   // Exercise the real rendering functions with a small DOM fixture, no browser or APIs.
   const html = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
@@ -101,9 +101,9 @@ export async function testConversationUI(runCase) {
   }
   const sent = [], host = new Node('div'), trayHost = new Node('section');
   const document = { createElement: tag => new Node(tag), getElementById: id => id === 'comparisonTray' ? trayHost : null };
-  const openedAxes = [];
-  const renderer = new Function('document', 'messagesEl', 'appendLimitedMarkdown', 'ask', 'resolveRestaurantDetail', 'showToast', 'isCurrentLocationIntent', 'canUseCurrentLocation', 'chooseMenuCard', 'routeQuestion', 'openSearchPicker', renderSource + '\nreturn { renderRestaurantCards, renderMessage };')(
-    document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹을래']), value => sent.push([value]), axis => openedAxes.push(axis));
+  const openedAxes = [], answerActions=[];
+  const renderer = new Function('document', 'messagesEl', 'appendLimitedMarkdown', 'ask', 'resolveRestaurantDetail', 'showToast', 'isCurrentLocationIntent', 'canUseCurrentLocation', 'chooseMenuCard', 'routeQuestion', 'openSearchPicker','copyAnswer','regenerateAnswer', renderSource + '\nreturn { renderRestaurantCards, renderMessage };')(
+    document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹을래']), value => sent.push([value]), axis => openedAxes.push(axis),value=>answerActions.push(['copy',value]),value=>answerActions.push(['regenerate',value]));
   const nodes = root => [root, ...root.children.flatMap(nodes)];
   const ofClass = (root, cls) => nodes(root).filter(node => node.className.split(' ').includes(cls));
   const group = renderer.renderRestaurantCards(first.body.restaurants);
@@ -149,6 +149,8 @@ export async function testConversationUI(runCase) {
   assert.equal(ofClass(trayHost, 'comparison-submit')[0].disabled, true);
   const message = renderer.renderMessage({ role: 'assistant', content: first.body.message, restaurants: first.body.restaurants, quickReplies: first.body.suggestions, meta: first.body.meta });
   const bubble = ofClass(message, 'ai-bubble')[0];
+  const tools=ofClass(message,'answer-action');assert.deepEqual(tools.map(button=>button.attributes['aria-label']),['복사','다시 생성']);tools.forEach(button=>button.click());assert.deepEqual(answerActions.map(item=>item[0]),['copy','regenerate']);
+  assert.equal(ofClass(message,'ai-avatar').length,0,'AI text has no avatar or speech balloon');
   const conditions = ofClass(message, 'result-conditions')[0];
   assert.deepEqual(conditions.children.map(node => node.textContent), ['강남역', '삼겹살']);
   conditions.children[0].click(); conditions.children[1].click();
