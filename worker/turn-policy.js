@@ -1,7 +1,7 @@
 import { normalizeResponseState } from './response-modes.js';
 import { withParticle } from './korean.js';
 import { FORBIDDEN_COPY } from './conversation-copy.js';
-import { nearbySuggestions } from './search-axes.js';
+import { nearbySuggestions, SEARCH_REGIONS, searchMessage } from './search-axes.js';
 
 export const IMMEDIATE_REQUEST = /바로\s*보여줘|그냥\s*추천해줘|질문\s*(?:없이|하지\s*마)/;
 const unique = values => [...new Set(values)];
@@ -82,6 +82,12 @@ export function applyTurnPolicy(response, payload = {}) {
   const analysis = { ...(response.meta.analysis || {}), intent: response.meta.intent || response.meta.analysis?.intent || response.meta.variant,
     stage: plan.stage, missing_slots: plan.missing_slots, next_question: plan.next_question, can_search: plan.can_search };
   const cleanMeta = { ...response.meta }; delete cleanMeta._turnDraft;
+  if (response.meta.unsupportedRegion) {
+    state.stage = 'narrowing'; state.pendingQuestionSlot = 'region';
+    const question = { slot: 'region', text: '', chips: SEARCH_REGIONS.map(region => ({ label: region, message: searchMessage({ region, food: state.slots.menu || state.slots.food_type }) })) };
+    const fixedAnalysis = { ...analysis, stage: 'narrowing', missing_slots: ['region'], next_question: question, can_search: false };
+    return { ...response, restaurants: [], suggestions: SEARCH_REGIONS, meta: { ...cleanMeta, analysis: fixedAnalysis, responseModeState: state, turnPolicy: { ...fixedAnalysis, intro: response.message, questionText: '', actionChips: [] } } };
+  }
   if (exempt) {
     const noFollowup = response.meta.mode === 'E' || response.meta.variant === 'compare';
     const message = noFollowup ? response.message.split(/(?<=[.!?？])\s+/).filter(unit => !/[?？]/.test(unit)).join(' ') || '현재 확인된 정보만 안내해드릴게요.' : response.message;

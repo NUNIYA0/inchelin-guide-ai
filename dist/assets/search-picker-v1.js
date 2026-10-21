@@ -1,7 +1,7 @@
 import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
 import { SEARCH_FOODS, SEARCH_REGIONS, searchMessage, validSearchRegion } from './search-axes-data-v1.js';
 
-// The same two-axis controls are mounted at home and in the category/region sheet.
+// Shared two-axis controls for plugin sheets and result-condition editing, not the home screen.
 export function mountSearchPicker({ home, getSlots, send, locate, isBusy, onOpen = () => {} }) {
   const el = (tag, text = '', className = '') => { const node = document.createElement(tag); node.textContent = text; node.className = className; return node; };
   const button = (label, action, cls = 'meal-chip') => { const node = el('button', label, cls); node.type = 'button'; node.addEventListener('click', action); return node; };

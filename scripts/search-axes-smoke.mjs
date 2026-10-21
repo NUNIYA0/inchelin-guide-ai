@@ -111,8 +111,8 @@ export async function testSearchAxes(runCase) {
     busy = true; picker.open('food'); assert.equal(picker.dialog.open, false);
   } finally { globalThis.document = previous; }
   const html = await readFile(new URL('../dist/index.html', import.meta.url), 'utf8');
-  assert.ok(html.indexOf('id="welcomeForm"') < html.indexOf('id="homeSearchAxes"'));
-  assert.ok(html.indexOf('id="homeSearchAxes"') < html.indexOf('id="suggestions"'));
+  assert.doesNotMatch(html, /homeSearchAxes/);
+  assert.ok(html.indexOf('id="welcomeForm"') < html.indexOf('id="suggestions"'));
   assert.match(html, /openSearch: openSearchPicker/);
   console.log('Food × region picker/search mocked regressions passed (7 quick regions, 10 categories).');
 }

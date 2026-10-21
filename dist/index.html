@@ -197,7 +197,6 @@
       overflow: hidden;
     }
     .welcome { width: min(720px, 100%); transform: translateY(-3px); }
-    .main:not(.chat-mode) .workspace { overflow-y: auto; overflow-x: hidden; align-items: start; align-content: start; }
     h1 {
       margin: 0 0 66px;
       text-align: center;
@@ -331,10 +330,7 @@
     .quick-reply.quick-reply-chip .quick-reply-title { font-size: 12px; font-weight: 500; }
     .quick-reply.menu-more { grid-column: 1 / -1; justify-self: start; }
     .turn-notice { margin: 0 0 8px; color: #555; font: 400 14px/1.5 system-ui, sans-serif; }
-    .search-axes { margin-top: 18px; padding: 16px; border: 1px solid #e4e4e4; border-radius: 18px; text-align: left; }
-    .search-axes .meal-chip, .result-conditions .meal-chip { font: 400 14px/1.5 system-ui, sans-serif; }
-    .search-axes .primary-action { width: 100%; min-height: 48px; border-radius: 12px; font: 600 16px system-ui, sans-serif; }
-    .search-axes .primary-action:disabled { background: #ddd; color: #666; cursor: default; }
+    .result-conditions .meal-chip { font: 400 14px/1.5 system-ui, sans-serif; }
     .axis-group h3 { margin: 0 0 8px; font: 600 14px/1.5 system-ui, sans-serif; }
     .axis-group + .axis-group { margin-top: 16px; }
     .axis-details { margin-top: 8px; }
@@ -768,7 +764,6 @@
               <button class="send" id="welcomeSend" type="submit" aria-label="질문 보내기" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
           </form>
-          <section id="homeSearchAxes" class="search-axes" aria-label="음식 종류와 지역으로 찾기"></section>
           <div class="suggestions" id="suggestions" aria-label="추천 질문"></div>
         </div>
 
@@ -2502,8 +2497,8 @@
     renderPlugins();
     let searchPicker = null;
     function openSearchPicker(axis) { if (searchPicker) searchPicker.open(axis); else showToast('선택기를 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); }
-    import('/assets/search-picker-v1.js?v=117').then(({ mountSearchPicker }) => {
-      searchPicker = mountSearchPicker({ home: $('#homeSearchAxes'), getSlots: () => pluginState().slots,
+    import('/assets/search-picker-v1.js?v=118').then(({ mountSearchPicker }) => {
+      searchPicker = mountSearchPicker({ getSlots: () => pluginState().slots,
         send: message => { currentLocationCoords = null; ask(message); }, locate: message => requestCurrentLocation(message),
         isBusy: () => generating || locationRequestInFlight,
         onOpen: () => { closeOverlay('pluginOverlay'); taskMenu.classList.remove('open'); } });

@@ -73,11 +73,11 @@ export async function testTurnPolicy(runCase) {
   assert.equal(again.body.meta.responseModeState.questionCount, 1);
   assert.deepEqual(again.body.meta.responseModeState.askedSlots, ['region']);
   // 6. At most three questions overall and at most two additional refining questions.
-  let response = await runCase({ message: '서울에서 한식 먹을 곳 찾아줘', env, naverResponse: places('서울') });
+  let response = await runCase({ message: '강남에서 한식 먹을 곳 찾아줘', env, naverResponse: places('강남') });
   assert.equal(response.body.meta.turnPolicy.next_question.slot, 'companion');
   for (const [message, area, menu, next] of [
-    ['가족과 함께 가요', '서울', '삼겹살', 'sub_menu'],
-    ['국밥 먹고 싶어요', '서울', '국밥', 'sub_region'],
+    ['가족과 함께 가요', '강남', '삼겹살', 'sub_menu'],
+    ['국밥 먹고 싶어요', '강남', '국밥', 'sub_region'],
     ['홍대에서 찾아줘', '홍대', '국밥', null],
   ]) {
     response = await runCase({ message, env, context: { responseModeState: response.body.meta.responseModeState }, naverResponse: places(area, menu) });

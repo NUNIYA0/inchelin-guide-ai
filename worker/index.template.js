@@ -14,7 +14,7 @@ import {
 import { withParticle } from "./korean.js";
 import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
 import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons } from "./conversation-copy.js";
-import { placeMatchesRegion, cardArea } from "./search-axes.js";
+import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION } from "./search-axes.js";
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -254,6 +254,7 @@ function userMessagesOnly(messages) {
 }
 
 function locationMatches(text) {
+  for (const alias of Object.values(REGION_NORMALIZATION).flat().sort((a, b) => b.length - a.length)) text = String(text || '').split(alias).join(normalizeSearchRegion(alias));
   const explicit = [...String(text || "").matchAll(/(?:^|\s)([0-9A-Za-z가-힣·.-]+?)(?:에서|\s*(?:근처|주변))/g)]
     .map(match => match[1]).filter(validRegionCandidate);
   if (explicit.length) return explicit;
@@ -766,6 +767,30 @@ const RESPONSE_MODE_SCHEMA = {
   required: ["intent", "sub_intent", "confidence", "slots", "reference", "change", "flags", ...Object.keys(TURN_ANALYSIS_FIELDS)],
   additionalProperties: false,
 };
+
+function prioritizeSearchAxes(value, messages, state) {
+  const analysis = normalizeAnalysis(value);
+  if (['service', 'compare', 'specific_place', 'food_talk', 'out_of_scope'].includes(analysis.intent)) return analysis;
+  if (analysis.intent === 'followup' && analysis.reference?.target_index) return analysis;
+  if (analysis.change?.action === 'exclude_previous' || (analysis.intent === 'menu_trouble' && analysis.sub_intent === 'narrow')) return analysis;
+  const latest = [...messages].reverse().find(message => message.role === 'user')?.content || '';
+  const food = normalizeFoodAxis(latest);
+  const useCurrent = /현재\s*위치|내\s*주변/.test(latest);
+  const rawRegion = locationMatches(latest).at(-1) || analysis.slots.region || mentionedSearchRegion(latest);
+  const region = useCurrent ? '' : normalizeSearchRegion(rawRegion);
+  if (food) Object.assign(analysis.slots, food);
+  if (region && validRegionCandidate(region)) analysis.slots.region = region;
+  if (useCurrent) analysis.slots.use_current_location = true;
+  const ambiguous = /맛있는\s*(?:거|것|곳)|아무거나/.test(latest) && !food && !state.slots.menu && !state.slots.food_type;
+  if (food || region || useCurrent || ambiguous) {
+    analysis.intent = state.lastCards.length ? 'condition_change' : region || useCurrent || ambiguous || state.slots.region ? 'place_search' : 'menu_trouble';
+    analysis.sub_intent = ambiguous ? 'ambiguous_food' : state.lastCards.length ? 'replace' : 'axis_search';
+    analysis.confidence = Math.max(0.9, analysis.confidence);
+    analysis.flags.food_related = true;
+    if (state.lastCards.length) analysis.change = { slot: food ? 'food_type' : 'region', action: 'replace' };
+  }
+  return normalizeAnalysis(analysis);
+}
 
 async function analyzeResponseModeIntent(env, messages, stateValue) {
   const state = normalizeResponseState(stateValue);
@@ -1727,7 +1752,7 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
   ];
   const cuisine = cuisineRules.find(([requestPattern]) => requestPattern.test(requested));
   if (cuisine && !cuisine[1].test(searchable)) return false;
-  const explicitMenu = requested.match(/마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|햄버거|버거|해산물|횟집|고기|카레|전골|만두|죽|비빔밥|덮밥/)?.[0];
+  const explicitMenu = normalizeFoodAxis(requested)?.menu || requested.match(/마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|햄버거|버거|해산물|횟집|고기|카레|전골|만두|죽|비빔밥|덮밥/)?.[0];
   if (!explicitMenu) return true;
   const aliases = {
     삼겹살: /삼겹살|돼지|돈육|육류|고깃집|고기구이/, 고기: /삼겹살|돼지|소고기|한우|갈비|육류|고깃집|고기구이/,
@@ -2317,7 +2342,7 @@ async function handleChat(request, env) {
       return json(chatResponse("현재 위치에서 확인된 직선거리가 가까운 순으로 정렬했어요.", recommendationQuickReplies(true), cards, { mode: "D", responseModeState: nextState }));
     }
   }
-  const analysis = await analyzeResponseModeIntent(env, messages, responseState);
+  const analysis = prioritizeSearchAxes(await analyzeResponseModeIntent(env, messages, responseState), messages, responseState);
   if (analysis.slots.region && analysis.slots.region !== responseState.slots.region && (responseState.lastCards.length || /말고/.test(latestUserMessage))) {
     currentLocation = null;
     currentLocationName = analysis.slots.region;
@@ -2325,6 +2350,14 @@ async function handleChat(request, env) {
   responseState = applyAnalysisToState(responseState, analysis);
   // A model-classified service question can never reach answer generation or card selection.
   if (analysis.intent === "service") return json(generalModeResponse(analysis, responseState, dataSource, latestUserMessage));
+  if (!linkedPlaceResearch && ['menu_trouble', 'place_search', 'condition_change'].includes(analysis.intent)
+    && responseState.slots.region && !responseState.slots.use_current_location && !SEARCH_REGIONS.includes(normalizeSearchRegion(responseState.slots.region))) {
+    const requestedRegion = responseState.slots.region;
+    const nextState = normalizeResponseState({ ...responseState, slots: { ...responseState.slots, region: null, use_current_location: false }, lastCards: [], focus: null, pendingQuestionSlot: 'region' });
+    return json(chatResponse(`‘${requestedRegion}’은 현재 검색 가능한 지역이 아니에요. 아래 지역 중에서 골라주세요.`, SEARCH_REGIONS, [], {
+      mode: 'B', intent: 'place_search', analysis, responseModeState: nextState, unsupportedRegion: requestedRegion,
+    }));
+  }
   const decision = linkedPlaceResearch
     ? { mode: "GENERAL", variant: "linked_place", intent: "general", questionSlot: null, showCards: false, needSearch: false, excludePlaceIds: [] }
     : decideMode(analysis, responseState);

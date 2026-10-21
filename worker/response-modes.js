@@ -1,3 +1,4 @@
+import { normalizeFoodAxis, normalizeSearchRegion, FOOD_HIERARCHY, REGION_NORMALIZATION } from './search-axes.js';
 export const INTENTS = [
   "menu_trouble", "place_search", "followup", "condition_change", "compare",
   "specific_place", "food_talk", "service", "general", "out_of_scope",
@@ -50,6 +51,11 @@ export function buildIntentAnalysisInstructions(stateValue) {
     stage: state.stage, askedSlots: state.askedSlots, questionCount: state.questionCount, preferences: state.preferences,
   };
   return `너는 인슐랭가이드 AI의 1단계 의도 분석기다. 응답 문장을 만들지 말고 JSON만 출력한다.
+맛집 검색의 최우선 축은 food_type과 region이다. 메뉴(menu)는 세부 음식이며 food_type은 상위 종류다. 음식·지역을 분위기·동행·예산보다 먼저 추출하고 확정한다.
+둘 다 있으면 즉시 검색하고 하나만 있으면 없는 축 하나를 묻는다. '거기 말고 성수에서'는 region만, '그럼 국밥으로'는 음식 축만 바꿔 나머지 슬롯을 유지한다.
+'맛있는 거'처럼 음식이 모호하면 지역부터 묻고 메뉴 탐색으로 이어간다. 지원 지역 안내에 확장 계획을 약속하지 않는다.
+음식 사전: ${JSON.stringify(FOOD_HIERARCHY)}
+지역 정규화: ${JSON.stringify(REGION_NORMALIZATION)}
 intent는 menu_trouble, place_search, followup, condition_change, compare, specific_place, food_talk, service, general, out_of_scope 중 하나다.
 우선순위: 범위 밖 → service(와인 포함) → 지역 질문에 대한 답 → 직전 카드의 후속/조건 변경/비교 → 목록 밖 특정 상호 → 강한 식당 신호 → 메뉴 고민 → 음식 지식 → 약한 지역/음식 신호 → general.
 음식명만 있고 식당·지역 신호가 없으면 menu_trouble이다. '삼겹살 추천해줘'는 menu_trouble/declare다. 지역+음식이 정해졌거나 맛집·식당·가게·~집·찾아줘가 있으면 place_search다. '강남역 근처에서 뭐 먹지'는 강한 식당 신호가 없으므로 menu_trouble이다.
@@ -173,7 +179,13 @@ export function normalizeAnalysis(value = {}) {
     can_search: value.can_search === true,
     sub_intent: cleanString(value.sub_intent, 80),
     confidence: Number.isFinite(Number(value.confidence)) ? Math.max(0, Math.min(1, Number(value.confidence))) : 1,
-    slots: cleanSlots(value.slots),
+    slots: (() => {
+      const slots = cleanSlots(value.slots);
+      const food = normalizeFoodAxis(slots.menu || slots.food_type);
+      if (food) { slots.food_type = food.food_type; slots.menu = food.menu; }
+      if (slots.region) slots.region = normalizeSearchRegion(slots.region);
+      return slots;
+    })(),
     reference: {
       target_index: [1, 2, 3].includes(Number(reference.target_index)) ? Number(reference.target_index) : null,
       target_name: cleanString(reference.target_name, 180),
@@ -241,6 +253,7 @@ export function decideMode(analysisValue, stateValue) {
   }
   if (intent === "specific_place") return { ...base, mode: "E", showCards: true, needSearch: true, intent };
   if (["followup", "condition_change", "compare"].includes(intent)) {
+    if (intent === 'condition_change' && (!hasRegion || !hasFood)) return { ...base, mode: 'B', questionSlot: hasRegion ? 'menu' : 'region', intent };
     if (hasPrev) return {
       ...base,
       mode: "D",

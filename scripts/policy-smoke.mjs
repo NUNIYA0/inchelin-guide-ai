@@ -8,6 +8,7 @@ import { testPluginActionsUI } from "./plugin-actions-smoke.mjs";
 import { testTurnPolicy } from "./turn-policy-smoke.mjs";
 import { testConversationUI } from "./conversation-ui-smoke.mjs";
 import { testSearchAxes } from "./search-axes-smoke.mjs";
+import { testAISearchPolicy } from "./ai-search-policy-smoke.mjs";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -614,9 +615,9 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "신림역 6번 출구 근처에서 혼자 저녁 한식 먹을 곳 추천해줘",
+    message: "역삼역 6번 출구 근처에서 혼자 저녁 한식 먹을 곳 추천해줘",
     context: {
-      currentLocationName: "서울특별시 관악구 신림동",
+      currentLocationName: "서울특별시 강남구 역삼동",
       currentLocation: { latitude: 37.4842, longitude: 126.9297 },
     },
     env: {
@@ -629,7 +630,7 @@ function semanticAnalysis(overrides = {}) {
       items: [
         {
           title: "신림애견카페",
-          roadAddress: "서울특별시 관악구 신림로 10",
+          roadAddress: "서울특별시 강남구 역삼로 10",
           category: "생활,편의>애견카페",
           link: "https://map.naver.com/p/entry/place/901",
           mapx: "1269298000",
@@ -637,7 +638,7 @@ function semanticAnalysis(overrides = {}) {
         },
         {
           title: "신림당구클럽",
-          roadAddress: "서울특별시 관악구 신림로 11",
+          roadAddress: "서울특별시 강남구 역삼로 11",
           category: "스포츠,오락>당구장",
           link: "https://map.naver.com/p/entry/place/902",
           mapx: "1269299000",
@@ -645,7 +646,7 @@ function semanticAnalysis(overrides = {}) {
         },
         {
           title: "신림혼밥식당",
-          roadAddress: "서울특별시 관악구 신림로 12",
+          roadAddress: "서울특별시 강남구 역삼로 12",
           category: "음식점>한식",
           link: "https://map.naver.com/p/entry/place/903",
           mapx: "1269310000",
@@ -653,7 +654,7 @@ function semanticAnalysis(overrides = {}) {
         },
         {
           title: "깨진�<상호>",
-          roadAddress: "서울특별시 관악구 신림로 13",
+          roadAddress: "서울특별시 강남구 역삼로 13",
           category: "음식점>한식",
           link: "https://map.naver.com/p/entry/place/904",
           mapx: "1269320000",
@@ -670,7 +671,7 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "신림역 근처 저녁 한식 맛집 추천해줘",
+    message: "역삼역 근처 저녁 한식 맛집 추천해줘",
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
@@ -680,7 +681,7 @@ function semanticAnalysis(overrides = {}) {
     naverResponse: {
       items: [{
         title: "신림커피",
-        roadAddress: "서울특별시 관악구 신림로 20",
+        roadAddress: "서울특별시 강남구 역삼로 20",
         category: "음식점>카페,디저트",
         link: "https://map.naver.com/p/entry/place/905",
       }],
@@ -692,7 +693,7 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "신림역 근처 카페 추천해줘",
+    message: "역삼역 근처 카페 추천해줘",
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
@@ -702,7 +703,7 @@ function semanticAnalysis(overrides = {}) {
     naverResponse: {
       items: [{
         title: "신림커피",
-        roadAddress: "서울특별시 관악구 신림로 20",
+        roadAddress: "서울특별시 강남구 역삼로 20",
         category: "음식점>카페,디저트",
         link: "https://map.naver.com/p/entry/place/905",
       }],
@@ -772,7 +773,7 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "신림역 주변",
+    message: "역삼역 주변",
     history: [
       { role: "user", content: "한식 먹을 곳 찾아줘" },
       { role: "assistant", content: "한 끼로 먹기 좋은 곳을 찾아볼게요. 어느 지역에서 찾을까요?" },
@@ -786,14 +787,14 @@ function semanticAnalysis(overrides = {}) {
     },
     intentAnalysis: semanticAnalysis({
       intent: "restaurant_recommendation",
-      location: "신림역 주변",
+      location: "역삼역 주변",
       distancePreference: "주변",
       needsRestaurantSearch: true,
     }),
     naverResponse: {
       items: [{
         title: "신림식당",
-        roadAddress: "서울특별시 관악구 신림로 1",
+        roadAddress: "서울특별시 강남구 역삼로 1",
         category: "한식",
         link: "https://map.naver.com/p/entry/place/881",
         mapx: "1269290000",
@@ -802,13 +803,13 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
-  assert.equal(new URL(naverCall.href).searchParams.get("query"), "신림역 한식");
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "역삼 한식");
   assert.equal(result.body.restaurants[0].name, "신림식당");
 }
 
 {
   const result = await runCase({
-    message: "신림역 주변",
+    message: "역삼역 주변",
     history: [
       { role: "user", content: "한식 먹을 곳 추천해줘" },
       { role: "assistant", content: "어느 지역에서 찾을까요?" },
@@ -822,13 +823,13 @@ function semanticAnalysis(overrides = {}) {
     },
     intentAnalysis: semanticAnalysis({
       intent: "food_conversation",
-      location: "신림역 주변",
+      location: "역삼역 주변",
       distancePreference: "주변",
       needsRestaurantSearch: false,
     }),
     naverResponse: { items: [] },
   });
-  assert.match(result.body.message, /신림역에서 한식 조건에 맞는 곳을 찾지 못했어요/);
+  assert.match(result.body.message, /역삼에서 한식 조건에 맞는 곳을 찾지 못했어요/);
   assert.equal(result.body.meta.restaurantSearchStatus, "no_results");
   assert.ok(result.calls.filter(call => call.href.includes("naverapihub.apigw.ntruss.com")).length >= 1);
 }
@@ -1054,7 +1055,7 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "판교 쪽에서 팀 저녁 한식 모임 장소 부탁해",
+    message: "성수 쪽에서 팀 저녁 한식 모임 장소 부탁해",
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
@@ -1064,15 +1065,15 @@ function semanticAnalysis(overrides = {}) {
     },
     intentAnalysis: semanticAnalysis({
       intent: "restaurant_recommendation",
-      location: "판교",
+      location: "성수",
       situation: "직장 동료 회식",
       mealTime: "저녁",
       needsRestaurantSearch: true,
     }),
     naverResponse: {
       items: [{
-        title: "판교모임식당",
-        roadAddress: "경기도 성남시 분당구 판교역로 1",
+        title: "성수모임식당",
+        roadAddress: "서울 성동구 성수동1가 1",
         category: "한식",
         link: "https://map.naver.com/p/entry/place/777",
         mapx: "1271110000",
@@ -1081,8 +1082,8 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
-  assert.match(new URL(naverCall.href).searchParams.get("query"), /^판교 한식 (?:팀|모임|직장 동료 회식)/);
-  assert.equal(result.body.restaurants[0].name, "판교모임식당");
+  assert.match(new URL(naverCall.href).searchParams.get("query"), /^성수 한식 (?:팀|모임|직장 동료 회식)/);
+  assert.equal(result.body.restaurants[0].name, "성수모임식당");
 }
 
 {
@@ -1111,7 +1112,7 @@ function semanticAnalysis(overrides = {}) {
 
 {
   const result = await runCase({
-    message: "송도에서 신선한 회를 먹을 식당 찾아줘",
+    message: "종로에서 신선한 회를 먹을 식당 찾아줘",
     env: {
       OPENAI_API_KEY: "test-key",
       RESTAURANT_DATA_SOURCE: "naver",
@@ -1121,14 +1122,14 @@ function semanticAnalysis(overrides = {}) {
     },
     intentAnalysis: semanticAnalysis({
       intent: "restaurant_recommendation",
-      location: "송도",
+      location: "종로",
       foodCategory: "회",
       needsRestaurantSearch: true,
     }),
     naverResponse: {
       items: [{
-        title: "송도횟집",
-        roadAddress: "인천광역시 연수구 송도동 1",
+        title: "종로횟집",
+        roadAddress: "서울 종로구 관철동 1",
         category: "일식>생선회",
         link: "https://map.naver.com/p/entry/place/778",
         mapx: "1266000000",
@@ -1137,7 +1138,7 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   const naverCall = result.calls.find(call => call.href.includes("naverapihub.apigw.ntruss.com"));
-  assert.equal(new URL(naverCall.href).searchParams.get("query"), "송도 회");
+  assert.equal(new URL(naverCall.href).searchParams.get("query"), "종로 회");
   assert.doesNotMatch(new URL(naverCall.href).searchParams.get("query"), /회식/);
 }
 
@@ -1246,8 +1247,9 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   assert.notDeepEqual(result.body.suggestions.map(item => item.split("|")[0]), ["한식", "중식", "일식", "양식"]);
-  assert.equal(result.body.suggestions.filter(item => item !== "다른 메뉴 보기").length, 3);
-  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 1);
+  assert.equal(result.body.meta.mode, "B");
+  assert.ok(result.body.suggestions.includes("현재 위치 연결"));
+  assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
 // Multiple card references must take precedence over a single-card focus.
@@ -1309,14 +1311,14 @@ function semanticAnalysis(overrides = {}) {
   const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };
   for (const message of ["울릉도에서 마라탕 먹을 곳 찾아줘", "울릉도 근처 마라탕 추천해줘", "울릉도 주변 마라탕 알려줘"]) {
     const result = await runCase({ message, env, analyzerEnabled: true, naverResponse: { items: [] } });
-    assert.equal(result.body.meta.responseModeState.slots.region, "울릉도");
+    assert.equal(result.body.meta.analysis.slots.region, "울릉도");
+    assert.equal(result.body.meta.unsupportedRegion, "울릉도");
     assert.equal(result.body.meta.responseModeState.slots.menu, "마라탕");
-    assert.equal(result.body.message, "울릉도에서 마라탕 조건에 맞는 곳을 찾지 못했어요.");
-    assert.deepEqual(result.body.suggestions, ["지역 넓히기", "메뉴 바꾸기"]);
+    assert.match(result.body.message, /울릉도.*현재 검색 가능한 지역이 아니에요/);
+    assert.deepEqual(result.body.suggestions, ['강남', '강남역', '역삼', '홍대', '성수', '종로', '여의도']);
     assert.deepEqual(result.body.restaurants, []);
     const searches = result.calls.filter(call => call.href.includes("/search/v1/local"));
-    assert.equal(searches.length, 1);
-    assert.equal(new URL(searches[0].href).searchParams.get("query"), "울릉도 마라탕");
+    assert.equal(searches.length, 0);
     assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
   }
   const state = normalizeResponseState({ slots: { menu: "마라탕", region: "울릉도" }, pendingQuestionSlot: "region" });
@@ -1629,7 +1631,9 @@ for (const row of intentRows) {
   };
   state = applyAnalysisToState(state, analysis);
   // v114 intentionally replaces legacy region-only C routing with a menu question.
-  const expectedMode = expected.mode === "C" && !state.slots.menu && !state.slots.food_type ? "B" : expected.mode;
+  // v118: a condition change also collects a missing core axis before any new search.
+  const expectedMode = (expected.mode === "C" && !state.slots.menu && !state.slots.food_type)
+    || (expected.mode === 'D' && analysis.intent === 'condition_change' && (!(state.slots.menu || state.slots.food_type) || !(state.slots.region || state.slots.use_current_location))) ? 'B' : expected.mode;
   assert.equal(decideMode(analysis, state).mode, expectedMode, `golden mode mismatch: ${row.id} ${row.utterance}`);
 }
 
@@ -2126,4 +2130,5 @@ assert.match(
 await testTurnPolicy(runCase);
 await testConversationUI(runCase);
 await testSearchAxes(runCase);
+await testAISearchPolicy(runCase);
 console.log("Inchelin data policy smoke tests passed.");
