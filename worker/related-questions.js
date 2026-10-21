@@ -4,6 +4,7 @@ import { normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH
 import { FORBIDDEN_COPY } from './conversation-copy.js';
 import { RELATED_QUESTION_POLICY } from './answer-plan.js';
 import { withParticle } from './korean.js';
+import './response-rules.js';
 
 export const RELATED_INTENTS = ['place_search','condition_change','followup','compare','service'];
 // The per-intent table explicitly includes menu exploration, food conversation
@@ -22,6 +23,8 @@ const searchCache=new Map();
 const pendingSearches=new Map();
 export function clearRelatedSearchCache(){searchCache.clear();pendingSearches.clear();}
 export async function confirmedCombination(key,search,timeoutMs=700){
+  globalThis.InchelinResponseRules.prune(searchCache);
+  key=globalThis.InchelinResponseRules.cacheKey(key);
   const cached=searchCache.get(key);
   if(cached && cached.expires>Date.now())return cached.found;
   if(pendingSearches.has(key))return pendingSearches.get(key);
@@ -187,6 +190,13 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
     for(const candidate of confirmed.filter(Boolean)){
       if(selected.some(item=>item.axis===candidate.validated.axis))continue;
       selected.push({...candidate.validated,source:candidate.source});if(selected.length>=limit)break;
+    }
+    // Fill shortages from already verified, named cards, never an unverified search or FAQ.
+    // Distinct axes have priority; separate real card details remain answerable fallback options.
+    for(const candidate of confirmed.filter(Boolean)) {
+      if(selected.length>=limit)break;
+      if(selected.some(item=>item.key===candidate.validated.key))continue;
+      selected.push({...candidate.validated,source:candidate.source,fallback:true});
     }
   }
   // Never fill an exhausted session with repeated or unanswerable questions.

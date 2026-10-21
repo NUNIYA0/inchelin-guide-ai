@@ -45,7 +45,8 @@ export async function testV132(runCase){
   assert.ok(linked.body.restaurants.length);assert.equal(linked.body.meta.responseModeState.slots.menu,'삼겹살');assert.equal(linked.body.meta.responseModeState.slots.region,'강남');assert.ok(linked.body.restaurants.every(card=>!next.body.restaurants.some(old=>old.id===card.id)),'current-situation link excludes already shown places');
   const timing=result=>Object.fromEntries(result.headers.get('Server-Timing').split(', ').map(value=>{const [key,duration]=value.split(';dur=');return [key,Number(duration)];}));
   const a=timing(first),b=timing(next);
-  for(const row of [a,b]){for(const key of ['intent','search','details','copy','decode','policy','suggestions','total'])assert.ok(Number.isFinite(row[key]));assert.ok(row.search>=25&&row.copy>=50);assert.ok(row.suggestions<300,'preflight stage is not six serial waits');}
+  for(const row of [a,b]){for(const key of ['intent','search','details','copy','decode','policy','suggestions','total'])assert.ok(Number.isFinite(row[key]));assert.ok(row.copy>=50);assert.ok(row.suggestions<300,'preflight stage is not six serial waits');}
+  assert.ok(a.search>=25);assert.ok(b.search<25,'condition-only refinement reuses current verified candidates');
   console.log('v132 mock stage timings ms (30ms Naver / 60ms answer fixture, NOT live AI): '+JSON.stringify({first:a,next:b,axes:rounds}));
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
   const fn=name=>html.match(new RegExp('    (?:async )?function '+name+'\\([^]*?\\n    \\}'))[0];

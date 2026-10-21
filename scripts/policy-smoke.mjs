@@ -21,6 +21,7 @@ import { testWelcomeFirstSearch } from './welcome-first-search-smoke.mjs';
 import { testRelatedContext } from './related-context-smoke.mjs';
 import { testV130 } from './v130-regression-smoke.mjs';
 import { testV132 } from './v132-regression-smoke.mjs';
+import { testV133 } from './v133-regression-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -2110,7 +2111,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   const built = buildRequest([
     { role: "assistant", content: "이전 식당", restaurants: [{ id: "old", name: "이전식당" }] },
     { role: "user", content: "처음부터 다시 할게" },
-    { role: "assistant", content: "처음부터 시작할게요", meta: { variant: "hard_reset", responseModeState: clearedState } },
+    { role: "assistant", content: "처음부터 시작할게요", meta: { responseRulesVersion:globalThis.InchelinResponseRules.VERSION,generatedAt:Date.now(),variant: "hard_reset", responseModeState: clearedState } },
     { role: "user", content: "삼겹살 먹고 싶어" },
   ]);
   assert.deepEqual(built.context.recentRestaurants, []);
@@ -2145,6 +2146,7 @@ await testTurnPolicy(runCase);
 await testConversationUI(runCase);
 await testV130(runCase);
 await testV132(runCase);
+await testV133(runCase);
 await testSearchAxes(runCase);
 await testAISearchPolicy(runCase);
 await testConversationCopyRegression(runCase);

@@ -20,6 +20,7 @@ import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
 import { applyRelatedQuestions, confirmedCombination, relatedContext } from './related-questions.js';
 import './naver-map.js';
 import { createChatTiming } from './request-timing.js';
+import './response-rules.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2166,6 +2167,7 @@ function restaurantCard(place, source, userText = "", locationName = "") {
     name: restaurantName,
     restaurantName,
     category: simplifiedRestaurantCategory(registered.rawCategory || registered.category) || null,
+    rawCategory: safeText(registered.rawCategory || registered.category,200),
     regionLabel: cardArea({ ...place, address, roadAddress: registered.roadAddress }, locationName),
     privateRoom: factValue(place, 'private_room') === true ? true : null,
     address,
@@ -2270,6 +2272,12 @@ function restaurantResultsMessage(state, count, hasCoordinates) {
 }
 
 async function handleChat(request, env, execution = {}) {
+  const clientVersion=request.headers.get('X-Response-Rules-Version');
+  if(clientVersion && clientVersion!==globalThis.InchelinResponseRules.VERSION) {
+    const response=json({error:'response_rules_changed'},409);
+    response.headers.set('X-Response-Rules-Version',globalThis.InchelinResponseRules.VERSION);
+    return response;
+  }
   execution.measure ||= async(name,action)=>action();
   const declaredLength = Number(request.headers.get("content-length") || 0);
   if (declaredLength > 120000) return json({ error: "대화 내용이 너무 깁니다." }, 413);
@@ -2297,6 +2305,10 @@ async function handleChat(request, env, execution = {}) {
   if (totalCharacters > 60000) return json({ error: "대화가 너무 길어요. 새 채팅에서 이어주세요." }, 413);
 
   const context = payload?.context && typeof payload.context === "object" ? payload.context : {};
+  if(context.responseModeState?.responseRulesVersion && !globalThis.InchelinResponseRules.isCurrent(context.responseModeState)) {
+    context.responseModeState={...emptyResponseState(),slots:context.responseModeState.slots};
+    context.recentRestaurants=[];context.hasRestaurantResults=false;
+  }
   let currentLocationName = safeText(context.currentLocationName, 240);
   let currentLocation = locationCoordinates(context.currentLocation);
   const recentRestaurants = sanitizeRecentRestaurants(context.recentRestaurants);
@@ -2441,6 +2453,7 @@ async function handleChat(request, env, execution = {}) {
     currentLocationName = analysis.slots.region;
   }
   if (analysis.sub_intent !== 'auto_region' && (mentionedSearchRegion(latestUserMessage) || analysis.slots.use_current_location)) responseState.regionFlexible = false;
+  const priorCandidateState=normalizeResponseState(responseState);
   responseState = applyAnalysisToState(responseState, analysis);
   analysis.answer_plan = answerPlanFor(analysis,responseState,latestUserMessage);
   execution.analysis = analysis; execution.state = responseState;
@@ -2488,20 +2501,39 @@ async function handleChat(request, env, execution = {}) {
   const venueIntent = decision.needSearch;
   let groundedPlaces = [];
   const searchNow = !linkedPlaceResearch && decision.needSearch;
+  // Optional preferences cannot shrink a previously verified food/region result set.
+  const preferenceRefinement=analysis.intent==='condition_change'
+    && globalThis.InchelinResponseRules.isCurrent(priorCandidateState)
+    && priorCandidateState.slots.region===responseState.slots.region
+    && priorCandidateState.slots.menu===responseState.slots.menu
+    && priorCandidateState.slots.food_type===responseState.slots.food_type
+    && analysis.change?.action!=='exclude_previous' && !/다른\s*(?:곳|식당)/.test(latestUserMessage);
+  const retainedPlaces=preferenceRefinement?priorCandidateState.lastCards.map(card=>({
+    id:card.id,name:card.name,address:card.address,business_status:card.businessStatus||'unknown',distance_meters:card.distanceMeters,
+    registered_data:{rawCategory:card.rawCategory||card.category,roadAddress:card.roadAddress,longitude:card.longitude,latitude:card.latitude,naverPlaceId:card.naverPlaceId,naverPlaceUrl:card.naverPlaceUrl},
+    facts:Object.fromEntries([['private_room',card.privateRoom],['parking',card.parking],['phone',card.phone],['opening_hours',card.openingHours]]
+      .filter(([,value])=>value!==null&&value!==undefined&&value!=='')
+      .map(([key,value])=>[key,{value,resolution_status:'confirmed',origin:card.dataSource||dataSource}])),retainedCard:card,
+  })).filter(place=>validateRestaurantCandidate(place,{messages,intentAnalysis,source:dataSource,locationName:signals.locationName})):[];
+  const preferenceScore=place=>Number(Boolean(place.retainedCard.privateRoom && /회식/.test(responseState.slots.companion||'')))+Number(responseState.slots.parking===true&&place.retainedCard.parking===true);
+  retainedPlaces.sort((a,b)=>preferenceScore(b)-preferenceScore(a));
 
   if (searchNow) {
     let lookup;
     try {
-      lookup = await execution.measure('search',()=>provider.searchRestaurants({
+      lookup = retainedPlaces.length>=3?{configured:true,places:retainedPlaces}:await execution.measure('search',()=>provider.searchRestaurants({
         query: latestUserMessage,
         messages,
         locationName: signals.locationName,
         intentAnalysis,
       }));
     } catch (error) {
+      if(retainedPlaces.length) lookup={configured:true,places:retainedPlaces};
+      else {
       console.error("Restaurant provider request failed", dataSource, error instanceof Error ? error.message : "unknown error");
       const reason = error instanceof RestaurantProviderError ? error.code : "api_request_failed";
       return json(providerRequestFailedResponse(dataSource, reason));
+      }
     }
 
     if (!lookup.configured) {
@@ -2512,6 +2544,7 @@ async function handleChat(request, env, execution = {}) {
       const excludedIds = new Set(decision.excludePlaceIds.map(String));
       if (excludedIds.size) lookup.places = lookup.places.filter(place => !excludedIds.has(String(place.id)));
       lookup.places = lookup.places.filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: dataSource, locationName: signals.locationName }));
+      if(retainedPlaces.length) lookup.places=[...retainedPlaces,...lookup.places.filter(place=>!retainedPlaces.some(old=>String(old.id)===String(place.id)))];
       // Only an explicit flexible-region answer permits automatic area expansion.
       // Each additional query retains the food/optional conditions and validates its own area.
       if (responseState.regionFlexible && dataSource === 'naver' && lookup.places.length < 3) {
@@ -2553,7 +2586,7 @@ async function handleChat(request, env, execution = {}) {
         || /(?:지금|현재)?.{0,5}영업.{0,8}(?:중|하는|곳|데|식당)?\s*만?/.test(latestUserMessage);
       // Unknown optional attributes never block region/menu search. Confirmed negatives
       // can be excluded, but unknown candidates remain with an explicit caveat.
-      if (wantsParkingOnly) groundedPlaces = groundedPlaces.filter(place => factValue(place, "parking") !== false);
+      if (wantsParkingOnly && !preferenceRefinement) groundedPlaces = groundedPlaces.filter(place => factValue(place, "parking") !== false);
       if (wantsActiveOnly) groundedPlaces = groundedPlaces.filter(place => !["temporarily_closed", "permanently_closed"].includes(place.business_status));
 
       if (!groundedPlaces.length && permanentlyClosed.length) return json(closedVenueResponse());
@@ -2703,6 +2736,7 @@ async function handleChat(request, env, execution = {}) {
   const selectionLimit = decision.mode === "E" ? 1 : 3;
   const selectedIds = validateRestaurantSelection(result?.selectedRestaurantIds, groundedPlaces, decision.excludePlaceIds, selectionLimit);
   let orderedPlaces = selectedIds.map(id => groundedPlaces.find(place => String(place.id) === id)).filter(Boolean);
+  if(retainedPlaces.length) orderedPlaces=[...retainedPlaces,...orderedPlaces.filter(place=>!retainedPlaces.some(old=>String(old.id)===String(place.id)))];
   if (currentLocation) {
     orderedPlaces = orderedPlaces.sort((left, right) => {
       const a = Number.isFinite(Number(left.distance_meters)) ? Number(left.distance_meters) : Number.POSITIVE_INFINITY;
@@ -2780,7 +2814,11 @@ export default {
         })):planned;
         const report=timing.finish();
         if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'chat_timing',status:response.status,...report}));
-        const output=json(finalizeConversationCopy(completed),response.status);
+        const current=finalizeConversationCopy(completed);
+        current.meta={...current.meta,responseRulesVersion:globalThis.InchelinResponseRules.VERSION,generatedAt:Date.now()};
+        if(current.meta.responseModeState?.lastCards?.length)Object.assign(current.meta.responseModeState,{responseRulesVersion:current.meta.responseRulesVersion,generatedAt:current.meta.generatedAt});
+        const output=json(current,response.status);
+        output.headers.set('X-Response-Rules-Version',globalThis.InchelinResponseRules.VERSION);
         output.headers.set('Server-Timing',Object.entries(report.stages).map(([name,value])=>`${name};dur=${value}`).join(', '));
         output.headers.set('X-Inchelin-Isolate-First',String(report.firstInIsolate));
         return output;
@@ -2810,7 +2848,8 @@ export default {
       return new Response(INDEX_HTML, {
         headers: {
           "content-type": "text/html; charset=utf-8",
-          "cache-control": "no-cache",
+          "cache-control": "no-store",
+          "clear-site-data": '"cache"',
           "permissions-policy": "geolocation=(self)",
         },
       });
@@ -2821,7 +2860,7 @@ export default {
       return new Response(decodeBase64(asset.body), {
         headers: {
           "content-type": asset.type,
-          "cache-control": "public, max-age=31536000, immutable",
+          "cache-control": url.pathname.endsWith('.js') ? "no-store" : "public, max-age=31536000, immutable",
         },
       });
     }

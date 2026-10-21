@@ -39,7 +39,7 @@ export async function testTurnPolicy(runCase) {
   assert.equal(refined.body.meta.responseModeState.slots.companion, '회식');
   assert.equal(refined.body.meta.responseModeState.preferences.companion, '회식');
   assert.equal(refined.body.restaurants.length, 3);
-  assert.ok(refined.calls.some(call => call.href.includes('/search/v1/local') && new URL(call.href).searchParams.get('query').includes('회식')));
+  assert.deepEqual(refined.body.restaurants.map(card=>card.id),first.body.restaurants.map(card=>card.id),'optional condition keeps the original verified pool');
   assert.equal(questions(refined.body), 0);
   assert.match(refined.body.meta.turnPolicy.intro, /회식 자리로 강남역 삼겹살집 3곳을 골라봤어요/);
   assert.equal(refined.body.meta.turnPolicy.intro.split(/[.!?]+/).filter(Boolean).length,1);
