@@ -31,7 +31,7 @@ export function questionTemplate(slot, state, response) {
   ] };
   if (slot === 'sub_menu') {
     const menu = state.slots.food_type;
-    const options = { 고기: ['삼겹살', '갈비', '불고기'], 한식: ['국밥', '김치찌개', '비빔밥'], 면: ['냉면', '칼국수', '쌀국수'], 일식: ['초밥', '라멘', '돈까스'], 중식: ['마라탕', '짬뽕', '볶음밥'], 양식: ['파스타', '피자', '스테이크'], 분식: ['떡볶이', '만두'], 카페: ['베이커리', '디저트'] }[menu];
+    const options = { 고기: ['삼겹살', '갈비', '불고기'], 한식: ['국밥', '김치찌개', '비빔밥'], 면: ['냉면', '칼국수', '쌀국수'], 일식: ['초밥', '라멘', '돈까스'], 중식: ['마라탕', '짬뽕', '볶음밥'], 양식: ['파스타', '피자', '스테이크'], 분식: ['떡볶이', '김밥'], 카페: ['샌드위치', '샐러드'] }[menu];
     if (options) return { slot, text: '어떤 메뉴가 끌리세요?', chips: options.map(menu => chip(menu, menu + ' 먹고 싶어요')) };
   }
   if (slot === 'sub_region') {

@@ -1,5 +1,5 @@
 import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
-import { SEARCH_FOODS, SEARCH_REGIONS, searchMessage, validSearchRegion } from './search-axes-data-v1.js';
+import { SEARCH_FOODS, SEARCH_REGIONS, searchMessage, validSearchRegion } from './search-axes-data-v1.js?v=124';
 
 // Shared two-axis controls for plugin sheets and result-condition editing, not the home screen.
 export function mountSearchPicker({ home, getSlots, send, locate, isBusy, onOpen = () => {} }) {

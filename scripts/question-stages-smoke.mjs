@@ -41,7 +41,7 @@ export async function testQuestionStages(runCase) {
     assert.ok(values.every(value=>!value.includes('제가')));
   };
   const first=(await run('오늘 뭐 먹을지 같이 골라줘')).body;
-  assert.deepEqual(first.meta.answer_plan,['text','question','chips']);checkLabels(first);
+  assert.deepEqual(first.meta.answer_plan.filter(block=>block!=='related_questions'),['text','question','chips']);checkLabels(first);
   assert.deepEqual(first.suggestions,CATEGORY_CHOICES);assert.equal(first.restaurants.length,0);assert.equal(first.meta.menuCards.length,0);
   assert.match(first.meta.turnPolicy.questionText,/제가 골라드릴까요\?/);
   assert.doesNotMatch(first.meta.turnPolicy.intro,/제가 골라드릴까요/);
@@ -54,18 +54,18 @@ export async function testQuestionStages(runCase) {
   auto.children[0].click();assert.equal(sent.at(-1),'네, 골라주세요');
   const autoResult=await run(sent.at(-1),first.meta.responseModeState,{analyzerEnabled:true,modeIntentAnalysis:{intent:'general',confidence:.1,slots:{}}});
   assert.equal(autoResult.body.meta.menuCards.length,3,'user assent follows normal analysis/policy even on low confidence');
-  tiles.children[5].click();assert.equal(sent.at(-1),'카페·디저트로 골라줘');
+  tiles.children[5].click();assert.equal(sent.at(-1),'카페 식사로 골라줘');
   const cafe=(await run(sent.at(-1),first.meta.responseModeState)).body;
   assert.equal(cafe.meta.menuCards.length,3);assert.ok(cafe.meta.menuCards.every(card=>MENU_CATEGORIES.카페.includes(card.name)));
   renderer.renderMessage({role:'user',content:'한식으로 골라줘'});
   assert.ok(tiles.children.every(button=>button.disabled));assert.equal(ofClass(category,'history-selected').length,1);assert.equal(ofClass(category,'history-check').length,1);
 
   const menus=(await run('한식으로 골라줘',first.meta.responseModeState)).body;
-  assert.deepEqual(menus.meta.answer_plan,['text','menu_cards','notice','chips']);checkLabels(menus);
+  assert.deepEqual(menus.meta.answer_plan.filter(block=>block!=='related_questions'),['text','menu_cards','notice','chips']);checkLabels(menus);
   const menuNode=render(menus);assert.equal(ofClass(menuNode,'menu-choice').length,3);assert.equal(ofClass(menuNode,'menu-more').length,1);
   const dish=menus.meta.menuCards[0].name;ofClass(menuNode,'menu-choice')[0].click();assert.equal(sent.at(-1),dish+' 먹을래');
   const region=(await run(sent.at(-1),menus.meta.responseModeState)).body;
-  assert.deepEqual(region.meta.answer_plan,['text','question','chips']);checkLabels(region);
+  assert.deepEqual(region.meta.answer_plan.filter(block=>block!=='related_questions'),['text','question','chips']);checkLabels(region);
   assert.equal(region.meta.turnPolicy.questionText,'지금 어디세요?');assert.deepEqual(region.suggestions,REGION_ANSWERS.map(choice=>choice.label));
   assert.ok(!region.suggestions.includes('상관없어요'));assert.equal(region.restaurants.length,0);
   const regionNode=render(region),regionAnswers=ofClass(regionNode,'question-region')[0];
@@ -76,13 +76,15 @@ export async function testQuestionStages(runCase) {
   ofClass(regionNode,'answer-tiles')[0].children[0].click();assert.equal(sent.at(-1),'강남이에요');
   const places={items:Array.from({length:3},(_,i)=>({title:dish+'집'+i,category:'한식>'+dish,roadAddress:'서울 강남구 역삼동 '+i,mapx:'1270000000',mapy:'375000000'}))};
   const found=(await run(sent.at(-1),region.meta.responseModeState,{naverResponse:places})).body;
-  assert.deepEqual(found.meta.answer_plan,['text','place_cards','source','question','chips']);checkLabels(found);
+  assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','question','chips']);checkLabels(found);
   const companion=render(found);assert.match(found.meta.turnPolicy.questionText,/누구와/);
   const group=ofClass(companion,'question-companion')[0];assert.equal(group.children.length,5);
   assert.deepEqual(group.children.map(button=>button.historyLabel),['혼자','2~3명','회식','가족','상관없어요']);
   assert.equal(ofClass(group,'skip-chip').length,1);assert.equal(group.children.at(-1),ofClass(group,'skip-chip')[0]);
   group.children[2].click();assert.equal(sent.at(-1),'회식이에요');
   const refined=(await run(sent.at(-1),found.meta.responseModeState,{naverResponse:places})).body;assert.equal(refined.meta.responseModeState.slots.companion,'회식');
+  const relatedButton=ofClass(companion,'related-question')[0];
+  assert.ok(relatedButton);relatedButton.click();assert.equal(sent.at(-1),found.meta.relatedQuestions[0].text,'related row uses the real routeQuestion→ask path');
 
   const malicious=applyAnswerPlan({message:'함께 골라봐요.',suggestions:['제가 골라드릴까요?','볼까요','너무 길어서 읽을 수 없는 답변','아','정했어요'],meta:{analysis:{intent:'out_of_scope'},responseModeState:{slots:{}},turnPolicy:{}}});
   assert.ok(malicious.suggestions.every(isUserAnswerLabel));assert.ok(malicious.suggestions.includes('정했어요'));

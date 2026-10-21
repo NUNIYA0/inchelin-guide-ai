@@ -16,6 +16,8 @@ import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-pol
 import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy, compactMenuCopy } from "./conversation-copy.js";
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION, ADJACENT_REGIONS } from "./search-axes.js";
 import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGION_ANSWERS, AUTO_MENU } from './answer-plan.js';
+import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
+import { applyRelatedQuestions } from './related-questions.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -684,7 +686,8 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   const service = /인슐랭|너\s*누구|AI\s*야|인공지능|뭐\s*할\s*수|누가\s*만들|사용법|대화.{0,8}삭제|채팅.{0,8}삭제|공유\s*링크|지난\s*대화|새\s*대화|로그인|로그아웃|어떻게\s*(?:써|사용|삭제|공유|로그인|로그아웃)|무료|요금|위치\s*정보|기록\s*저장|모바일|추천.{0,8}기준|어떤\s*원칙|원칙으로.{0,12}골라|데이터\s*출처|등록\s*(?:안\s*된|되지\s*않은|된)\s*식당|등록\s*식당\s*(?:기준|범위)|카드.{0,5}왜|와인/i.test(latest);
   const outOfScope = /당구장|병원|의원|약국|학원|미용실|네일|주식|날씨|편의점/.test(latest);
   const foodTalk = /유래|먹는\s*법|조리\s*법|만드는\s*법|재료|어울리는\s*(?:반찬|곁들임)/.test(latest);
-  const namedPlace = latest.match(/([0-9A-Za-z가-힣]{2,}(?:식당|가든|키친|레스토랑|카페|점|관|옥|집))(?=\s|은|는|이|가|에서|어때|영업|주차|전화|메뉴|위치|$)/)?.[1] || "";
+  const knownCard=state.lastCards.find(card=>latest.includes(card.name));
+  const namedPlace = knownCard?.name || latest.match(/([0-9A-Za-z가-힣]{2,}(?:식당|가든|키친|레스토랑|카페|점|관|옥|집))(?=\s|은|는|이|가|에서|어때|영업|주차|전화|메뉴|위치|$)/)?.[1] || "";
   let intent = "general";
   let sub = null;
   if (outOfScope) intent = "out_of_scope";
@@ -692,6 +695,7 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
     intent = "service";
     sub = /와인/.test(latest) ? "wine" : /추천.{0,8}기준|원칙|데이터|등록|검증|카드|거리|영업|폐업/.test(latest) ? "data_basis" : /무료|요금|위치\s*정보|기록\s*저장|로그인해야|모바일|공개\s*범위/.test(latest) ? "policy" : /어떻게|삭제|공유|지난\s*대화|새\s*대화|로그인|로그아웃|위치\s*버튼/.test(latest) ? "how_to" : "about";
   } else if (hasPrev && isComparisonRequest(latest, state.lastCards)) intent = "compare";
+  else if (knownCard && /상세|정보/.test(latest)) intent='specific_place';
   else if (foodTalk) intent = "food_talk";
   else if (hasPrev && (/회식|혼자|혼밥|가족|데이트|\d+\s*[~〜-]?\s*\d*\s*명|예산|조용|아늑|분위기/.test(latest)) && !ordinalReference(latest)) {
     intent = "condition_change"; sub = "add";
@@ -927,7 +931,7 @@ async function modeAResponse(analysis, state, env, messages = []) {
       const menus = result?.menus;
       if (Array.isArray(menus) && menus.length === 3 && new Set(menus.map(item => item.menu)).size === 3
         && new Set(menus.map(item => allowed.find(entry => entry.menu === item.menu)?.family)).size === 3
-        && menus.every(item => allowed.some(entry => entry.menu === item.menu) && typeof item.description === 'string' && item.description.length > 0 && item.description.length <= 80 && typeof item.reason === 'string' && item.reason.length <= 100)) {
+        && menus.every(item => allowed.some(entry => entry.menu === item.menu) && typeof item.description === 'string' && item.description.length > 0 && item.description.length <= 80 && typeof item.reason === 'string' && item.reason.length <= 100 && !SIDE_FOOD.test(item.description+' '+item.reason))) {
         candidates = menus.map(item => ({ menu: item.menu, direction: item.description, reason: item.reason }));
         menuIntro = typeof result.intro === 'string' ? result.intro : '';
       }
@@ -2296,6 +2300,14 @@ async function handleChat(request, env, execution = {}) {
       mode: "GENERAL", variant: "hard_reset", responseModeState: emptyResponseState(),
     }));
   }
+  if (isSideRequest(latestUserMessage) && /먹고\s*싶|마시고\s*싶|먹을래|마실래|땡|추천|골라/.test(latestUserMessage) && !/기준|서비스/.test(latestUserMessage)) {
+    const state=normalizeResponseState(context.responseModeState||{});state.pendingQuestionSlot='menu';
+    const question='보통 어떤 메인과 같이 드세요?';
+    const chips=['국밥','삼겹살','냉면'].map(label=>({label,message:label+' 먹을래'}));
+    return json(chatResponse('곁들이는 음식보다는 한 끼의 메인부터 골라봐요. '+question,chips.map(item=>item.label),[],{
+      mode:'B',flow:'side_main',intent:'menu_trouble',analysis:normalizeAnalysis({intent:'menu_trouble',slots:{}}),responseModeState:state,
+      turnPolicy:{intro:'곁들이는 음식보다는 한 끼의 메인부터 골라봐요.',questionText:question,next_question:{slot:'menu',text:question,chips}}}));
+  }
   // Known service questions are resolved before link research and model routing.
   const serviceState = normalizeResponseState(context.responseModeState || { lastCards: recentRestaurants, shownPlaces: recentRestaurants });
   if (/^상관\s*없어요[.!]?$/.test(latestUserMessage.trim()) && ['companion','sub_region'].includes(serviceState.pendingQuestionSlot)) {
@@ -2394,7 +2406,7 @@ async function handleChat(request, env, execution = {}) {
     responseState.askedSlots = [...new Set([...responseState.askedSlots,'region'])];
   }
   if (analysis.confidence < .6) return json(menuQuestionResponse(responseState, 'clarify', analysis));
-  const cafeCategoryChoice = /^카페·디저트(?:로|\s|$)/.test(latestUserMessage);
+  const cafeCategoryChoice = /^카페(?:·디저트|\s*식사)(?:로|\s|$)/.test(latestUserMessage);
   const categoryChoice = cafeCategoryChoice ? '카페' : Object.keys(MENU_CATEGORIES).find(name => new RegExp(name + '(?:으로|로|이|이요|을|를|\\s*먹고|$)').test(latestUserMessage));
   if (categoryChoice && (cafeCategoryChoice || !normalizeFoodAxis(latestUserMessage)?.menu) && /골라|먹고|먹을|^\S+$/.test(latestUserMessage) && !/맛집|식당|먹을\s*곳|찾아줘/.test(latestUserMessage)
     && (responseState.pendingQuestionSlot === 'menu_category' || /(?:으로|로)\s*골라/.test(latestUserMessage) || !analysis.slots.region && !responseState.slots.region)) {
@@ -2565,6 +2577,8 @@ async function handleChat(request, env, execution = {}) {
     return json(chatResponse(message,[],[card],{mode:'E',intent:analysis.intent,analysis,responseModeState:updateStateAfterResponse(responseState,decision,{cards:[card]})}));
   }
   const timeContext = [
+    `메인 메뉴 사전: ${JSON.stringify(MAIN_DISHES)}`,
+    `이미 보여준 연관 질문: ${JSON.stringify(responseState.shownSuggestions)}`,
     `Current local datetime: ${String(context.currentLocalDatetime || "unknown").slice(0, 64)}`,
     `Timezone: ${String(context.timezone || "unknown").slice(0, 64)}`,
     `Current meal period: ${String(context.currentMealPeriod || "unknown").slice(0, 32)}`,
@@ -2625,6 +2639,7 @@ async function handleChat(request, env, execution = {}) {
               message: { type: "string" },
               turn_text: { type: "object", properties: { summary: { type: "string" }, reason: { type: "string" } }, required: ["summary", "reason"], additionalProperties: false },
               next_question: TURN_ANALYSIS_FIELDS.next_question,
+              related_questions: TURN_ANALYSIS_FIELDS.related_questions,
               card_reasons: { type: "array", maxItems: 3, items: { type: "object", properties: { id: { type: "string" }, reason: { type: "string" } }, required: ["id", "reason"], additionalProperties: false } },
               suggestions: {
                 type: "array",
@@ -2639,7 +2654,7 @@ async function handleChat(request, env, execution = {}) {
                 maxItems: 3,
               },
             },
-            required: ["message", "suggestions", "selectedRestaurantIds", "turn_text", "next_question", "card_reasons"],
+            required: ["message", "suggestions", "selectedRestaurantIds", "turn_text", "next_question", "card_reasons", "related_questions"],
             additionalProperties: false,
           },
         },
@@ -2707,6 +2722,7 @@ async function handleChat(request, env, execution = {}) {
     ...(linkedPlaceResearch && result.suggestions?.some(value => value.includes('|')) ? { flow:'menu_options', menuCards:result.suggestions.filter(value=>value.includes('|')).slice(0,3).map(value=>({name:value.split('|')[0],description:value.split('|')[1].slice(0,22),reason:''})) } : {}),
     intent: analysis.intent,
     analysis,
+    relatedCandidates: [...(analysis.related_questions||[]),...(Array.isArray(result.related_questions)?result.related_questions:[])],
     ...(responseState.regionFlexible ? { flexibleRegion: true, expandedRegions: [...new Set(restaurants.map(card=>card.regionLabel).filter(area=>area && area !== signals.locationName))] } : {}),
     _turnDraft: { summary: analysis.sub_intent === 'auto_region' ? '지역을 따로 정하지 않으셔서 강남에서 먼저 골라봤어요.' : result.turn_text?.summary || result.message, reason: result.turn_text?.reason, question: result.next_question },
   }));
@@ -2734,7 +2750,12 @@ export default {
         const response = await handleChat(request, env, execution);
         const body = await response.json();
         if (response.ok && execution.analysis && !body.meta?.analysis) body.meta = { responseModeState:execution.state, ...body.meta, analysis:execution.analysis, intent:execution.analysis.intent };
-        return json(finalizeConversationCopy(response.ok ? applyAnswerPlan(applyTurnPolicy(body, payload),payload) : body), response.status);
+        const planned=response.ok?applyAnswerPlan(applyTurnPolicy(body,payload),payload):body;
+        const completed=response.ok?applyRelatedQuestions(planned,payload,(text,state)=>{
+          const messages=[...(payload.messages||[]),{role:'user',content:text}];
+          return prioritizeSearchAxes(fallbackResponseModeAnalysis(messages,state),messages,state);
+        }):planned;
+        return json(finalizeConversationCopy(completed),response.status);
       } catch (error) {
         console.error("Chat handler failed", error instanceof Error ? error.message : "unknown error");
         return json({ error: "답변을 불러오지 못했어요. 다시 시도해 주세요." }, 500);

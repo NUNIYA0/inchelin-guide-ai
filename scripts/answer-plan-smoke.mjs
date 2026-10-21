@@ -21,11 +21,11 @@ export async function testAnswerPlan() {
   const run=async(message,state={},extra={})=>{calls=[];const res=await worker.fetch(new Request('https://qa.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state}})}),{...env,...extra},{});assert.equal(res.status,200);const data=await res.json();assert.doesNotMatch([data.message,data.meta?.turnPolicy?.intro,data.meta?.turnPolicy?.questionText,...(data.meta?.menuCards||[]).flatMap(card=>[card.description,card.reason])].filter(Boolean).join(' '),FORBIDDEN_COPY);return data;};
   try {
     const first=await run('오늘 뭐 먹을지 같이 골라줘');
-    assert.deepEqual(first.meta.answer_plan,['text','question','chips']);assert.deepEqual(first.restaurants,[]);
-    assert.deepEqual(first.suggestions,['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);assert.match(first.message,/끌리는 쪽 있으세요/);
+    assert.deepEqual(first.meta.answer_plan.filter(block=>block!=='related_questions'),['text','question','chips']);assert.deepEqual(first.restaurants,[]);
+    assert.deepEqual(first.suggestions,['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);assert.match(first.message,/끌리는 쪽 있으세요/);
     assert.equal(first.meta.responseModeState.stage,'menu_category_asked');assert.equal(calls.length,0);
     const kind=await run('한식으로 골라줘',first.meta.responseModeState);
-    assert.deepEqual(kind.meta.answer_plan,['text','menu_cards','notice','chips']);assert.equal(kind.meta.menuCards.length,3);
+    assert.deepEqual(kind.meta.answer_plan.filter(block=>block!=='related_questions'),['text','menu_cards','notice','chips']);assert.equal(kind.meta.menuCards.length,3);
     assert.ok(kind.meta.menuCards.every(item=>MENU_CATEGORIES.한식.includes(item.name)));assert.equal(kind.meta.responseModeState.stage,'menu_options_shown');
     const auto=await run('네, 골라주세요',first.meta.responseModeState);
     assert.equal(auto.meta.menuCards.length,3);assert.equal(new Set(auto.meta.menuCards.map(x=>x.name)).size,3);
@@ -36,7 +36,7 @@ export async function testAnswerPlan() {
     assert.deepEqual(selected.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
     const found=await run('강남이에요',selected.meta.responseModeState);
     assert.equal(found.restaurants.length,3);assert.match(found.meta.turnPolicy.questionText,/누구와/);
-    assert.deepEqual(found.meta.answer_plan,['text','place_cards','source','question','chips']);
+    assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','question','chips']);
     const region=await run('오늘 홍대에서 뭐 먹지');assert.equal(region.meta.responseModeState.slots.region,'홍대');assert.match(region.message,/끌리는 쪽 있으세요/);assert.equal(region.restaurants.length,0);
     const regionKind=await run('한식으로 골라줘',region.meta.responseModeState);
     const typedKind=await run('중식',region.meta.responseModeState);assert.equal(typedKind.meta.menuCards.length,3);assert.ok(typedKind.meta.menuCards.every(card=>MENU_CATEGORIES.중식.includes(card.name)));assert.equal(typedKind.meta.responseModeState.slots.region,'홍대');
@@ -50,7 +50,7 @@ export async function testAnswerPlan() {
     const skip=await run('아무거나',first.meta.responseModeState);assert.equal(skip.meta.menuCards.length,3);assert.ok(skip.meta.responseModeState.askedSlots.includes('menu_category'));
     const skipMenu=await run('상관없어요',kind.meta.responseModeState);assert.ok(skipMenu.meta.responseModeState.slots.menu);assert.equal(skipMenu.meta.responseModeState.stage,'region_asked');
     const skipRegion=await run('상관없어요',selected.meta.responseModeState);assert.equal(skipRegion.meta.responseModeState.slots.region,'강남');assert.equal(skipRegion.restaurants.length,3);
-    const low=await run('점심에 뭐든 좀 찾아볼까',{}, {INTENT_ANALYZER_DISABLED:'false'});assert.equal(low.meta.flow,'clarify');assert.deepEqual(low.meta.answer_plan,['text','question','chips']);assert.equal(low.restaurants.length,0);
+    const low=await run('점심에 뭐든 좀 찾아볼까',{}, {INTENT_ANALYZER_DISABLED:'false'});assert.equal(low.meta.flow,'clarify');assert.deepEqual(low.meta.answer_plan.filter(block=>block!=='related_questions'),['text','question','chips']);assert.equal(low.restaurants.length,0);
     assert.equal(calls.filter(c=>c.url.includes('/search/v1/local')).length,0);
     const lowAgain=await run('점심에 뭐든 좀 찾아볼까',low.meta.responseModeState,{INTENT_ANALYZER_DISABLED:'false'});assert.equal(lowAgain.meta.turnPolicy.questionText,'');
     assert.ok(INTENT_ANALYSIS_SCHEMA.properties.answer_plan);assert.ok(INTENT_ANALYSIS_SCHEMA.required.includes('answer_plan'));
@@ -72,7 +72,7 @@ export async function testAnswerPlan() {
     for(const [intent,slots,utterances,expected] of table) for(const content of utterances){
       const analysis=normalizeAnalysis({intent,slots,confidence:1});assert.deepEqual(answerPlanFor(analysis,{slots},content),expected,content);
       const result=applyAnswerPlan({message:'함께 골라봐요.',restaurants:[{id:'x'},{id:'y'},{id:'z'}],suggestions:['추가 칩'],meta:{analysis,responseModeState:normalizeResponseState({slots}),menuCards:[{name:'국밥'}],notice:'시설 확인이 필요해요.',turnPolicy:{questionText:'누구와 가세요?',actionChips:['조건 바꾸기']}}},{messages:[{role:'user',content}]});
-      assert.deepEqual(result.meta.answer_plan,expected);if(!expected.includes('place_cards'))assert.equal(result.restaurants.length,0);
+      assert.deepEqual(result.meta.answer_plan.filter(block=>block!=='related_questions'),expected);if(!expected.includes('place_cards'))assert.equal(result.restaurants.length,0);
       if(!expected.includes('menu_cards'))assert.equal(result.meta.menuCards.length,0);if(!expected.includes('question'))assert.equal(result.meta.turnPolicy.questionText,'');
       if(!expected.includes('notice'))assert.equal(result.meta.notice,'');if(intent==='specific_place')assert.equal(result.restaurants.length,1);
       // Exercise the real request → mocked classifier → policy → public payload path.
@@ -80,12 +80,12 @@ export async function testAnswerPlan() {
       forcedAnalysis={intent,confidence:1,slots:{},flags:{food_related:true},reference:intent==='specific_place'?{target_name:'해정집'}:{}};
       const priorCards=['followup','condition_change','compare'].includes(intent)?[0,1,2].map(i=>({id:'shown-'+i,name:'식당'+i,category:'국밥',address:'서울 강남구 1층'})):[];
       const live=await run(content,{slots,lastCards:priorCards,shownPlaceIds:priorCards.map(card=>card.id)}, {INTENT_ANALYZER_DISABLED:'false'});
-      assert.deepEqual(live.meta.answer_plan,expected,'pipeline: '+content);
+      assert.deepEqual(live.meta.answer_plan.filter(block=>block!=='related_questions'),expected,'pipeline: '+content);
       if(!expected.includes('place_cards'))assert.equal(live.restaurants.length,0);
       if(intent==='specific_place')assert.ok(live.restaurants.length<=1);
     }
     forcedAnalysis={intent:'general',confidence:1,slots:{},flags:{}};
-    for(const message of ['안녕','고마워'])assert.deepEqual((await run(message,{}, {INTENT_ANALYZER_DISABLED:'false'})).meta.answer_plan,['text']);
+    for(const message of ['안녕','고마워'])assert.deepEqual((await run(message,{}, {INTENT_ANALYZER_DISABLED:'false'})).meta.answer_plan.filter(block=>block!=='related_questions'),['text']);
     forcedAnalysis={intent:'specific_place',confidence:1,slots:{},flags:{food_related:true},reference:{target_name:'해정집'}};
     const specific=await run('해정집 영업시간이랑 전화번호 알려줘',{}, {INTENT_ANALYZER_DISABLED:'false'});
     assert.match(specific.message,/영업시간/);assert.match(specific.message,/전화번호/);assert.match(specific.message,/확인된 정보가 없어요/);

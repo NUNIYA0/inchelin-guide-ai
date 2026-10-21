@@ -14,6 +14,7 @@ import { testConversationUsability } from "./conversation-usability-smoke.mjs";
 import { testAnswerPlan } from './answer-plan-smoke.mjs';
 import { testHistoryAlternatives } from './history-alternatives-smoke.mjs';
 import { testQuestionStages } from './question-stages-smoke.mjs';
+import { testRelatedQuestions } from './related-questions-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -430,7 +431,7 @@ function semanticAnalysis(overrides = {}) {
     expectedStatus: 200,
   });
   assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
   assert.equal(result.calls.length, 0);
 }
 
@@ -524,7 +525,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
   assert.equal(result.calls.length, 0);
 }
 
@@ -1053,7 +1054,7 @@ function semanticAnalysis(overrides = {}) {
     }),
   });
   assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -1235,7 +1236,7 @@ function semanticAnalysis(overrides = {}) {
     message: "오늘 뭐 먹을지 같이 골라줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
   assert.equal(result.body.restaurants.length, 0);
   assert.equal(result.calls.length, 0);
 }
@@ -1528,7 +1529,7 @@ for (const message of ["삼겹살 먹고 싶어", "파스타 먹고 싶어", "�
   const result = await runCase({ message, env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" } });
   if (message.includes('한식')) {
     assert.equal(result.body.meta.mode,'A'); assert.equal(result.body.meta.menuCards.length,3);
-    assert.deepEqual(result.body.meta.answer_plan,['text','menu_cards','notice','chips']); continue;
+    assert.deepEqual(result.body.meta.answer_plan.filter(block=>block!=='related_questions'),['text','menu_cards','notice','chips']); continue;
   }
   assert.equal(result.body.meta.mode, "B");
   const menuAnswer = result.body.message.split("\n\n")[0];
@@ -1897,7 +1898,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(sent.at(-1)[0], '역삼에서 먹을 곳 찾아줘');
   const regionReply = await runCase({ message: sent.at(-1)[0], env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver' }, context: { responseModeState: next } });
   assert.match(regionReply.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(regionReply.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
+  assert.deepEqual(regionReply.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
   transitions.setState(next);
   transitions.situations({ companion: '혼밥 · 데이트', parking: true, other: [] }, '혼자 먹기 좋은 곳, 데이트하기 좋은 곳, 주차 필요한 곳으로 찾아줘');
   next = sent.at(-1)[1].responseState;
@@ -2142,4 +2143,5 @@ await testConversationUsability(runCase);
 await testAnswerPlan();
 await testHistoryAlternatives(runCase);
 await testQuestionStages(runCase);
+await testRelatedQuestions(runCase);
 console.log("Inchelin data policy smoke tests passed.");

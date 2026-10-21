@@ -321,6 +321,16 @@
     .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 2px solid #222; background: #f7f7f7; color: #111; }
     .history-check { color: #111; font-size: 16px; font-weight: 700; margin-left: 6px; }
     .alternative-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .related-questions { display: grid; gap: 8px; width: 100%; min-width: 0; margin-top: 20px; }
+    .related-label { margin: 0 0 2px; color: #777; font: 400 13px/1.5 system-ui, sans-serif; }
+    .related-question { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-width: 0; min-height: 52px; padding: 16px; border: 1px solid transparent; border-radius: 14px; background: #f3f3f3; color: #222; text-align: left; font: 400 15px/1.5 system-ui, sans-serif; cursor: pointer; }
+    .related-text { min-width: 0; overflow-wrap: anywhere; }
+    .related-arrow { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 24px; width: 24px; height: 24px; border: 1px solid #ccc; border-radius: 50%; transition: transform .15s ease; }
+    .related-question:hover .related-arrow { transform: translateX(2px); }
+    .related-question:focus-visible { outline: 2px solid #222; outline-offset: 3px; }
+    .history-inactive .related-question { opacity: .5; cursor: default; pointer-events: none; }
+    .history-inactive .related-question.history-selected { opacity: 1; border-color: #222; }
+    @media (prefers-reduced-motion: reduce) { .related-arrow { transition: none; } .related-question:hover .related-arrow { transform: none; } }
     .menu-hint { margin: 8px 0 0; font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
     .menu-choice .quick-reply-arrow { grid-row: 1 / span 3; }
     .restaurant-map-link:hover { background: #f7f7f7; }
@@ -1650,14 +1660,14 @@
       const separator = raw.indexOf('|');
       const originalTitle = (separator >= 0 ? raw.slice(0, separator) : raw).trim();
       // Migrate old saved choices, not just newly returned payloads.
-      const title = /^제가.*까요[?？]?$/.test(originalTitle) ? '네, 골라주세요' : originalTitle === '면' ? '면 요리' : originalTitle === '다른 곳도 보여줘' ? '다른 곳 보기' : originalTitle;
+      const title = /^제가.*까요[?？]?$/.test(originalTitle) ? '네, 골라주세요' : originalTitle === '면' ? '면 요리' : originalTitle === '카페·디저트' ? '카페 식사' : originalTitle === '다른 곳도 보여줘' ? '다른 곳 보기' : originalTitle;
       const description = separator >= 0 ? raw.slice(separator + 1).trim() : '';
       return { title, originalTitle, description, prompt: title || raw };
     }
     // Replayed user messages reconstruct history state after reload/share, without
     // mutating or deleting the recorded assistant cards and chip groups.
     function retirePriorChoices(content) {
-      messagesEl.querySelectorAll('.menu-cards, .restaurant-group, .answer-chips, .menu-more, .action-chips, .alternative-chips, .result-conditions').forEach(group => {
+      messagesEl.querySelectorAll('.menu-cards, .restaurant-group, .answer-chips, .menu-more, .action-chips, .alternative-chips, .result-conditions, .related-questions').forEach(group => {
         if (group.historyRetired) return;
         group.historyRetired = true;
         group.classList.add('history-inactive');
@@ -1668,7 +1678,7 @@
             const check = document.createElement('span'); check.className = 'history-check'; check.textContent = '✓'; card.appendChild(check);
           }
         });
-        group.querySelectorAll('.quick-reply, .restaurant-map-link, .meal-chip').forEach(button => {
+        group.querySelectorAll('.quick-reply, .restaurant-map-link, .meal-chip, .related-question').forEach(button => {
           if (button.disabled) return;
           const label = button.historyLabel || button.textContent;
           const selected = label && (content === button.historyMessage || content.includes(label)) && !/다른 메뉴|다른 곳|조건 바꾸기/.test(label);
@@ -1768,7 +1778,7 @@
             }
             button.addEventListener('click', () => {
               if (button.disabled) return;
-              const isCuisineCategory = /^(?:한식|중식|일식|양식|분식|카페·디저트)$/.test(card.title);
+              const isCuisineCategory = /^(?:한식|중식|일식|양식|분식|카페 식사)$/.test(card.title);
               if (card.description && !isCuisineCategory && !isCurrentLocationIntent(card.title) && !/^(?:지역 직접 입력|직접 입력|지역 정하기)$/.test(card.title)) {
                 chooseMenuCard(card.title);
                 return;
@@ -1799,6 +1809,16 @@
             button.addEventListener('click',()=> { if (!button.disabled) routeQuestion(choice.message); }); alternatives.appendChild(button);
           });
           bubble.appendChild(alternatives);
+        }
+        if (allowed('related_questions') && message.meta?.relatedQuestions?.length) {
+          const related=document.createElement('section');related.className='related-questions';related.setAttribute('aria-label','연관 질문');
+          const label=document.createElement('p');label.className='related-label';label.textContent='이어서 물어볼 수 있어요';related.appendChild(label);
+          message.meta.relatedQuestions.slice(0,3).forEach(choice=>{
+            const button=document.createElement('button');button.type='button';button.className='related-question';button.setAttribute('aria-label',choice.text);button.historyLabel=choice.text;button.historyMessage=choice.text;
+            const text=document.createElement('span');text.className='related-text';text.textContent=choice.text;
+            const arrow=document.createElement('span');arrow.className='related-arrow';arrow.textContent='→';arrow.setAttribute('aria-hidden','true');
+            button.append(text,arrow);button.addEventListener('click',()=>{if(!button.disabled)routeQuestion(choice.text);});related.appendChild(button);
+          });bubble.appendChild(related);
         }
         if (allowed('chips') && message.meta?.turnPolicy?.actionChips?.length) {
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
@@ -2615,13 +2635,13 @@
     renderPlugins();
     let searchPicker = null;
     function openSearchPicker(axis) { if (searchPicker) searchPicker.open(axis); else showToast('선택기를 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); }
-    import('/assets/search-picker-v1.js?v=118').then(({ mountSearchPicker }) => {
+    import('/assets/search-picker-v1.js?v=124').then(({ mountSearchPicker }) => {
       searchPicker = mountSearchPicker({ getSlots: () => pluginState().slots,
         send: message => { currentLocationCoords = null; ask(message); }, locate: message => requestCurrentLocation(message),
         isBusy: () => generating || locationRequestInFlight,
         onOpen: () => { closeOverlay('pluginOverlay'); taskMenu.classList.remove('open'); } });
     }).catch(() => showToast('음식·지역 선택기를 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/plugin-actions-v1.js?v=117').then(({ mountPluginActions }) => {
+    import('/assets/plugin-actions-v1.js?v=124').then(({ mountPluginActions }) => {
       let storage;
       try { storage = window.localStorage; } catch (_) { /* 브라우저 저장소가 막혀도 도구를 이용해요. */ }
       pluginActions = mountPluginActions({

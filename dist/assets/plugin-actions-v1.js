@@ -1,5 +1,5 @@
 import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
-import { SEARCH_REGIONS } from './search-axes-data-v1.js';
+import { SEARCH_REGIONS } from './search-axes-data-v1.js?v=124';
 // These tools collect messages/slots only. Response modes stay in the existing pipeline.
 export const PLUGIN_IDS = [1, 2, 3, 4, 5];
 // Naver local search supports these region queries; availability still depends on the menu.

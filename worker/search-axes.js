@@ -1,4 +1,5 @@
 // Supported quick-entry regions. These aliases describe address areas, not walking radii.
+import { isMainDish } from './main-dishes.js';
 export const SEARCH_REGIONS = ['강남', '강남역', '역삼', '홍대', '성수', '종로', '여의도'];
 // Address-area neighbors, not proximity or walking-distance guarantees.
 export const ADJACENT_REGIONS = {
@@ -25,13 +26,13 @@ export function mentionedSearchRegion(text) {
 export const FOOD_HIERARCHY = [
   { food_type: '고기', menus: ['삼겹살', '갈비', '곱창', '불고기', '제육볶음', '목살', '닭갈비'], aliases: ['고깃집', '고기', '구이', '육류'] },
   { food_type: '국밥·찌개', menus: ['국밥', '순두부찌개', '김치찌개', '찌개', '전골', '곰탕', '설렁탕'], aliases: ['국밥·찌개', '찌개/국밥', '국물 있는 거', '국물'] },
-  { food_type: '면', menus: ['냉면', '칼국수', '비빔국수', '메밀국수', '쌀국수', '라멘', '우동', '국수'], aliases: ['면', '면요리'] },
-  { food_type: '한식', menus: ['비빔밥', '덮밥', '불고기덮밥', '죽', '만두'], aliases: ['한식'] },
+  { food_type: '면', menus: ['냉면', '칼국수', '비빔국수', '메밀국수', '쌀국수', '라멘', '우동', '국수', '쫄면','라면'], aliases: ['면', '면요리'] },
+  { food_type: '한식', menus: ['비빔밥', '덮밥', '불고기덮밥', '죽', '만두','김치볶음밥'], aliases: ['한식'] },
   { food_type: '일식', menus: ['돈까스', '돈가스', '초밥', '스시', '가츠동', '카레'], aliases: ['일식', '일본식'] },
-  { food_type: '중식', menus: ['마라탕', '마라샹궈', '짬뽕', '탕수육', '볶음밥', '짜장면', '군만두'], aliases: ['중식', '중국식'] },
-  { food_type: '양식', menus: ['파스타', '피자', '스테이크', '햄버거', '버거', '리소토', '라자냐'], aliases: ['양식'] },
+  { food_type: '중식', menus: ['마라탕', '마라샹궈', '짬뽕', '탕수육', '볶음밥', '짜장면', '군만두','잡채밥'], aliases: ['중식', '중국식'] },
+  { food_type: '양식', menus: ['파스타', '피자', '스테이크', '햄버거', '버거', '리소토', '라자냐','오믈렛','마르게리타'], aliases: ['양식'] },
   { food_type: '분식', menus: ['떡볶이', '김밥', '라볶이', '튀김', '어묵'], aliases: ['분식'] },
-  { food_type: '카페', menus: ['디저트', '베이커리', '샌드위치', '토스트', '크로플', '팬케이크'], aliases: ['카페', '커피', '빵'] },
+  { food_type: '카페', menus: ['디저트', '베이커리', '샌드위치', '토스트', '크로플', '팬케이크','베이글샌드위치'], aliases: ['카페', '커피', '빵'] },
   { food_type: '샐러드·포케', menus: ['샐러드', '포케'], aliases: [] },
   { food_type: '치킨', menus: ['치킨', '닭발'], aliases: [] },
   { food_type: '해산물', menus: ['해산물', '횟집'], aliases: [] },
@@ -63,8 +64,8 @@ export const SEARCH_FOODS = [
   { name: '일식', value: '일식', menus: ['초밥', '라멘', '돈까스'] },
   { name: '중식', value: '중식', menus: ['마라탕', '짬뽕', '볶음밥'] },
   { name: '양식', value: '양식', menus: ['파스타', '피자', '스테이크'] },
-  { name: '분식', value: '분식', menus: ['떡볶이', '만두'] },
-  { name: '카페', value: '카페', menus: ['카페', '디저트', '베이커리'] },
+  { name: '분식', value: '분식', menus: ['떡볶이', '김밥'] },
+  { name: '카페 식사', value: '카페', menus: ['샌드위치', '토스트', '포케'] },
   { name: '술집', value: '술집', menus: ['술집'] },
 ];
 const compact = value => String(value || '').replace(/\s/g, '');
@@ -96,5 +97,5 @@ export function nearbySuggestions(region, food) {
   const category = SEARCH_FOODS.find(item => item.value === food || item.menus.includes(food));
   const similar = ({ 국밥:['설렁탕','곰탕'], 설렁탕:['곰탕','국밥'], 곰탕:['설렁탕','국밥'], 냉면:['메밀국수','비빔국수'] })[food] || category?.menus.filter(menu => menu !== food).slice(0, 2) || [];
   return [...adjacent.slice(0, 2).map(value => ({ label: `${value}에서 찾기`, message: searchMessage({ region: value, food }) })),
-    ...similar.map(value => ({ label: `${value} 먹기`, message: searchMessage({ region, food: value }) }))];
+    ...similar.filter(isMainDish).map(value => ({ label: `${value} 먹기`, message: searchMessage({ region, food: value }) }))];
 }
