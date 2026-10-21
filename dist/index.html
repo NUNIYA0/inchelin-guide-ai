@@ -360,7 +360,10 @@
     .answer-full-row .quick-reply .quick-reply-title { font: 500 15px/1.4 system-ui, sans-serif; }
     .question-region .quick-reply.location-primary { background: #111; color: #fff; border-color: #111; }
     .answer-chips.question-companion { display: flex; flex-wrap: wrap; gap: 8px; overflow: visible; }
-    .question-companion .quick-reply { flex: 0 0 calc((100% - 24px) / 4); min-width: 0; justify-content: center; padding: 8px 4px; }
+    .question-companion .quick-reply { flex: 0 0 auto; min-width: fit-content; white-space: nowrap; justify-content: center; padding: 8px 12px; }
+    .answer-chips > .quick-reply-chip { flex: 0 0 auto; min-width: fit-content; white-space: nowrap; }
+    .answer-chips > .quick-reply-chip .quick-reply-title { min-width: fit-content; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
+    .answer-chips .history-check { flex-shrink: 0; white-space: nowrap; }
     .question-companion .quick-reply.skip-chip { flex: 0 0 auto; padding: 8px 12px; }
     .answer-chips[hidden], .menu-cards[hidden], .action-chips[hidden], .menu-more[hidden] { display: none !important; }
     .action-chips { margin-top: 16px; border-top: 1px solid #f1f1f1; padding-top: 12px; }

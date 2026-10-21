@@ -27,6 +27,15 @@ try {
     const rect=n=>{const r=n.getBoundingClientRect();return {x:r.x,y:r.y,w:r.width,h:r.height}};
     const capture=()=>({places:[...document.querySelectorAll('.restaurant-card')].map(rect),menus:[...menu.children].map(rect),columns:getComputedStyle(document.querySelector('.restaurant-list')).gridTemplateColumns.split(' ').length,menuColumns:getComputedStyle(menu).gridTemplateColumns.split(' ').length,clipped:[...document.querySelectorAll('.restaurant-title-link h3,.restaurant-address')].every(n=>getComputedStyle(n).overflow==='hidden'&&getComputedStyle(n).webkitLineClamp===(innerWidth<768?'1':'2')),overflow:document.documentElement.scrollWidth>innerWidth,viewport:innerWidth});
     const result=capture();host.replaceChild(renderRestaurantCards(cards.slice(0,2)),host.firstChild);result.two=capture().places;host.replaceChild(renderRestaurantCards(cards.slice(0,1)),host.firstChild);result.one=capture().places;document.getElementById('report').textContent=JSON.stringify(result);
+    // Exact container widths, including selected history pills with the real SVG size.
+    result.chips=[];
+    for(const width of [270,320,360])for(const selected of [false,true]){
+      const zone=document.createElement('section');zone.className='answer-question';zone.style.cssText='position:absolute;left:0;top:2000px;box-sizing:border-box;width:'+width+'px';
+      const group=document.createElement('div');group.className='quick-replies quick-replies-followup answer-chips question-companion'+(selected?' history-inactive':'');
+      group.innerHTML=['혼자','2~3명','회식','가족','상관없어요'].map((label,i)=>'<button class="quick-reply quick-reply-chip'+(i===4?' skip-chip':'')+(selected&&i===0?' history-selected':'')+'"><span class="quick-reply-title">'+label+'</span>'+(selected&&i===0?'<span class="history-check"><svg class="ui-icon"><path d="M5 12l4 4 10-10"/></svg></span>':'')+'</button>').join('');zone.append(group);document.body.append(zone);
+      result.chips.push({width,selected,wrap:new Set([...group.children].map(n=>n.getBoundingClientRect().top)).size>1,valid:[...group.children].every(button=>{const title=button.querySelector('.quick-reply-title'),range=document.createRange();range.selectNodeContents(title);const bounds=button.getBoundingClientRect(),check=button.querySelector('.history-check')?.getBoundingClientRect();return range.getClientRects().length===1&&getComputedStyle(button).whiteSpace==='nowrap'&&getComputedStyle(button).minWidth==='fit-content'&&button.scrollWidth<=button.clientWidth&&bounds.right<=zone.getBoundingClientRect().right&&(!check||check.right<=bounds.right&&check.top>=bounds.top&&check.bottom<=bounds.bottom);})});
+    }
+    document.getElementById('report').textContent=JSON.stringify(result);
   </script>`, 'utf8');
   const browser = process.env.CARD_TEST_BROWSER || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
   for (const width of [1024,768,767,390,360]) {
@@ -41,7 +50,9 @@ try {
     for(const set of [r.places,r.menus])if(width>=768)assert.ok(set.every(n=>Math.abs(n.h-set[0].h)<1),'desktop equal card heights');
     if(width<768)assert.ok(r.places.every(n=>n.h>=100&&n.h<=110),'mobile compact cards are 100–110px with one-line title/chips/address');
     assert.ok(r.clipped);assert.equal(r.overflow,false);
+    assert.equal(r.chips.length,6);assert.ok(r.chips.every(item=>item.valid),'270/320/360px: no text/check wrapping or clipping, normal and selected');
+    assert.ok(r.chips.filter(item=>item.width===270).every(item=>item.wrap),'narrow containers wrap whole pills, not their text');
     assert.ok(Math.abs(r.one[0].w-r.places[0].w)<1);assert.ok(Math.abs(r.two[0].w-r.places[0].w)<1);
-    console.log(width+'px: '+columns+' columns, equal heights, no horizontal overflow, 1–2 results retain width.');
+    console.log(width+'px: '+columns+' columns, card layout passed; 270/320/360px chip containers normal/selected: one-line text/check, whole-pill wrapping passed.');
   }
 } finally { await rm(root,{recursive:true,force:true}); }

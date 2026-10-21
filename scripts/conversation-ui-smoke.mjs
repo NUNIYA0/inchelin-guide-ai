@@ -334,6 +334,11 @@ export async function testConversationUI(runCase) {
   }
   assert.match(responsiveCards,/\.quick-replies.menu-cards \.menu-choice \{ min-width:0; width:100%; height:100%; box-sizing:border-box/);
   assert.match(responsiveCards,/@media \(max-width:767px\) \{[^]*?\.restaurant-card \{ height:auto; min-height:0/);
+  assert.match(html,/\.question-companion \.quick-reply \{ flex: 0 0 auto; min-width: fit-content; white-space: nowrap/);
+  assert.match(html,/\.answer-chips\.question-companion \{[^}]*flex-wrap: wrap/);
+  assert.match(html,/\.answer-chips > \.quick-reply-chip \.quick-reply-title \{ min-width: fit-content; white-space: nowrap/);
+  assert.match(html,/\.answer-chips \.history-check \{ flex-shrink: 0; white-space: nowrap/);
+  assert.doesNotMatch(html,/\.question-companion \.quick-reply \{[^}]*calc\(/,'answer pills never force four equal narrow columns');
   console.log('v129 responsive card DOM/CSS: 1024/768 three columns; 767/390/360 one column; fixed tracks for 1–2 cards, stretch/equal-row height, two-line clipping, separate compare hit area passed (browser pixels not checked).');
   console.log('Conversation copy/card/menu mocked regressions passed.');
 }
