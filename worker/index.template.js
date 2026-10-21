@@ -777,6 +777,12 @@ const RESPONSE_MODE_SCHEMA = {
 
 function prioritizeSearchAxes(value, messages, state) {
   const analysis = normalizeAnalysis(value);
+  const firstText=[...messages].reverse().find(message=>message.role==='user')?.content||'';
+  if (!state.lastCards.length && !state.shownPlaceIds.length && normalizeFoodAxis(firstText)
+    && mentionedSearchRegion(firstText) && !['service','compare','specific_place','food_talk','out_of_scope'].includes(analysis.intent)) {
+    analysis.intent='place_search'; analysis.sub_intent='axis_search'; analysis.change=null;
+    analysis.confidence=1;
+  }
   if (analysis.change?.action === 'exclude_previous') { analysis.intent = 'followup'; return analysis; }
   if (['service', 'compare', 'specific_place', 'food_talk', 'out_of_scope'].includes(analysis.intent)) return analysis;
   if (analysis.intent === 'followup' && analysis.reference?.target_index) return analysis;

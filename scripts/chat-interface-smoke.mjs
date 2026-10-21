@@ -78,7 +78,7 @@ export async function testChatInterface(runCase) {
   assert.match(html,/\.message\.ai \{ gap: 0; margin-bottom: 24px; font-size: 16px; line-height: 1.6/);
   assert.match(html,/\.composer, \.chat-composer \{[^}]*min-height: 52px;[^}]*border-radius: 28px/);
   assert.match(html,/prefers-reduced-motion: reduce\) \{ \.live-reveal[^}]*animation: none/);
-  assert.match(html,/event.key === 'Enter' && !event.shiftKey && window.innerWidth > 768/);
+  assert.match(html,/if \(shouldSendOnEnter\(event\)\)/);
   assert.doesNotMatch(html,/<i><\/i><i><\/i>/,'one loading dot only');
   for(const width of [360,390])assert.ok((width-32)*.8<width-32,'user 80% and cards fit reading column');
   console.log('v125: preflight/empty/timeout/cache/supported regions/casual tone/chip dedupe; real helper+renderer copy/regenerate/stop/resize/scroll; 360/390 DOM/CSS contracts passed (browser pixels not checked).');

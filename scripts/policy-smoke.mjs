@@ -17,6 +17,7 @@ import { testHistoryAlternatives } from './history-alternatives-smoke.mjs';
 import { testQuestionStages } from './question-stages-smoke.mjs';
 import { testRelatedQuestions } from './related-questions-smoke.mjs';
 import { testChatInterface } from './chat-interface-smoke.mjs';
+import { testWelcomeFirstSearch } from './welcome-first-search-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -1736,7 +1737,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.match(latest.body.message, /강남역.*삼겹살/);
   assert.doesNotMatch(latest.body.message, /조용/);
   assert.deepEqual(latest.body.meta.responseModeState.slots.other, []);
-  assert.match(indexHtml, /지금 내 주변에서 삼겹살집 찾아줘/);
+  assert.match(indexHtml, /홍대에서 냉면 먹을래/);
   assert.doesNotMatch(indexHtml, /지금 내 주변에서 영업 중인 곳 찾아줘|지역별 찾기:|상황별 추천:|선택한 조건으로 식당을 찾아줘/);
 }
 // v112: scenario regressions. All provider/model traffic is intercepted by runCase.
@@ -2147,4 +2148,5 @@ await testHistoryAlternatives(runCase);
 await testQuestionStages(runCase);
 await testRelatedQuestions(runCase);
 await testChatInterface(runCase);
+await testWelcomeFirstSearch(runCase);
 console.log("Inchelin data policy smoke tests passed.");

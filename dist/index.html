@@ -934,11 +934,11 @@
       answer: '말씀하신 내용과 이전 대화를 함께 살펴보고, 현재 연결된 맛집 검색 결과에서 자연스럽게 찾아드릴게요.'
     };
     const CORE_SUGGESTIONS = [
-      { label: '오늘 뭐 먹을지 같이 골라줘', prompt: '오늘 뭐 먹을지 같이 골라줘' },
-      { label: '강남에서 회식하기 좋은 고깃집 추천해줘', prompt: '강남에서 회식하기 좋은 고깃집 추천해줘' },
-      { label: '혼자 먹기 편한 한식집 찾아줘', prompt: '혼자 먹기 편한 한식집 찾아줘' },
-      { label: '주차 가능한 맛집으로 추천해줘', prompt: '주차 가능한 맛집으로 추천해줘' },
-      { label: '지금 내 주변에서 삼겹살집 찾아줘', prompt: '지금 내 주변에서 삼겹살집 찾아줘', locationAction: true }
+      { label: '홍대에서 냉면 먹을래', prompt: '홍대에서 냉면 먹을래' },
+      { label: '강남에서 삼겹살 먹을래', prompt: '강남에서 삼겹살 먹을래' },
+      { label: '역삼에서 국밥 먹을 곳 찾아줘', prompt: '역삼에서 국밥 먹을 곳 찾아줘' },
+      { label: '성수에서 파스타 먹을 곳 찾아줘', prompt: '성수에서 파스타 먹을 곳 찾아줘' },
+      { label: '여의도에서 초밥 먹을 곳 찾아줘', prompt: '여의도에서 초밥 먹을 곳 찾아줘' }
     ];
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
@@ -1396,7 +1396,18 @@
         : [];
       const restaurants = Array.isArray(data?.restaurants) ? data.restaurants.map(normalizeRestaurant).filter(Boolean).slice(0, 3) : [];
       const meta = data?.meta && typeof data.meta === 'object' ? data.meta : null;
+      assertCompleteAnswer({content,restaurants,meta});
       return { content, quickReplies, restaurants, meta };
+    }
+    function assertCompleteAnswer(answer) {
+      const plan=answer.meta?.answer_plan;
+      const claimsPlaces=/\d+곳(?:을|으로|만)?[^.!?\n]*(?:골라|찾았|추천|살펴)/.test(answer.content);
+      if (!Array.isArray(plan) || claimsPlaces && (!plan.includes('place_cards') || !answer.restaurants.length)
+        || plan.includes('place_cards') && answer.meta?.responseModeState?.lastCards?.length && !answer.restaurants.length
+        || plan.includes('place_cards') && !answer.restaurants.length && ['C','D'].includes(answer.meta?.mode) && !answer.meta?.responseModeState?.noResults && answer.meta?.restaurantSearchStatus !== 'no_results'
+        || plan.includes('question') && answer.meta?.turnPolicy?.next_question && !answer.meta.turnPolicy.questionText) {
+        throw new Error('incomplete_answer');
+      }
     }
     setInterval(() => refreshTimeSuggestions(), 60000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshTimeSuggestions(); });
@@ -2063,7 +2074,9 @@
       generationTimers = [];
       followConversation(status);
       try {
-        const answer = await requestAssistant(request, controller.signal);
+        const answer = await Promise.race([requestAssistant(request, controller.signal),new Promise((_,reject)=>{
+          generationTimers.push(setTimeout(()=>{reject(new Error('answer_timeout'));controller.abort();},30000));
+        })]);
         if (controller.signal.aborted) return;
         if (answer.meta?.variant === 'hard_reset') {
           currentLocationName = '';
@@ -2304,6 +2317,18 @@
       }
       ask(value);
     }
+    function submitWelcomeQuestion(value) {
+      // Welcome is a new conversation, even when reached after signup/history.
+      // Both recommended rows and typed welcome input enter the exact same path.
+      if (generating) return;
+      newChat();
+      routeQuestion(value);
+    }
+    function shouldSendOnEnter(event) {
+      if (event.isComposing || event.keyCode === 229 || event.key !== 'Enter' || event.shiftKey) return false;
+      const fine=window.matchMedia('(pointer: fine)').matches;
+      return window.innerWidth >= 768 || fine;
+    }
     function ask(question, { freshMenu = false, compareCards = null, responseState = null, alreadyAdded = false } = {}) {
       const value = question.trim();
       if (!value || generating) return;
@@ -2387,7 +2412,7 @@
       input.addEventListener('input', () => resizeInput(input));
       input.addEventListener('keydown', event => {
         if (event.isComposing || event.keyCode === 229) return;
-        if (event.key === 'Enter' && !event.shiftKey && window.innerWidth > 768 && !window.matchMedia('(pointer: coarse)').matches) {
+        if (shouldSendOnEnter(event)) {
           event.preventDefault();
           input.closest('form').requestSubmit();
         }
@@ -2398,15 +2423,14 @@
       autoFollowConversation=true;
       window.scrollTo({top:document.documentElement.scrollHeight,behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'});
     });
-    $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); routeQuestion($('#welcomeInput').value); });
+    $('#welcomeForm').addEventListener('submit', event => { event.preventDefault(); const value=$('#welcomeInput').value.trim(); if(value)submitWelcomeQuestion(value); });
     $('#chatForm').addEventListener('submit', event => { event.preventDefault(); if (generating) stopGeneration(); else routeQuestion($('#chatInput').value); });
     $('#suggestions').addEventListener('click', event => {
       const button = event.target.closest('.suggestion');
       if (!button) return;
       const item = activeSuggestions[Number(button.dataset.index)];
       if (!item) return;
-      if (item.locationAction) requestCurrentLocation(item.prompt);
-      else routeQuestion(item.prompt);
+      submitWelcomeQuestion(item.prompt);
     });
     $('#historyList').addEventListener('click', event => {
       const open = event.target.closest('[data-open-history]');

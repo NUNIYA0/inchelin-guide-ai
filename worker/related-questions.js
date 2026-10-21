@@ -77,6 +77,9 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
   if (explicitFood && !isMainDish(explicitFood)) return null;
   const descriptor=axisAndKey(text,analysis,state);
   if (!descriptor || descriptor.axis===pendingSlot || descriptor.axis==='companion' && state.askedSlots.includes('companion')) return null;
+  if (descriptor.axis.startsWith('service_') && !['service','general'].includes(parentIntent))return null;
+  if (['place_search','condition_change','followup'].includes(parentIntent)
+    && !['region','food','companion','compare'].includes(descriptor.axis))return null;
   if (state.shownSuggestions.some(old=>old.key===descriptor.key || compact(old.text)===compact(text))) return null;
   if (history.some(old=>compact(old)===compact(text))) return null;
   for (const old of history) { const prior=axisAndKey(old,classify(old,state)||{},state);if(prior?.key===descriptor.key)return null; }
@@ -84,9 +87,10 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
 }
 export function relatedTemplates(state,intent) {
   const food=isMainDish(state.slots.menu)?state.slots.menu:state.aCandidates.find(isMainDish)||'국밥';
-  const region=state.slots.region||'강남',other=[...new Set([...(ADJACENT_REGIONS[region]||[]),...SEARCH_REGIONS])].filter(area=>area!==region && SEARCH_REGIONS.includes(area));
+  const region=state.slots.region||'강남',other=[...new Set([...(region==='홍대'?['성수','종로','여의도']:ADJACENT_REGIONS[region]||[]),...SEARCH_REGIONS])].filter(area=>area!==region && SEARCH_REGIONS.includes(area));
   const similar=({국밥:['설렁탕','곰탕','냉면'],삼겹살:['갈비','불고기','국밥'],냉면:['메밀국수','칼국수','국밥']})[food]||['국밥','냉면','삼겹살'];
-  const search=[...other.map(area=>`${area}에서도 ${food} 먹을 곳 찾아줘`),...similar.filter(name=>name!==food).map(name=>`${food} 말고 ${name} 먹을 곳 찾아줘`), '회식하기 좋은 곳으로 다시 찾아줘','같은 조건으로 다른 곳도 보여줘'];
+  const regions=other.map(area=>`${area}에서도 ${food} 먹을 곳 찾아줘`),foods=similar.filter(name=>name!==food).map(name=>`${food} 말고 ${name} 먹을 곳 찾아줘`);
+  const search=[regions[0],foods[0],'회식하기 좋은 곳으로 다시 찾아줘',...regions.slice(1),...foods.slice(1),'같은 조건으로 다른 곳도 보여줘'].filter(Boolean);
   const menu=[`다른 ${state.menuCategory||'한식'} 메뉴도 보여줘`,'중식으로 먹을 메뉴를 골라줘',`${food} 먹을 곳도 같이 찾아줘`];
   const details=state.lastCards.slice(0,3).map(card=>`${card.name} 상세 정보도 알려줘`);
   const comparisons=state.lastCards.length>=2?[`${state.lastCards[0].name}랑 ${state.lastCards[1].name} 비교해줘`]:[];
@@ -96,7 +100,7 @@ export function relatedTemplates(state,intent) {
   if(intent==='compare') return [...details,...comparisons,...SERVICE_TEXTS];
   if(intent==='specific_place') return [`${region}에서 ${food}집 다른 곳도 찾아줘`,'상세보기는 어떻게 이용하는 거야?',...details,...search,...SERVICE_TEXTS];
   if(intent==='food_talk') return [`${food} 먹을 곳도 같이 찾아줘`,`${food} 먹는 법도 조금 더 알려줘`,...menu,...SERVICE_TEXTS];
-  return [...search,...comparisons,...SERVICE_TEXTS];
+  return [...search,...comparisons];
 }
 export async function applyRelatedQuestions(response,payload,classify,preflight=async()=>false) {
   const meta={...(response.meta||{})};
@@ -116,6 +120,8 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
     for (const candidate of [...proposed.map(item=>({text:typeof item==='string'?item:item?.text,source:'model'})),...relatedTemplates(state,parentIntent).map(text=>({text,source:'template'}))]) {
       const validated=validateRelated(candidate.text,options);
       if(!validated || selected.some(item=>item.axis===validated.axis || item.key===validated.key))continue;
+      if(['place_search','condition_change','followup'].includes(parentIntent) && validated.axis==='compare'
+        && (!selected.some(item=>['region','food','companion'].includes(item.axis)) || state.lastCards.length<2))continue;
       if(validated.axis==='menu_batch' && /다른 메뉴/.test(chips) || validated.axis==='more' && /다른 곳/.test(chips))continue;
       if(['region','food','place','companion','more'].includes(validated.axis)) {
         if(!state.slots.region && !response.restaurants?.length)continue;
@@ -128,7 +134,7 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
     }
   }
   // Never fill an exhausted session with repeated or unanswerable questions.
-  const questions=selected.length>=2 || parentIntent==='out_of_scope' ? selected : [];
+  const questions=selected;
   if(questions.length) {plan.push('related_questions');state.shownSuggestions.push(...questions.map(({text,key})=>({text,key})));}
   if(meta.analysis) meta.analysis.answer_plan=plan;
   return {...response,meta:{...meta,answer_plan:plan,responseModeState:state,relatedQuestions:questions}};

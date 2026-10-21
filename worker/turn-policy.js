@@ -76,6 +76,10 @@ export function applyTurnPolicy(response, payload = {}) {
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   const latest = [...messages].reverse().find(message => message.role === 'user')?.content || '';
   const previous = payload.context?.responseModeState || {};
+  if (!previous.lastCards?.length && !previous.shownPlaceIds?.length && !payload.context?.recentRestaurants?.length && response.restaurants?.length
+    && ['condition_change','followup'].includes(response.meta.analysis?.intent || response.meta.intent)) {
+    response={...response,meta:{...response.meta,intent:'place_search',analysis:{...response.meta.analysis,intent:'place_search',change:null}}};
+  }
   const plan = planTurn(response, previous, latest);
   const { state, exempt } = plan;
   const proposal = response.meta._turnDraft;
@@ -114,6 +118,7 @@ export function applyTurnPolicy(response, payload = {}) {
   const candidateText = value => {
     const valueText = text(value);
     if (!valueText || FORBIDDEN_COPY.test(valueText) || /[?？]|맛있|인기|평점|별점|최고|저렴|조용|주차|단체석|영업|분위기|예약|적합|도보|차량|좌석|앉기|편한|룸|모임.*많이/.test(valueText)) return null;
+    if (!/(?:요|죠)[.!。]?$/.test(valueText) || plan.stage === 'ready' && /새로 말씀|다시|바꿔|변경/.test(valueText)) return null;
     if (/\d/.test(valueText.replace(new RegExp(count + '곳', 'g'), '').replace(state.slots.companion || '\u0000', ''))) return null;
     if ((valueText.match(/[.!。]/g) || []).length > 1 || /\d+곳/.test(valueText) && !valueText.includes(count + '곳')) return null;
     if (response.meta.mode !== 'A' && !valueText.includes(food) && !valueText.includes(area) && !(state.slots.companion && valueText.includes(state.slots.companion))) return null;
@@ -130,7 +135,7 @@ export function applyTurnPolicy(response, payload = {}) {
     `${area}에서 함께 살펴볼 식당 ${count}곳이에요`,
   ] : response.meta.mode === 'A' ? [
     '오늘은 서로 다른 방향의 메뉴 세 가지로 좁혀봤어요', '이번 한 끼에 어울릴 서로 다른 방향을 골랐어요',
-    '말씀하신 식사 고민에 맞춰 다른 메뉴들을 준비했어요', '새로운 메뉴 방향을 함께 살펴볼게요',
+    '말씀하신 식사 고민에 맞춰 다른 메뉴들을 골랐어요', '새로운 메뉴 방향을 함께 살펴볼게요',
   ] : !state.slots.menu && !state.slots.food_type && state.slots.region ? [
     `${area}에서 먹을 곳을 함께 골라봐요`, `${area}로 정하셨군요, 메뉴도 골라볼게요`, '어디서 먹을지는 정했으니 메뉴만 골라봐요',
   ] : [`${food} 드시고 싶으시군요`, `${food} 좋죠, 먹을 곳도 함께 찾아볼게요`, `이번 식사는 ${withParticle(food, '으로/로')} 골라볼게요`, '한 가지만 더 고르면 먹을 곳을 찾을 수 있어요'];

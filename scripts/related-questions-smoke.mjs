@@ -17,11 +17,11 @@ export async function testRelatedQuestions(runCase) {
   },...extra});
   const first=await run('강남에서 국밥 먹을 곳 찾아줘');
   const state=first.body.meta.responseModeState;
-  const check=(body,name,min=2)=>{
+  const check=(body,name,min=0)=>{
     const questions=body.meta.relatedQuestions;
     assert.ok(questions.length>=min && questions.length<=3,name+': '+JSON.stringify(questions));
     assert.equal(new Set(questions.map(item=>item.axis)).size,questions.length);
-    assert.ok(body.meta.answer_plan.includes('related_questions'));
+    assert.equal(body.meta.answer_plan.includes('related_questions'),questions.length>0);
     for(const item of questions){assert.ok(item.text.length>=12 && item.text.length<=30);assert.doesNotMatch(item.text,SIDE_FOOD);assert.doesNotMatch(item.text,FORBIDDEN_COPY);assert.doesNotMatch(item.text,/영업|평점|가격|웨이팅|분위기|주차|인기/);assert.ok(item.intent);}
     assert.equal(body.meta.relatedCandidates,undefined);
     assert.ok(!body.meta.analysis?.related_questions,'raw model candidates never leak');
@@ -40,9 +40,9 @@ export async function testRelatedQuestions(runCase) {
     ['out_of_scope','주식 추천해줘',{}],
   ];
   for(const [intent,message,previous,extra] of matrix){
-    const result=await run(message,previous,extra);check(result.body,intent,intent==='out_of_scope'?1:2);
+    const result=await run(message,previous,extra);check(result.body,intent,intent==='out_of_scope'?1:0);
     if(intent==='compare') assert.ok(result.body.meta.relatedQuestions.some(item=>item.axis==='detail'));
-    if(intent==='specific_place') assert.ok(result.body.meta.relatedQuestions.some(item=>item.axis==='service_detail'),'detail usage stays answerable after prior more-place suggestions were shown');
+    if(!['service','general'].includes(intent))assert.ok(result.body.meta.relatedQuestions.every(item=>!item.axis.startsWith('service_')),'FAQ questions only appear after service/general answers');
     if(['service','general'].includes(intent)) assert.ok(result.body.meta.relatedQuestions.some(item=>item.axis==='start'));
   }
   for(const message of ['오늘 뭐 먹지','냉면 먹고 싶어','계란찜 먹고 싶어']){
