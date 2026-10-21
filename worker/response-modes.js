@@ -1,13 +1,15 @@
 import { normalizeFoodAxis, normalizeSearchRegion, FOOD_HIERARCHY, REGION_NORMALIZATION } from './search-axes.js';
+import { ANSWER_BLOCKS, answerPlanFor, MENU_CATEGORIES } from './answer-plan.js';
 export const INTENTS = [
   "menu_trouble", "place_search", "followup", "condition_change", "compare",
   "specific_place", "food_talk", "service", "general", "out_of_scope",
 ];
 export const TURN_ANALYSIS_FIELDS = {
-  stage: { type: "string", enum: ["exploring", "narrowing", "ready", "refining"] },
+  stage: { type: "string", enum: ["exploring", "narrowing", "ready", "refining", "menu_category_asked", "menu_options_shown", "region_asked"] },
+  answer_plan: { type: 'array', items: { type: 'string', enum: ANSWER_BLOCKS }, maxItems: 8 },
   missing_slots: { type: "array", items: { type: "string", enum: ["menu", "region", "companion", "sub_menu", "sub_region"] } },
   next_question: { anyOf: [{ type: "null" }, { type: "object", properties: {
-    slot: { type: "string", enum: ["menu", "region", "companion", "sub_menu", "sub_region"] },
+    slot: { type: "string", enum: ["menu_category", "menu", "region", "companion", "sub_menu", "sub_region", "clarify"] },
     text: { type: "string" },
     chips: { type: "array", items: { type: "object", properties: { label: { type: "string" }, message: { type: "string" } }, required: ["label", "message"], additionalProperties: false } }
   }, required: ["slot", "text", "chips"], additionalProperties: false }] },
@@ -68,6 +70,7 @@ stage는 exploring(메뉴·지역 탐색), narrowing(한 축 부족), ready(지�
 missing_slots는 지역·메뉴 등 실제 검색을 바꾸는 축만 적는다. next_question은 질문 하나(slot,text,chips{label,message}) 또는 null이다.
 can_search는 지역+메뉴가 있을 때 true다. 분위기·예산은 질문하지 않고 선호로 기록하며 검증되지 않았음을 안내한다.
 askedSlots는 다시 묻지 않는다. 바로 보여줘/그냥 추천해줘, 서비스/비교/특정식당 질문은 next_question=null이다.
+answer_plan은 렌더할 블록 순서다. 메뉴 고민+종류 없음=text/question/chips, 종류 있음 또는 알아서 골라줘=text/menu_cards/notice, 음식+지역 검색=text/place_cards/source/question/chips, 한 축 부족=text/question/chips, followup=text/place_cards/source, condition_change=text/place_cards/source/chips, compare=text/chips, specific_place=text/place_cards(최대1), food_talk=text/question, service/general=text, out_of_scope=text/chips. 미확인 조건은 notice를 추가한다. 낮은 신뢰도는 text/question/chips이며 카드를 만들지 않는다.
 confidence가 낮아도 가장 가능성 높은 분류를 내고 food_related를 정확히 표시한다.
 <runtime_context>${JSON.stringify(context)}</runtime_context>`;
 }
@@ -103,6 +106,7 @@ export function emptyResponseState() {
     questionCount: 0,
     refinementQuestionCount: 0,
     previousOpenings: [],
+    consecutiveQuestions: 0,
   };
 }
 
@@ -156,8 +160,9 @@ export function normalizeResponseState(value = {}) {
     aCandidates: Array.isArray(value.aCandidates || value.a_candidates) ? (value.aCandidates || value.a_candidates).map(String).filter(Boolean).slice(0, 12) : [],
     aProposed: Array.isArray(value.aProposed || value.a_proposed) ? [...new Set((value.aProposed || value.a_proposed).map(String).filter(Boolean))].slice(0, 80) : [],
     noResults: value.noResults === true || value.no_results === true,
-    stage: ["exploring", "narrowing", "ready", "refining"].includes(value.stage) ? value.stage : "exploring",
-    askedSlots: Array.isArray(value.askedSlots) ? [...new Set(value.askedSlots)].filter(slot => ["menu", "region", "companion", "sub_menu", "sub_region"].includes(slot)) : [],
+    stage: ["exploring", "narrowing", "ready", "refining", "menu_category_asked", "menu_options_shown", "region_asked"].includes(value.stage) ? value.stage : "exploring",
+    askedSlots: Array.isArray(value.askedSlots) ? [...new Set(value.askedSlots)].filter(slot => ["menu_category", "menu", "region", "companion", "sub_menu", "sub_region", "clarify"].includes(slot)) : [],
+    consecutiveQuestions: Math.min(2, Math.max(0, Number(value.consecutiveQuestions) || 0)),
     preferences: Object.fromEntries(["companion", "budget", "vibe"].map(key => [key, cleanString(value.preferences?.[key])])),
     questionCount: Math.min(3, Math.max(0, Math.trunc(Number(value.questionCount) || 0))),
     refinementQuestionCount: Math.min(2, Math.max(0, Math.trunc(Number(value.refinementQuestionCount) || 0))),
@@ -172,9 +177,10 @@ export function normalizeAnalysis(value = {}) {
   const flags = value.flags && typeof value.flags === "object" ? value.flags : {};
   return {
     intent,
-    stage: ["exploring", "narrowing", "ready", "refining"].includes(value.stage) ? value.stage : "exploring",
+    answer_plan: answerPlanFor(value, { slots: value.slots }),
+    stage: ["exploring", "narrowing", "ready", "refining", "menu_category_asked", "menu_options_shown", "region_asked"].includes(value.stage) ? value.stage : "exploring",
     missing_slots: Array.isArray(value.missing_slots) ? value.missing_slots.filter(slot => ["menu", "region", "companion", "sub_menu", "sub_region"].includes(slot)) : [],
-    next_question: value.next_question && ["menu", "region", "companion", "sub_menu", "sub_region"].includes(value.next_question.slot) ? {
+    next_question: value.next_question && ["menu_category", "menu", "region", "companion", "sub_menu", "sub_region", "clarify"].includes(value.next_question.slot) ? {
       slot: value.next_question.slot, text: cleanString(value.next_question.text, 120) || "",
       chips: Array.isArray(value.next_question.chips) ? value.next_question.chips.slice(0, 8).map(item => ({ label: cleanString(item?.label, 40) || "", message: cleanString(item?.message, 160) || "" })) : [],
     } : null,
@@ -221,7 +227,7 @@ export function resetSlots(stateValue, kind) {
 
 export function applyAnalysisToState(stateValue, analysisValue) {
   const analysis = normalizeAnalysis(analysisValue);
-  if (analysis.intent === "condition_change" && (analysis.change?.action === "exclude_previous" || analysis.sub_intent === "exclude_previous")) {
+  if (analysis.change?.action === 'exclude_previous' || analysis.sub_intent === 'exclude_previous') {
     return normalizeResponseState(stateValue);
   }
   let state = resetSlots(stateValue, analysis.flags.new_topic);
@@ -259,9 +265,9 @@ export function decideMode(analysisValue, stateValue) {
     if (hasPrev) return {
       ...base,
       mode: "D",
-      showCards: intent === "condition_change",
-      needSearch: intent === "condition_change",
-      excludePlaceIds: intent === "condition_change" && (analysis.change?.action === "exclude_previous" || analysis.sub_intent === "exclude_previous") ? [...state.shownPlaceIds] : [],
+      showCards: intent === 'condition_change' || analysis.change?.action === 'exclude_previous',
+      needSearch: intent === 'condition_change' || analysis.change?.action === 'exclude_previous',
+      excludePlaceIds: analysis.change?.action === 'exclude_previous' || analysis.sub_intent === 'exclude_previous' ? [...state.shownPlaceIds] : [],
       intent,
     };
     intent = "place_search";
@@ -309,6 +315,21 @@ export const MODE_A_POOL = [
   ["비빔밥", "채소와 비벼 먹는 밥", "여러 나물과 밥을 함께 즐겨요", "비빔밥", ["아침", "점심"]],
   ["전골", "함께 끓이는 한 냄비", "재료를 나누어 먹기 좋아요", "전골", ["저녁"]],
   ["만두", "속을 고르는 한 접시", "찜·구이 중 원하는 식감을 골라요", "만두", ["야식"]],
+  ["제육볶음", "매콤한 고기와 밥", "매콤하게 먹고 싶을 때 골라봐요", "볶음", ["점심", "저녁"]],
+  ["짬뽕", "얼큰한 국물면", "따뜻한 국물이 당길 때 골라요", "중식면", ["점심"]],
+  ["볶음밥", "고슬고슬한 밥", "간편하게 한 끼 먹기 좋아요", "볶음밥", ["점심"]],
+  ["탕수육", "바삭한 고기 요리", "함께 나눠 먹을 때 골라봐요", "중식튀김", ["저녁"]],
+  ["김밥", "재료를 담은 한 줄", "간단하게 먹을 때 골라봐요", "김밥", ["점심"]],
+  ["스테이크", "고기 한 접시", "고기 굽기를 골라 즐겨봐요", "스테이크", ["저녁"]],
+  ["우동", "따뜻한 국물과 면", "부드러운 면이 당길 때 골라요", "우동", ["점심"]],
+  ["갈비", "양념과 고기 구이", "양념 맛을 즐기고 싶을 때 골라요", "갈비", ["저녁"]],
+  ["순두부찌개", "두부와 따뜻한 국물", "국물과 밥으로 한 끼 골라봐요", "찌개", ["점심"]],
+  ["칼국수", "국물과 손칼국수 면", "따뜻한 한 그릇으로 골라요", "칼국수", ["점심"]],
+  ["베이커리", "갓 구운 빵 한 끼", "빵을 골라 간단히 먹어요", "베이커리", ["아침"]],
+  ["디저트", "달콤한 간식", "달콤하게 쉬어가고 싶을 때 골라요", "디저트", ["오후"]],
+  ["불고기", "달큰한 양념과 고기", "밥과 함께 먹고 싶을 때 골라요", "불고기", ["점심", "저녁"]],
+  ["마라탕", "얼얼한 국물 한 그릇", "재료를 골라 따뜻하게 먹어요", "마라탕", ["점심", "저녁"]],
+  ["김치찌개", "김치와 따뜻한 국물", "밥과 함께 든든하게 먹어요", "김치찌개", ["점심"]],
 ].map(([menu, direction, reason, family, times]) => ({ menu, direction, reason, family, times }));
 
 export function chooseModeACandidates(analysisValue, stateValue) {
@@ -320,7 +341,9 @@ export function chooseModeACandidates(analysisValue, stateValue) {
   const used = new Set(state.aProposed.map(String));
   const selected = [];
   const meal = state.slots.meal_time || analysis.slots.meal_time || "";
-  const ranked = pool.filter((item, index) => !used.has(item[1]) && pool.findIndex(other => other[1] === item[1]) === index).map(item => {
+  const category = !state.slots.menu && MENU_CATEGORIES[state.slots.food_type];
+  const eligible = category ? pool.filter(item => category.includes(item[1])) : pool;
+  const ranked = eligible.filter((item, index) => !used.has(item[1]) && eligible.findIndex(other => other[1] === item[1]) === index).map(item => {
     const entry = MODE_A_POOL.find(candidate => candidate.menu === item[1]);
     const random = new Uint32Array(1); crypto.getRandomValues(random);
     const score = (matched?.values.some(candidate => candidate[1] === item[1]) ? 10 : 0)

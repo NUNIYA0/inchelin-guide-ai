@@ -54,18 +54,18 @@ export async function testTurnPolicy(runCase) {
   }
   // 4. One missing axis: no cards, one region question and device-location action.
   const narrow = await runCase({ message: '삼겹살 먹고 싶어', env });
-  assert.equal(narrow.body.meta.analysis.stage, 'narrowing');
+  assert.equal(narrow.body.meta.analysis.stage, 'region_asked');
   assert.deepEqual(narrow.body.meta.analysis.missing_slots, ['region']);
   assert.equal(narrow.body.meta.analysis.can_search, false);
   assert.deepEqual(narrow.body.restaurants, []);
   assert.equal(questions(narrow.body), 1);
-  assert.ok(narrow.body.suggestions.includes('현재 위치'));
+  assert.ok(narrow.body.suggestions.includes('현재 위치 연결'));
   assert.equal(narrow.calls.length, 0);
   boundedCopy(narrow.body);
   const regionOnly = await runCase({ message: '홍대에서 먹을 곳 찾아줘', env });
-  assert.equal(regionOnly.body.meta.analysis.stage, 'narrowing');
+  assert.equal(regionOnly.body.meta.analysis.stage, 'menu_category_asked');
   assert.deepEqual(regionOnly.body.restaurants, []);
-  assert.equal(regionOnly.body.meta.turnPolicy.next_question.slot, 'menu');
+  assert.equal(regionOnly.body.meta.turnPolicy.next_question.slot, 'menu_category');
   assert.equal(regionOnly.calls.length, 0);
   // 5. The same missing slot is not asked twice.
   const again = await runCase({ message: '삼겹살 먹고 싶어', env, context: { responseModeState: narrow.body.meta.responseModeState } });
@@ -77,7 +77,7 @@ export async function testTurnPolicy(runCase) {
   assert.equal(response.body.meta.turnPolicy.next_question.slot, 'companion');
   for (const [message, area, menu, next] of [
     ['가족과 함께 가요', '강남', '삼겹살', null],
-    ['국밥 먹고 싶어요', '강남', '국밥', 'sub_region'],
+    ['국밥 먹고 싶어요', '강남', '국밥', null],
     ['홍대에서 찾아줘', '홍대', '국밥', null],
   ]) {
     response = await runCase({ message, env, context: { responseModeState: response.body.meta.responseModeState }, naverResponse: places(area, menu) });
@@ -86,10 +86,10 @@ export async function testTurnPolicy(runCase) {
     assert.ok(response.body.meta.responseModeState.refinementQuestionCount <= 2);
     boundedCopy(response.body);
   }
-  assert.equal(response.body.meta.responseModeState.questionCount, 2);
-  assert.equal(response.body.meta.responseModeState.refinementQuestionCount, 1);
+  assert.equal(response.body.meta.responseModeState.questionCount, 1);
+  assert.equal(response.body.meta.responseModeState.refinementQuestionCount, 0);
   assert.equal(questions(response.body), 0);
-  assert.equal(new Set(response.body.meta.responseModeState.askedSlots).size, 2);
+  assert.equal(new Set(response.body.meta.responseModeState.askedSlots).size, 1);
   // 7. FAQ, comparison and a specific restaurant cannot start a new interview.
   const faq = await runCase({ message: '추천은 어떤 기준으로 하나요?', env, context: { responseModeState: first.body.meta.responseModeState } });
   const compare = await runCase({ message: '첫 번째랑 두 번째 비교해줘', env, context: { responseModeState: first.body.meta.responseModeState } });

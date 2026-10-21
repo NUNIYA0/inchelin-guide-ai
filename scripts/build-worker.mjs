@@ -52,6 +52,7 @@ const responseModes = await readFile(join(root, "worker", "response-modes.js"), 
 const turnPolicy = await readFile(join(root, "worker", "turn-policy.js"), "utf8");
 const conversationCopy = await readFile(join(root, "worker", "conversation-copy.js"), "utf8");
 const korean = await readFile(join(root, "worker", "korean.js"), "utf8");
+const answerPlan = await readFile(join(root, 'worker', 'answer-plan.js'), 'utf8');
 const serviceFaq = JSON.parse(await readFile(join(root, "data", "service-faq.json"), "utf8"));
 const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
@@ -60,6 +61,8 @@ const worker = template
 
 const hostingManifest = await readFile(join(root, ".openai", "hosting.json"));
 await Promise.all([
+  writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
+  writeFile(join(hostingOutputRoot, 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(outputRoot, "dist", "server", "index.js"), worker),
   writeFile(join(outputRoot, "dist", "server", "response-modes.js"), responseModes),
   writeFile(join(outputRoot, "dist", "server", "turn-policy.js"), turnPolicy),

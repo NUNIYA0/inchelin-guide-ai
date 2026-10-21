@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { FORBIDDEN_COPY, STYLE_RULES, groundedCardReason, safeCardReason, cardReasonOptions, applyCardReasons } from '../worker/conversation-copy.js';
 import { normalizeResponseState, MODE_A_POOL } from '../worker/response-modes.js';
+import { answerPlanFor } from '../worker/answer-plan.js';
 
 export async function testConversationUI(runCase) {
   const env = { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver', NAVER_API_HUB_CLIENT_ID: 'stub-id', NAVER_API_HUB_CLIENT_SECRET: 'stub-secret' };
@@ -44,7 +45,7 @@ export async function testConversationUI(runCase) {
     { menu: '전골', description: '함께 끓이는 한 냄비', reason: '친구들과 함께 나눠 먹기 좋아요' },
     { menu: '피자', description: '오븐에 구운 한 판', reason: '친구들과 토핑을 나눠 골라봐요' },
   ] };
-  const menu = await runCase({ message: '쌀쌀하고 친구들이랑 저녁 뭐 먹을지 고민이야', env, menuResponses: [menus] });
+  const menu = await runCase({ message: '쌀쌀하고 친구들이랑 저녁 뭐 먹을지 고민이야, 알아서 골라줘', env, menuResponses: [menus] });
   assert.equal(menu.body.meta.mode, 'A');
   assert.equal(menu.body.meta.menuSelectionSource, 'model');
   assert.ok(menu.body.message.startsWith(menus.intro));
@@ -57,11 +58,11 @@ export async function testConversationUI(runCase) {
   const nextMenus = { menus: MODE_A_POOL.filter(item => !menus.menus.some(choice => choice.menu === item.menu)).slice(0, 3).map(item => ({ menu: item.menu, description: item.direction, reason: item.reason })) };
   const more = await runCase({ message: '다른 메뉴도 추천해줘', env, context: { responseModeState: menu.body.meta.responseModeState }, menuResponses: [nextMenus] });
   assert.ok(more.body.meta.menuCards.every(card => !menu.body.meta.menuCards.some(old => old.name === card.name)));
-  const invalid = await runCase({ message: '오늘 뭐 먹지', env, menuResponses: [{ menus: menus.menus.map(item => ({ ...item, menu: '없는메뉴' })) }] });
+  const invalid = await runCase({ message: '알아서 골라줘', env, menuResponses: [{ menus: menus.menus.map(item => ({ ...item, menu: '없는메뉴' })) }] });
   assert.equal(invalid.body.meta.menuSelectionSource, 'fallback');
   assert.ok(invalid.body.meta.menuCards.every(card => MODE_A_POOL.some(item => item.menu === card.name)));
   const badMenus = { menus: menus.menus.map(item => ({ ...item, reason: '제공된 검색 결과의 후보입니다.' })) };
-  const retriedMenu = await runCase({ message: '오늘 뭐 먹지', env, menuResponses: [badMenus, menus] });
+  const retriedMenu = await runCase({ message: '알아서 골라줘', env, menuResponses: [badMenus, menus] });
   assert.equal(retriedMenu.calls.filter(call => call.body?.text?.format?.name === 'inchelin_menu_choices').length, 2);
   assert.equal(retriedMenu.body.meta.menuSelectionSource, 'model');
   assert.doesNotMatch(groundedCardReason({ ...card, distanceMeters: null }), /거리/);
@@ -162,12 +163,31 @@ export async function testConversationUI(runCase) {
   assert.equal(ofClass(menuNode, 'quick-reply-reason').length, 3);
   const choice = ofClass(menuNode, 'menu-choice')[0]; choice.click();
   assert.equal(sent.at(-1)[0], '국밥 먹고 싶어요');
-  assert.equal(ofClass(menuNode, 'menu-more').length, 1);
+  assert.equal(ofClass(menuNode, 'menu-more').length, 0, 'menu-options plan has no chips block');
+  // Two representative display envelopes per each of the eleven table rows.
+  const table = [
+    ['menu_trouble',{}],['menu_trouble',{food_type:'한식'}],['place_search',{region:'강남',menu:'국밥'}],
+    ['place_search',{menu:'국밥'}],['followup',{}],['condition_change',{region:'강남',menu:'국밥'}],
+    ['compare',{}],['specific_place',{}],['food_talk',{}],['service',{}],['out_of_scope',{}],
+  ];
+  for (const [intent, slots] of table) for (const version of [1,2]) {
+    const answer_plan = answerPlanFor({intent,slots},{slots});
+    const rendered = renderer.renderMessage({role:'assistant',content:'함께 골라봐요.',restaurants:first.body.restaurants,
+      quickReplies:['국밥|따뜻한 밥','선택'],meta:{answer_plan,answer_limits:{place_cards:intent==='specific_place'?1:3},
+        menuCards:[{name:'국밥',description:'따뜻한 한 그릇',reason:'든든하게 먹어요'}],notice:'매장 확인이 필요해요.',
+        turnPolicy:{intro:'함께 골라봐요.',questionText:'누구와 가세요?',actionChips:['조건 바꾸기']}}});
+    assert.equal(ofClass(rendered,'restaurant-card').length,answer_plan.includes('place_cards')?(intent==='specific_place'?1:3):0, intent+version);
+    assert.equal(ofClass(rendered,'restaurant-source').length,answer_plan.includes('source')&&answer_plan.includes('place_cards')?1:0);
+    assert.equal(ofClass(rendered,'menu-choice').length,answer_plan.includes('menu_cards')?1:0);
+    assert.equal(ofClass(rendered,'turn-question').length,answer_plan.includes('question')?1:0);
+    assert.equal(ofClass(rendered,'answer-chips').length,answer_plan.includes('chips')?1:0);
+    assert.equal(ofClass(rendered,'turn-notice').length,answer_plan.includes('notice')?1:0);
+  }
   const menuBubble = ofClass(menuNode, 'ai-bubble')[0];
   const menuClasses = menuBubble.children.map(node => node.className);
   assert.ok(menuClasses.indexOf('message-copy') < menuClasses.indexOf('menu-hint'));
-  assert.ok(menuClasses.indexOf('menu-hint') < menuClasses.indexOf('quick-replies menu-cards'));
-  assert.ok(menuClasses.indexOf('quick-replies menu-cards') < menuClasses.indexOf('turn-question'));
+  assert.ok(menuClasses.indexOf('quick-replies menu-cards') < menuClasses.indexOf('menu-hint'));
+  assert.equal(ofClass(menuNode,'turn-question').length,0,'menu-options plan has no question block');
   assert.ok(menu.body.meta.menuCards.every(item => [...item.description].length <= 22 && [...item.reason].length <= 30));
   assert.ok(ofClass(message, 'action-chips').every(group => group.children.length <= 2));
   assert.ok(ofClass(message, 'answer-chips')[0].textContent.includes('상관없어요'));

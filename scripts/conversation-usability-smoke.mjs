@@ -19,8 +19,8 @@ export async function testConversationUsability(runCase) {
   for (const message of ['삼겹살 먹고 싶어', '홍대에서 먹을 곳 찾아줘']) {
     const narrow = await runCase({ message, env });
     const slot = narrow.body.meta.turnPolicy.next_question.slot;
-    const skip = await runCase({ message: '상관없어요', env, context: { responseModeState: narrow.body.meta.responseModeState } });
-    assert.equal(skip.calls.length, 0); assert.equal(skip.body.meta.turnPolicy.next_question, null);
+    const skip = await runCase({ message: '상관없어요', env, naverResponse, context: { responseModeState: narrow.body.meta.responseModeState } });
+    assert.equal(skip.calls.length, 1, 'skip now chooses and proceeds instead of ending the flow'); assert.equal(skip.body.meta.turnPolicy.next_question, null);
     assert.ok(skip.body.meta.responseModeState.askedSlots.includes(slot));
     assert.doesNotMatch(skip.body.message, /[?？]/);
   }

@@ -38,7 +38,7 @@ export async function testSearchAxes(runCase) {
   assert.equal(foodOnly.body.meta.turnPolicy.next_question.slot, 'region');
   const areaOnly = await runCase({ message: searchMessage({ region: '홍대' }), env });
   assert.equal(areaOnly.body.meta.mode, 'B'); assert.equal(areaOnly.body.restaurants.length, 0);
-  assert.equal(areaOnly.body.meta.turnPolicy.next_question.slot, 'menu');
+  assert.equal(areaOnly.body.meta.turnPolicy.next_question.slot, 'menu_category');
   const first = await runCase({ message: '홍대에서 냉면 먹을 곳 찾아줘', env, naverResponse: { items: [item('홍대냉면', rows.홍대)] } });
   const street = await runCase({ message: '홍대에서 냉면 먹을 곳 찾아줘', env, naverResponse: { items: [{ ...item('홍대냉면', '서울 마포구 월드컵북로5길 1'), address: '서울 마포구 서교동 1' }] } });
   assert.equal(street.body.restaurants.length, 1, 'jibun address is preserved for region evidence');

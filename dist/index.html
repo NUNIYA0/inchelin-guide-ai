@@ -1574,7 +1574,7 @@
       host.append(items, compare);
     }
     function clearComparisonTray() { comparisonTray.clear(); comparisonButtons.clear(); renderComparisonTray(); }
-    function renderRestaurantCards(restaurants) {
+    function renderRestaurantCards(restaurants, showSource = true) {
       const group = document.createElement('section'); group.className = 'restaurant-group';
       const list = document.createElement('div'); list.className = 'restaurant-list';
       list.setAttribute('aria-label', '맛집 목록');
@@ -1622,7 +1622,7 @@
         actions.appendChild(compare); card.appendChild(actions); list.appendChild(card);
       });
       group.appendChild(list);
-      if (restaurants.some(restaurant => restaurant.dataSource === 'naver')) {
+      if (showSource && restaurants.some(restaurant => restaurant.dataSource === 'naver')) {
         const source = document.createElement('p'); source.className = 'restaurant-source'; source.textContent = '네이버 검색 기준'; group.appendChild(source);
       }
       renderComparisonTray(); return group;
@@ -1635,6 +1635,8 @@
       return { title, description, prompt: title || raw };
     }
     function renderMessage(message, extra = '', follow = false) {
+      const answerPlan = new Set(Array.isArray(message.meta?.answer_plan) ? message.meta.answer_plan : ['text']);
+      const allowed = block => answerPlan.has(block);
       if (message.role === 'user') messagesEl.querySelectorAll('.answer-chips, .menu-cards, .menu-more, .action-chips').forEach(group => { group.hidden = true; });
       const item = document.createElement('div');
       item.className = `message ${message.role === 'assistant' ? 'ai' : 'user'} ${extra}`.trim();
@@ -1648,7 +1650,7 @@
         avatar.alt = 'Inchelin Guide AI';
         const bubble = document.createElement('div');
         bubble.className = 'ai-bubble';
-        if (message.meta?.searchConditions) {
+        if (allowed('text') && message.meta?.searchConditions) {
           const conditions = document.createElement('div'); conditions.className = 'result-conditions'; conditions.setAttribute('aria-label', '현재 검색 조건');
           for (const [axis, label] of [['region', message.meta.searchConditions.region], ['food', message.meta.searchConditions.food]]) {
             if (!label) continue;
@@ -1657,17 +1659,17 @@
           }
           bubble.appendChild(conditions);
         }
-        bubble.appendChild(copy);
-        if (message.meta?.notice) {
+        if (allowed('text')) bubble.appendChild(copy);
+        const isMenuTurn = allowed('menu_cards') && message.meta?.menuCards?.length;
+        if (!isMenuTurn && allowed('notice') && message.meta?.notice) {
           const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; bubble.appendChild(notice);
         }
-        if (message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants));
-        const isMenuTurn = message.meta?.mode === 'A' && message.meta?.menuCards?.length;
-        if (isMenuTurn) { const hint = document.createElement('p'); hint.className = 'menu-hint'; hint.textContent = '끌리는 게 없으면 먹고 싶은 걸 말해 주세요'; bubble.appendChild(hint); }
+        if (allowed('place_cards') && message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants.slice(0,message.meta?.answer_limits?.place_cards || 3),allowed('source')));
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
         const menus = document.createElement('div'); menus.className = 'quick-replies menu-cards';
         const menuActions = document.createElement('div'); menuActions.className = 'quick-replies quick-replies-followup action-chips';
-        const visibleQuickReplies = (message.quickReplies || []).filter(reply => {
+        const displayReplies = [...(allowed('chips') ? message.quickReplies || [] : []), ...(isMenuTurn ? message.meta.menuCards.slice(0,3).map(card=>`${card.name}|${card.description}`) : [])];
+        const visibleQuickReplies = [...new Set(displayReplies)].filter(reply => {
           const card = quickReplyCard(reply);
           if (['비교하기', '메뉴 탐색'].includes(card.title)) return false;
           if (isCurrentLocationIntent(card.title) && !canUseCurrentLocation()) return false;
@@ -1677,7 +1679,7 @@
           const isActionReply = reply => /^(?:현재 위치|내 주변|지역|다른 지역|위치)/.test(quickReplyCard(reply).title);
           visibleQuickReplies.forEach(reply => {
             const card = quickReplyCard(reply);
-            const menuChoice = message.meta?.menuCards?.find(choice => choice.name === card.title);
+            const menuChoice = allowed('menu_cards') ? message.meta?.menuCards?.find(choice => choice.name === card.title) : null;
             if (menuChoice) card.description = menuChoice.description;
             const actionReply = isActionReply(reply);
             const button = document.createElement('button');
@@ -1715,7 +1717,7 @@
                 return;
               }
               const policyChoice = message.meta?.turnPolicy?.next_question?.chips?.find(choice => choice.label === card.title);
-              routeQuestion(policyChoice?.message || card.prompt);
+              routeQuestion(policyChoice?.message || ({ '제가 골라드릴까요?':'알아서 골라줘', '메뉴 고민하기':'오늘 뭐 먹을지 같이 골라줘', '식당 찾기':'먹을 곳 찾아줘' }[card.title]) || card.prompt);
             });
             if (menuChoice) menus.appendChild(button);
             else if (card.title === '다른 메뉴 보기') menuActions.appendChild(button);
@@ -1723,12 +1725,13 @@
           });
         }
         if (menus.children.length) bubble.appendChild(menus);
-        if (message.meta?.turnPolicy?.questionText) {
+        if (isMenuTurn && allowed('notice')) { const hint = document.createElement('p'); hint.className = 'menu-hint' + (message.meta?.notice ? ' turn-notice' : ''); hint.textContent = message.meta?.notice || message.meta?.turnPolicy?.menuHint || '끌리는 메뉴를 고르거나 먹고 싶은 걸 말해 주세요'; bubble.appendChild(hint); }
+        if (allowed('question') && message.meta?.turnPolicy?.questionText) {
           const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
         }
-        if (answers.children.length) bubble.appendChild(answers);
-        if (menuActions.children.length) bubble.appendChild(menuActions);
-        if (message.meta?.turnPolicy?.actionChips?.length) {
+        if (allowed('chips') && answers.children.length) bubble.appendChild(answers);
+        if (allowed('chips') && menuActions.children.length) bubble.appendChild(menuActions);
+        if (allowed('chips') && message.meta?.turnPolicy?.actionChips?.length) {
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
           message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label;
@@ -1984,7 +1987,7 @@
     function appendLocationFallback(reason) {
       const retryable = ['denied', 'timeout', 'unavailable', 'reverse-geocode'].includes(reason);
       appendMessage('assistant', locationFallbackMessage(reason), {
-        quickReplies: retryable ? ['내 주변에서 찾기'] : []
+        quickReplies: retryable ? ['내 주변에서 찾기'] : [], meta:{answer_plan:['text','chips']}
       });
     }
     async function geolocationPermissionState() {
@@ -2162,14 +2165,14 @@
     }
     function pluginReply(content, quickReplies = [], state = pluginState()) {
       showChatView();
-      appendMessage('assistant', content, { quickReplies, meta: { mode: 'GENERAL', variant: 'plugin', responseModeState: state } });
+      appendMessage('assistant', content, { quickReplies, meta: { mode: 'GENERAL', variant: 'plugin', answer_plan: quickReplies.length ? ['text','chips'] : ['text'], responseModeState: state } });
     }
     function selectPluginRegion(region, useCoordinates = false, label = true) {
       currentLocationName = region;
       if (!useCoordinates) currentLocationCoords = null;
       const state = pluginState();
       state.slots = { ...state.slots, region, use_current_location: useCoordinates, menu: null, food_type: null };
-      Object.assign(state, { lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null, aCandidates: [], aProposed: [], pendingQuestionSlot: 'menu', noResults: false });
+      Object.assign(state, { lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null, aCandidates: [], aProposed: [], pendingQuestionSlot: 'menu_category', askedSlots:[], questionCount:0, consecutiveQuestions:0, noResults: false });
       ask(useCoordinates ? '내 주변에서 먹을 곳 찾아줘' : region + '에서 먹을 곳 찾아줘', { responseState: state, alreadyAdded: !label });
     }
     function selectPluginSituations(patch, message) {

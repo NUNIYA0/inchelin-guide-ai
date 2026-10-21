@@ -55,7 +55,7 @@ export async function generateFriendly(call) {
 export function stripAnalysisFields(value, inAnalysis = false, path = []) {
   if (Array.isArray(value)) return value.map(item => stripAnalysisFields(item, inAnalysis, path));
   if (!value || typeof value !== 'object') return value;
-  const allowedAnalysis = new Set(['intent', 'sub_intent', 'confidence', 'slots', 'reference', 'change', 'flags', 'stage', 'missing_slots', 'next_question', 'can_search']);
+  const allowedAnalysis = new Set(['intent', 'sub_intent', 'confidence', 'slots', 'reference', 'change', 'flags', 'stage', 'missing_slots', 'next_question', 'can_search', 'answer_plan']);
   return Object.fromEntries(Object.entries(value).filter(([key]) =>
     !/^_|reasoning|notes?|rationale|explanation|^turn_text$|^summary$|^reason$/i.test(key)
       // Card/menu reasons are public, evidence-bound display fields, not analysis.

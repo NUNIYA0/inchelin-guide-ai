@@ -11,14 +11,15 @@ export async function testAISearchPolicy(runCase) {
     const result = await runCase({ message: text, env });
     assert.equal(result.body.meta.analysis.slots.food_type, kind, text);
     assert.equal(result.body.meta.analysis.slots.menu, menu, text);
-    assert.equal(result.body.meta.mode, 'B');
-    assert.equal(result.body.meta.turnPolicy.next_question.slot, 'region');
-    assert.equal(result.body.restaurants.length, 0); assert.equal(result.calls.length, 0);
+    assert.equal(result.body.meta.mode, menu ? 'B' : 'A');
+    if (menu) assert.equal(result.body.meta.turnPolicy.next_question.slot, 'region');
+    else assert.equal(result.body.meta.menuCards.length,3);
+    assert.equal(result.body.restaurants.length, 0); assert.equal(result.calls.length, menu ? 0 : 1);
   }
   for (const [text, region] of [['역삼 쪽', '역삼'], ['홍대입구', '홍대'], ['홍대입구역', '홍대'], ['강남역 근처', '강남역']]) {
     const result = await runCase({ message: text, env });
     assert.equal(result.body.meta.analysis.slots.region, region, text);
-    assert.equal(result.body.meta.mode, 'B'); assert.equal(result.body.meta.turnPolicy.next_question.slot, 'menu');
+    assert.equal(result.body.meta.mode, 'B'); assert.equal(result.body.meta.turnPolicy.next_question.slot, 'menu_category');
     assert.equal(localCalls(result).length, 0);
   }
   assert.deepEqual(normalizeFoodAxis('고기'), { food_type: '고기', menu: null });
@@ -42,7 +43,7 @@ export async function testAISearchPolicy(runCase) {
   // Normalization also runs after a model classification, not only the disabled-analyzer path.
   const model = await runCase({ message: '고기 먹고 싶다', env, analyzerEnabled: true, modeIntentAnalysis: { intent: 'general', confidence: 0.4, slots: {}, flags: {} } });
   assert.equal(model.body.meta.analysis.slots.food_type, '고기');
-  assert.equal(model.body.meta.mode, 'B'); assert.equal(model.body.meta.turnPolicy.next_question.slot, 'region');
+  assert.equal(model.body.meta.mode, 'B'); assert.equal(model.body.meta.flow, 'clarify');
   const analysisCall = model.calls.find(call => call.body?.text?.format?.name === 'inchelin_response_mode_analysis');
   assert.match(analysisCall.body.instructions, /최우선 축은 food_type과 region/);
   // ④ Replacing one axis preserves the other and does not exclude all earlier cards.
@@ -62,13 +63,14 @@ export async function testAISearchPolicy(runCase) {
   assert.ok(foodChange.body.restaurants.every(card => card.category === '국밥'));
   // ⑤ Vague food asks region before menu exploration; there is no guessed cuisine.
   const vague = await runCase({ message: '맛있는 거 찾아줘', env });
-  assert.equal(vague.body.meta.mode, 'B'); assert.equal(vague.body.meta.turnPolicy.next_question.slot, 'region');
+  assert.equal(vague.body.meta.mode, 'B'); assert.equal(vague.body.meta.turnPolicy.next_question.slot, 'menu_category');
   assert.equal(vague.body.meta.responseModeState.slots.food_type, null); assert.equal(vague.body.restaurants.length, 0);
   const vagueBare = await runCase({ message: '맛있는 거', env });
-  assert.equal(vagueBare.body.meta.turnPolicy.next_question.slot, 'region');
+  assert.equal(vagueBare.body.meta.turnPolicy.next_question.slot, 'menu_category');
   assert.equal(vagueBare.calls.length, 0);
   const vagueArea = await runCase({ message: '홍대입구', env, context: { responseModeState: vague.body.meta.responseModeState } });
-  assert.equal(vagueArea.body.meta.turnPolicy.next_question.slot, 'menu'); assert.ok(vagueArea.body.suggestions.includes('상관없어요'));
+  assert.equal(vagueArea.body.meta.responseModeState.slots.region,'홍대');
+  assert.equal(vagueArea.body.meta.menuCards.length,3);
   const explore = await runCase({ message: '오늘 뭐 먹을지 같이 골라줘', env, context: { responseModeState: vagueArea.body.meta.responseModeState } });
   assert.equal(explore.body.meta.mode, 'A'); assert.equal(explore.body.meta.menuCards.length, 3);
   assert.equal(explore.body.meta.responseModeState.slots.region, '홍대');

@@ -75,7 +75,7 @@ export async function testConversationCopyRegression(runCase) {
     intent: 'menu_trouble', confidence: 1, slots: { food_type: '고기' }, flags: {}, reasoning: 'PRIVATE_REASONING', note: 'PRIVATE_NOTE',
     next_question: { slot: 'region', text: '어느 지역 PRIVATE_QUESTION에서 찾을까요?', chips: [] },
   } });
-  assertPublic(analysisOnly.body); assert.equal(analysisOnly.body.meta.turnPolicy.questionText, '어느 지역에서 찾을까요?');
+  assertPublic(analysisOnly.body); assert.equal(analysisOnly.body.meta.turnPolicy.questionText, '');
   // Existing cross-turn opening diversity remains active after fallback.
   const repeated = await runCase({ message: '그럼 국밥으로 할래', env, context: { responseModeState: change.body.meta.responseModeState },
     history: [{ role: 'assistant', content: change.body.message }], naverResponse: items(3, '국밥'), aiResponses: [dirty, dirty] });

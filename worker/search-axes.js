@@ -32,7 +32,7 @@ export const FOOD_HIERARCHY = [
   { food_type: '술집', menus: [], aliases: ['술집', '주점', '호프', '포차'] },
 ];
 export function normalizeFoodAxis(value) {
-  const text = String(value || '');
+  const text = String(value || '').replace(/제육(?!볶음|덮밥)/g,'제육볶음');
   if (/국밥·찌개|찌개\/국밥|국밥(?:이나|과|\/|·)\s*찌개/.test(text)) return { food_type: '국밥·찌개', menu: null };
   const matches = FOOD_HIERARCHY.flatMap(entry => entry.menus.flatMap(menu => [...text.matchAll(new RegExp(menu, 'g'))].map(match => ({ food_type: entry.food_type, menu, at: match.index, size: menu.length }))));
   const full = matches.filter(item => !matches.some(other => other !== item && other.at <= item.at && other.at + other.size >= item.at + item.size && other.size > item.size));

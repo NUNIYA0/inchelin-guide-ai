@@ -2,6 +2,7 @@ import { normalizeResponseState } from './response-modes.js';
 import { withParticle } from './korean.js';
 import { FORBIDDEN_COPY, repeatsCopySentences } from './conversation-copy.js';
 import { nearbySuggestions, SEARCH_REGIONS, searchMessage } from './search-axes.js';
+import { answerPlanFor } from './answer-plan.js';
 
 export const IMMEDIATE_REQUEST = /바로\s*보여줘|그냥\s*추천해줘|질문\s*(?:없이|하지\s*마)/;
 const unique = values => [...new Set(values)];
@@ -19,8 +20,8 @@ export function turnPreferences(previous, latest, slots) {
 }
 export function questionTemplate(slot, state, response) {
   if (slot === 'region') return { slot, text: '어느 지역에서 찾을까요?', chips: [
-    chip('현재 위치', '내 주변에서 먹을 곳 찾아줘'), chip('강남역', '강남역에서 찾아줘'),
-    chip('홍대', '홍대에서 찾아줘'), chip('역삼', '역삼에서 찾아줘'),
+    chip('현재 위치 연결', '내 주변에서 먹을 곳 찾아줘'), chip('강남', '강남이에요'),
+    chip('홍대', '홍대예요'), chip('역삼', '역삼이에요'), chip('성수', '성수예요'), chip('직접 입력', '지역 직접 입력'),
   ] };
   if (slot === 'menu') {
     const candidates = response.meta?.mode === 'A' ? (response.suggestions || []).filter(value => value.includes('|')).map(value => {
@@ -46,7 +47,7 @@ export function planTurn(response, previousValue = {}, latest = '') {
   const previous = normalizeResponseState(previousValue);
   const state = normalizeResponseState(response.meta?.responseModeState || previous);
   const intent = response.meta?.analysis?.intent || response.meta?.intent || response.meta?.variant || '';
-  const exempt = ['service', 'compare', 'specific_place', 'general', 'food_talk', 'out_of_scope', 'hard_reset', 'linked_place', 'preference_skip'].includes(intent)
+  const exempt = ['service', 'compare', 'specific_place', 'general', 'food_talk', 'out_of_scope', 'followup', 'hard_reset', 'linked_place', 'preference_skip'].includes(intent)
     || ['GENERAL', 'E'].includes(response.meta?.mode) || response.meta?.variant === 'compare';
   const hasRegion = Boolean(state.slots.region || state.slots.use_current_location);
   const hasFood = Boolean(state.slots.menu || state.slots.food_type);
@@ -57,7 +58,8 @@ export function planTurn(response, previousValue = {}, latest = '') {
   state.preferences = turnPreferences(state.preferences, latest, state.slots);
   let next_question = null;
   const optionalPause = stage === 'refining' && hadCards && Boolean(previous.pendingQuestionSlot);
-  if (!exempt && !optionalPause && !IMMEDIATE_REQUEST.test(latest) && state.questionCount < 3 && (stage !== 'refining' || state.refinementQuestionCount < 2)) {
+  const allowedQuestion = answerPlanFor({ ...(response.meta?.analysis || {}), intent }, state, latest).includes('question');
+  if (!exempt && allowedQuestion && state.consecutiveQuestions < 2 && !optionalPause && !IMMEDIATE_REQUEST.test(latest) && state.questionCount < 3 && (stage !== 'refining' || state.refinementQuestionCount < 2)) {
     const requestedRegion = response.meta?.mode === 'B' && /지역\s*(?:넓히기|바꾸기|변경)/.test(latest);
     const axes = requestedRegion ? ['region'] : !hasFood && (hasRegion || response.meta?.mode === 'A') ? ['menu'] : !hasRegion ? ['region'] : response.restaurants?.length ? [
       !state.slots.companion && !state.preferences.companion && 'companion',
@@ -72,6 +74,7 @@ export function planTurn(response, previousValue = {}, latest = '') {
 }
 export function applyTurnPolicy(response, payload = {}) {
   if (!response?.meta?.responseModeState) return response;
+  if (response.meta.flow) return response;
   if (response.meta.variant === 'hard_reset') return response;
   const messages = Array.isArray(payload.messages) ? payload.messages : [];
   const latest = [...messages].reverse().find(message => message.role === 'user')?.content || '';
@@ -163,6 +166,7 @@ export function applyTurnPolicy(response, payload = {}) {
     if (plan.stage === 'refining') state.refinementQuestionCount++;
   }
   state.pendingQuestionSlot = question?.slot || null;
+  state.consecutiveQuestions = question ? state.consecutiveQuestions + 1 : 0;
   state.previousOpenings = [...state.previousOpenings, opening(summary)].slice(-3);
   analysis.next_question = question;
   let suggestions = response.meta.mode === 'A' ? [...(response.suggestions || []), ...(question?.chips || []).map(value => value.label)]
