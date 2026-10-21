@@ -41,7 +41,7 @@ export async function testWelcomeFirstSearch(runCase){
     const requests=[];
     const fetch=async(url,options)=>{const request=JSON.parse(options.body);requests.push(request);if(partial)return Response.json({message:'홍대에서 냉면 먹을 곳 3곳을 골라봤어요.'});const result=await run(request.messages.at(-1).content);return Response.json(result.body);};
     const source=`
-      let currentId='old',currentLocationName='역삼',currentLocationCoords=null,chatMessages=[{role:'assistant',content:'이전 기록',restaurants:[],meta:{responseModeState:{slots:{region:'역삼'},lastCards:[{id:'old'}]}}}],generating=false,autoFollowConversation=true,lastAIRequest=null,activeRequestController=null,generationTimers=[],regeneratingAnswer=false,pending;
+      let currentId='old',currentLocationName='역삼',currentLocationCoords=null,chatMessages=[{role:'assistant',content:'이전 기록',restaurants:[],meta:{responseModeState:{slots:{region:'역삼'},lastCards:[{id:'old'}]}}}],generating=false,autoFollowConversation=true,lastAIRequest=null,activeRequestController=null,generationTimers=[],conversationEpoch=0,locationRequestInFlight=false,regeneratingAnswer=false,pending;
       const answerRequests=new WeakMap(),AI_API_ENDPOINT='/api/chat';
       const $=selector=>document.getElementById(selector.slice(1)),qsa=()=>[],saveConversation=()=>{},updateShareVisibility=()=>{},leaveSharedConversation=()=>{},setSidebar=()=>{},stopGeneration=()=>{},showToast=()=>{},followConversation=()=>{},isNearConversationBottom=()=>true;
       const normalizeRestaurant=value=>value,appendLimitedMarkdown=(node,text)=>{node.textContent=text;};

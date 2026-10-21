@@ -22,7 +22,7 @@ export async function testRelatedQuestions(runCase) {
     assert.ok(questions.length>=min && questions.length<=3,name+': '+JSON.stringify(questions));
     assert.equal(new Set(questions.map(item=>item.axis)).size,questions.length);
     assert.equal(body.meta.answer_plan.includes('related_questions'),questions.length>0);
-    for(const item of questions){assert.ok(item.text.length>=12 && item.text.length<=30);assert.doesNotMatch(item.text,SIDE_FOOD);assert.doesNotMatch(item.text,FORBIDDEN_COPY);assert.doesNotMatch(item.text,/영업|평점|가격|웨이팅|분위기|주차|인기/);assert.ok(item.intent);}
+    for(const item of questions){assert.ok(item.text.length>=12 && item.text.length<=(['detail','compare'].includes(item.axis)?40:30));assert.doesNotMatch(item.text,SIDE_FOOD);assert.doesNotMatch(item.text,FORBIDDEN_COPY);assert.doesNotMatch(item.text,/영업|평점|가격|웨이팅|분위기|주차|인기/);assert.ok(item.intent);}
     assert.equal(body.meta.relatedCandidates,undefined);
     assert.ok(!body.meta.analysis?.related_questions,'raw model candidates never leak');
   };

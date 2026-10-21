@@ -20,6 +20,7 @@ import { testChatInterface } from './chat-interface-smoke.mjs';
 import { testWelcomeFirstSearch } from './welcome-first-search-smoke.mjs';
 import { testRelatedContext } from './related-context-smoke.mjs';
 import { testV130 } from './v130-regression-smoke.mjs';
+import { testV132 } from './v132-regression-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -39,7 +40,7 @@ function request(message, history = [], context = {}) {
   });
 }
 
-async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, webResearchResponse = "웹 검색에서 동일 매장의 메뉴판과 리뷰를 확인했습니다.", aiResponse, aiResponses, menuResponses, intentAnalysis, modeIntentAnalysis, analyzerEnabled = false, expectedStatus = 200, generationStatus = 200 }) {
+async function runCase({ message, history = [], env, context, dbResponse, enrichmentResponse, naverResponse, naverStatus = 200, imageResponse, linkHtml, linkRedirect, blogResponse, webResearchResponse = "웹 검색에서 동일 매장의 메뉴판과 리뷰를 확인했습니다.", aiResponse, aiResponses, menuResponses, intentAnalysis, modeIntentAnalysis, analyzerEnabled = false, expectedStatus = 200, generationStatus = 200,delays={} }) {
   clearRelatedSearchCache(); // Independent fixtures must not reuse a different mock search dataset.
   const originalFetch = globalThis.fetch;
   const calls = [];
@@ -55,7 +56,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
       return new Response(linkHtml, { status: 200, headers: { "content-type": "text/html" } });
     }
     if (href.includes("/search/v1/blog")) return Response.json(blogResponse || { items: [] });
-    if (href.includes("naverapihub.apigw.ntruss.com")) return Response.json(typeof naverResponse === 'function' ? naverResponse(new URL(href).searchParams.get('query')) : naverResponse, { status: naverStatus });
+    if (href.includes("naverapihub.apigw.ntruss.com")) {if(delays.naver)await new Promise(resolve=>setTimeout(resolve,delays.naver));return Response.json(typeof naverResponse === 'function' ? await naverResponse(new URL(href).searchParams.get('query')) : naverResponse, { status: naverStatus });}
     if (href.includes("openapi.naver.com/v1/search/image")) return Response.json(imageResponse || { items: [] });
     if (href.endsWith("/v1/chat/completions")) {
       return Response.json({ choices: [{ message: { content: webResearchResponse } }] });
@@ -74,15 +75,16 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
         return Response.json({ output_text: JSON.stringify(menuResponses?.[menuIndex++] || {}) });
       }
       const selectedId = body.instructions?.match(/"restaurant_id":"([^"]+)"/)?.[1];
+      if(delays.copy)await new Promise(resolve=>setTimeout(resolve,delays.copy));
       if (generationStatus !== 200) return new Response('{}', { status: generationStatus });
       return Response.json({ output_text: JSON.stringify(aiResponses?.[answerIndex++] || aiResponse || { message: "검색 결과를 확인했어요.", suggestions: [], selectedRestaurantIds: selectedId ? [selectedId] : [] }) });
     }
     throw new Error(`Unexpected URL: ${href}`);
   };
   try {
-    const response = await worker.fetch(request(message, history, context), { ...env, INTENT_ANALYZER_DISABLED: analyzerEnabled ? "false" : "true" }, {});
+    const response = await worker.fetch(request(message, history, context), { ...env,CHAT_TIMING_LOGS:'false', INTENT_ANALYZER_DISABLED: analyzerEnabled ? "false" : "true" }, {});
     assert.equal(response.status, expectedStatus);
-    return { body: await response.json(), calls };
+    return { body: await response.json(), calls,headers:response.headers };
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -1407,7 +1409,7 @@ function semanticAnalysis(overrides = {}) {
     assert.ok(!card.recommendationReason.includes(card.address));
   }
   const searchCalls = third.calls.filter(call => call.href.includes("/search/v1/local"));
-  assert.ok(searchCalls.length >= 1 && searchCalls.length <= 4, 'one main search plus at most three suggestion preflights');
+  assert.ok(searchCalls.length >= 1 && searchCalls.length <= 7, 'one main search plus at most six concurrent suggestion preflights');
   assert.equal(new URL(searchCalls[0].href).searchParams.get("query"), "역삼 삼겹살");
   assert.equal(third.calls.filter(call => call.body?.text?.format?.name === "inchelin_response_mode_analysis").length, 0);
   const fourth = await runCase({
@@ -2142,6 +2144,7 @@ assert.match(
 await testTurnPolicy(runCase);
 await testConversationUI(runCase);
 await testV130(runCase);
+await testV132(runCase);
 await testSearchAxes(runCase);
 await testAISearchPolicy(runCase);
 await testConversationCopyRegression(runCase);

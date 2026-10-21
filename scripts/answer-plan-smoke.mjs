@@ -3,7 +3,7 @@ import worker from '../build/dist/server/index.js';
 import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES } from '../worker/answer-plan.js';
 import { FORBIDDEN_COPY } from '../worker/conversation-copy.js';
 import { normalizeResponseState, normalizeAnalysis, INTENT_ANALYSIS_SCHEMA, MODE_A_POOL } from '../worker/response-modes.js';
-const env={OPENAI_API_KEY:'test-key',NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub',RESTAURANT_DATA_SOURCE:'naver',INTENT_ANALYZER_DISABLED:'true'};
+const env={OPENAI_API_KEY:'test-key',NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub',RESTAURANT_DATA_SOURCE:'naver',INTENT_ANALYZER_DISABLED:'true',CHAT_TIMING_LOGS:'false'};
 const places={items:Array.from({length:3},(_,i)=>({title:'강남국밥'+i,category:'한식>국밥',roadAddress:'서울 강남구 강남 테스트길 '+i,mapx:'1270000000',mapy:'375000000'}))};
 export async function testAnswerPlan() {
   let calls=[], forcedAnalysis=null, failMenu=null; const original=globalThis.fetch;

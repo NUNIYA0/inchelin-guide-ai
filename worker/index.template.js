@@ -19,6 +19,7 @@ import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGI
 import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
 import { applyRelatedQuestions, confirmedCombination, relatedContext } from './related-questions.js';
 import './naver-map.js';
+import { createChatTiming } from './request-timing.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -699,10 +700,10 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   else if (knownCard && /상세|정보|자세/.test(latest)) intent='specific_place';
   else if (foodTalk) intent = "food_talk";
   else if (hasPrev && (/회식|혼자|혼밥|가족|데이트|\d+\s*[~〜-]?\s*\d*\s*명|예산|조용|아늑|분위기/.test(latest)) && !ordinalReference(latest)) {
-    intent = "condition_change"; sub = "add";
+    intent = "condition_change"; sub = /다른.{0,10}(?:곳|식당|집)/.test(latest)?"exclude_previous":"add";
   }
   else if (IMMEDIATE_REQUEST.test(latest)) { intent = "place_search"; sub = "immediate"; }
-  else if (hasPrev && /다른\s*(?:곳|데)|별로|더\s*없|주차되는\s*곳|말고|바꿔|조용한\s*곳/.test(latest)) {
+  else if (hasPrev && /다른.{0,10}(?:곳|데|식당|집)|별로|더\s*없|주차되는\s*곳|말고|바꿔|조용한\s*곳/.test(latest)) {
     intent = "condition_change";
     sub = /다른|별로|더\s*없/.test(latest) ? "exclude_previous" : /말고/.test(latest) ? "replace" : "add";
   } else if (hasPrev && (ordinalReference(latest) || /거기|그\s*곳|그\s*집|아까/.test(latest))) {
@@ -824,7 +825,8 @@ async function analyzeResponseModeIntent(env, messages, stateValue) {
   const instructions = buildIntentAnalysisInstructions(state);
   for (let attempt = 0; attempt < 2; attempt += 1) {
     try {
-      const response = await withTurnDeadline(signal => fetch("https://api.openai.com/v1/responses", {
+      const parsed = await withTurnDeadline(async signal => {
+      const response = await fetch("https://api.openai.com/v1/responses", {
         signal,
         method: "POST",
         headers: { authorization: `Bearer ${env.OPENAI_API_KEY}`, "content-type": "application/json" },
@@ -837,9 +839,10 @@ async function analyzeResponseModeIntent(env, messages, stateValue) {
           max_output_tokens: 700,
           store: false,
         }),
-      }), 2000);
+      });
       if (!response.ok) throw new Error(`response_mode_analysis_${response.status}`);
-      const parsed = normalizeAnalysis(JSON.parse(extractOutputText(await response.json())));
+      return normalizeAnalysis(JSON.parse(extractOutputText(await response.json())));
+      }, 2000);
       if (parsed.slots.region && !validRegionCandidate(parsed.slots.region)) parsed.slots.region = null;
       if (!parsed.slots.region && fallback.slots.region) parsed.slots.region = fallback.slots.region;
       if (fallback.slots.parking === true) parsed.slots.parking = true;
@@ -1169,19 +1172,15 @@ async function postJsonWithTimeout(url, token, body, timeoutMs = 6500) {
 }
 
 async function getJsonWithTimeout(url, headers = {}, timeoutMs = 6500) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
-  try {
+  return withTurnDeadline(async signal=>{
     const response = await fetch(url, {
       method: "GET",
       headers: { accept: "application/json", ...headers },
-      signal: controller.signal,
+      signal,
     });
     if (!response.ok) throw new UpstreamHttpError(response.status, "get_json");
     return await response.json();
-  } finally {
-    clearTimeout(timeout);
-  }
+  },timeoutMs);
 }
 
 const NAVER_LINK_PATTERN = /https?:\/\/(?:naver\.me|(?:m\.)?map\.naver\.com|(?:m\.)?place\.naver\.com)\/[^\s<>()]+/i;
@@ -1848,7 +1847,7 @@ class NaverRestaurantProvider {
       return { configured: false, places: [], ambiguous: false, query, errorCode: "missing_credentials" };
     }
     try {
-      for (const candidateQuery of (suggestionCheck ? queries.slice(0,1) : queries)) {
+      const attempts=(suggestionCheck ? queries.slice(0,1) : queries).map(async candidateQuery=>{
         const url = new URL(endpoint);
         url.searchParams.set("query", candidateQuery);
         url.searchParams.set("display", "5");
@@ -1858,7 +1857,7 @@ class NaverRestaurantProvider {
         const data = await getJsonWithTimeout(url.toString(), {
           "X-NCP-APIGW-API-KEY-ID": clientId,
           "X-NCP-APIGW-API-KEY": clientSecret,
-        }, suggestionCheck ? 650 : 6500);
+        }, suggestionCheck ? 650 : 3000);
         const places = (Array.isArray(data?.items) ? data.items : [])
           .map(sanitizeNaverPlace)
           .filter(Boolean)
@@ -1870,10 +1869,11 @@ class NaverRestaurantProvider {
           apiStatus: 200,
           resultCount: places.length,
         });
-        if (places.length) {
-          return { configured: true, places, ambiguous: false, query: candidateQuery, attemptedQueries: queries, apiStatus: 200 };
-        }
-      }
+        return { configured: true, places, ambiguous: false, query: candidateQuery, attemptedQueries: queries, apiStatus: 200 };
+      });
+      const matched=await Promise.any(attempts.map(async task=>{const result=await task;if(!result.places.length)throw null;return result;}))
+        .catch(error=>{const failed=error.errors?.find(Boolean);if(failed)throw failed;return null;});
+      if(matched)return matched;
       return { configured: true, places: [], ambiguous: false, query, attemptedQueries: queries, apiStatus: 200 };
     } catch (error) {
       const status = error instanceof UpstreamHttpError ? error.status : 0;
@@ -2270,6 +2270,7 @@ function restaurantResultsMessage(state, count, hasCoordinates) {
 }
 
 async function handleChat(request, env, execution = {}) {
+  execution.measure ||= async(name,action)=>action();
   const declaredLength = Number(request.headers.get("content-length") || 0);
   if (declaredLength > 120000) return json({ error: "대화 내용이 너무 깁니다." }, 413);
 
@@ -2403,7 +2404,7 @@ async function handleChat(request, env, execution = {}) {
       return json(chatResponse("현재 위치에서 확인된 직선거리가 가까운 순으로 정렬했어요.", recommendationQuickReplies(true), cards, { mode: "D", responseModeState: nextState }));
     }
   }
-  let analysis = prioritizeSearchAxes(await analyzeResponseModeIntent(env, messages, responseState), messages, responseState);
+  let analysis = prioritizeSearchAxes(await execution.measure('intent',()=>analyzeResponseModeIntent(env, messages, responseState)), messages, responseState);
   if (/^(?:네[,，]?\s*)?골라주세요[.!]?$/.test(latestUserMessage.trim())) analysis = normalizeAnalysis({...analysis,intent:'menu_trouble',confidence:1,sub_intent:'auto_menu',slots:{...analysis.slots,menu:null}});
   const explicitRegionIndifference = /아무\s*데나|어디든/.test(latestUserMessage) || /^상관\s*없어요[.!]?$/.test(latestUserMessage.trim()) && responseState.pendingQuestionSlot === 'region';
   if (explicitRegionIndifference && (analysis.slots.menu || responseState.slots.menu || responseState.pendingQuestionSlot === 'region' && responseState.slots.food_type)) {
@@ -2491,12 +2492,12 @@ async function handleChat(request, env, execution = {}) {
   if (searchNow) {
     let lookup;
     try {
-      lookup = await provider.searchRestaurants({
+      lookup = await execution.measure('search',()=>provider.searchRestaurants({
         query: latestUserMessage,
         messages,
         locationName: signals.locationName,
         intentAnalysis,
-      });
+      }));
     } catch (error) {
       console.error("Restaurant provider request failed", dataSource, error instanceof Error ? error.message : "unknown error");
       const reason = error instanceof RestaurantProviderError ? error.code : "api_request_failed";
@@ -2539,7 +2540,7 @@ async function handleChat(request, env, execution = {}) {
     } else if (lookup.configured && lookup.ambiguous) {
       return json(ambiguousVenueResponse(lookup.places));
     } else if (lookup.configured) {
-      const enriched = await Promise.all(lookup.places.map(place => provider.getRestaurantDetail(place)));
+      const enriched = await execution.measure('details',()=>Promise.all(lookup.places.map(place => provider.getRestaurantDetail(place))));
       const permanentlyClosed = enriched.filter(place => place.business_status === "permanently_closed");
       groundedPlaces = rankRestaurants(
         enriched.filter(place => place.business_status !== "permanently_closed"),
@@ -2616,7 +2617,7 @@ async function handleChat(request, env, execution = {}) {
       : decision.mode === "E"
         ? "응답 모드 E다. 특정 매장의 확인된 정보만 짧게 답하고 해당 매장 id 하나만 골라라. 확인되지 않은 사실은 만들지 마라."
         : "링크 조사 결과에만 근거해 사용자의 질문에 직접 답하라.";
-  const generateResponse = retry => withTurnDeadline(signal => fetch("https://api.openai.com/v1/responses", {
+  const generateResponse = retry => execution.measure('copy',()=>withTurnDeadline(signal => fetch("https://api.openai.com/v1/responses", {
     signal,
     method: "POST",
     headers: {
@@ -2671,7 +2672,7 @@ async function handleChat(request, env, execution = {}) {
       max_output_tokens: 850,
       store: false,
     }),
-  }), 6500).catch(() => ({ ok: false, status: 504, headers: new Headers() }));
+  }), retry ? 2500 : 5500)).catch(() => ({ ok: false, status: 504, headers: new Headers() }));
 
   const response = await generateResponse(false);
   if (!response.ok) {
@@ -2682,14 +2683,14 @@ async function handleChat(request, env, execution = {}) {
 
   let result;
   try {
-    const rawContent = response.ok ? extractOutputText(await withTurnDeadline(() => response.json(), 2000)) : JSON.stringify({ message: "먹을 곳을 함께 골라볼게요.", suggestions: [], selectedRestaurantIds: [] });
+    const rawContent = response.ok ? extractOutputText(await execution.measure('decode',()=>withTurnDeadline(() => response.json(), 2000))) : JSON.stringify({ message: "먹을 곳을 함께 골라볼게요.", suggestions: [], selectedRestaurantIds: [] });
     const first = JSON.parse(rawContent);
     let initial = true;
     result = await generateFriendly(async retry => {
       if (initial) { initial = false; return first; }
       const regenerated = await generateResponse(retry);
       if (!regenerated.ok) throw new Error('style_regeneration_failed');
-      return JSON.parse(extractOutputText(await withTurnDeadline(() => regenerated.json(), 2000)));
+      return JSON.parse(extractOutputText(await execution.measure('decode',()=>withTurnDeadline(() => regenerated.json(), 2000))));
     });
     result ||= { message: "먼저 식당을 골라봤어요.", suggestions: [], selectedRestaurantIds: [] };
   } catch {
@@ -2753,14 +2754,15 @@ export default {
     if (url.pathname === "/api/chat") {
       if (request.method === "OPTIONS") return new Response(null, { status: 204 });
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
+      const timing=createChatTiming();
       try {
         const payload = await request.clone().json().catch(() => ({}));
-        const execution = {};
+        const execution = {measure:timing.measure};
         const response = await handleChat(request, env, execution);
         const body = await response.json();
         if (response.ok && execution.analysis && !body.meta?.analysis) body.meta = { responseModeState:execution.state, ...body.meta, analysis:execution.analysis, intent:execution.analysis.intent };
-        const planned=response.ok?applyAnswerPlan(applyTurnPolicy(body,payload),payload):body;
-        const completed=response.ok?await applyRelatedQuestions(planned,payload,(text,state)=>{
+        const planned=response.ok?await timing.measure('policy',()=>applyAnswerPlan(applyTurnPolicy(body,payload),payload)):body;
+        const completed=response.ok?await timing.measure('suggestions',()=>applyRelatedQuestions(planned,payload,(text,state)=>{
           const messages=[...(payload.messages||[]),{role:'user',content:text}];
           return prioritizeSearchAxes(fallbackResponseModeAnalysis(messages,state),messages,state);
         },async({region,food,text,state})=>{
@@ -2768,17 +2770,23 @@ export default {
           const messages=[{role:'user',content:region+'에서 '+food+' 먹을 곳 찾아줘'}];
           const intentAnalysis={location:region,foodCategory:food,foodPreference:'',otherConditions:[],needsRestaurantSearch:true};
           const valid=place=>validateRestaurantCandidate(place,{messages,intentAnalysis,source:provider.source,locationName:region});
-          const excluded=/다른.{0,3}(?:곳|식당)/.test(text)?new Set(state.shownPlaceIds):new Set();
+          const excluded=/다른.{0,10}(?:곳|식당|집)/.test(text)?new Set(state.shownPlaceIds):new Set();
           if((planned.restaurants||[]).some(place=>!excluded.has(place.id)&&valid(place)))return true;
           // Existing validated results can answer the current combination without another lookup.
           return confirmedCombination(provider.source+':'+region+':'+food+':'+[...excluded].sort().join(','),async()=>{
             const result=await provider.searchRestaurants({messages,locationName:region,intentAnalysis,suggestionCheck:true});
             return result.places.some(place=>!excluded.has(place.id)&&valid(place));
           });
-        }):planned;
-        return json(finalizeConversationCopy(completed),response.status);
+        })):planned;
+        const report=timing.finish();
+        if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'chat_timing',status:response.status,...report}));
+        const output=json(finalizeConversationCopy(completed),response.status);
+        output.headers.set('Server-Timing',Object.entries(report.stages).map(([name,value])=>`${name};dur=${value}`).join(', '));
+        output.headers.set('X-Inchelin-Isolate-First',String(report.firstInIsolate));
+        return output;
       } catch (error) {
         console.error("Chat handler failed", error instanceof Error ? error.message : "unknown error");
+        if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'chat_timing',status:500,...timing.finish()}));
         return json({ error: "답변을 불러오지 못했어요. 다시 시도해 주세요." }, 500);
       }
     }

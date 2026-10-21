@@ -61,7 +61,7 @@ export async function testChatInterface(runCase) {
   const oldNode=new Node(),elements={chatSend:new Node(),chatInput:{...input,value:'',closest:input.closest}};
   const host={children:[oldNode],appendChild(node){this.children.push(node);},querySelector(selector){return selector.includes('status')?this.children.find(node=>node.className?.includes('status')&&!node.removed):oldNode;}};
   const generation=new Function('document','messagesEl','requestAssistant','$','followConversation','saveConversation',`
-    let generating=false,regeneratingAnswer=false,activeRequestController=null,generationTimers=[],chatMessages=[arguments[6]],autoFollowConversation=false,currentLocationName='',currentLocationCoords=null;
+    let generating=false,regeneratingAnswer=false,activeRequestController=null,generationTimers=[],conversationEpoch=0,chatMessages=[arguments[6]],autoFollowConversation=false,currentLocationName='',currentLocationCoords=null;
     const answerRequests=new WeakMap(); const normalizeMessage=value=>value;
     const isNearConversationBottom=()=>false,resizeInput=()=>{},showRequestError=()=>{},renderMessage=(message)=>{const node=document.createElement('div');messagesEl.appendChild(node);return node;};
     const appendMessage=()=>{throw Error('replacement must not append');};
