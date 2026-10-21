@@ -40,13 +40,11 @@ export function testMealToolsUI() {
     globalThis.matchMedia = () => ({ matches: reduced });
     globalThis.setTimeout = callback => { timers.set(++serial, callback); return serial; };
     globalThis.clearTimeout = id => timers.delete(id);
-    mountMealTools({ getMessages: () => [{ role: 'assistant', meta: { mode: 'A', responseModeState: { aCandidates: ['냉면', '국밥', '피자'] } } }], isBusy: () => false, onSend: (...args) => sent.push(args) });
+    const searchOpened = [];
+    mountMealTools({ openSearch: axis => searchOpened.push(axis), getMessages: () => [{ role: 'assistant', meta: { mode: 'A', responseModeState: { aCandidates: ['냉면', '국밥', '피자'] } } }], isBusy: () => false, onSend: (...args) => sent.push(args) });
     const dialog = body.children[0];
     triggers[0].click();
-    byText(dialog, '중식').click();
-    byText(dialog, '마라탕').click();
-    assert.deepEqual(sent.pop(), ['마라탕 먹고 싶어', { freshMenu: true }]);
-    assert.equal(dialog.open, false);
+    assert.equal(searchOpened.pop(), 'food', 'category action delegates to shared picker');
     triggers[1].click();
     assert.equal(dialog.querySelectorAll('input').length, 3);
     byText(dialog, '삭제').click();

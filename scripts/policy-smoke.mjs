@@ -7,6 +7,7 @@ import { testMealToolsUI } from "./meal-tools-smoke.mjs";
 import { testPluginActionsUI } from "./plugin-actions-smoke.mjs";
 import { testTurnPolicy } from "./turn-policy-smoke.mjs";
 import { testConversationUI } from "./conversation-ui-smoke.mjs";
+import { testSearchAxes } from "./search-axes-smoke.mjs";
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -567,7 +568,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(result.body.restaurants[0].longitude, 127);
   assert.equal(result.body.restaurants[0].latitude, 37.5);
   assert.ok(result.body.restaurants[0].distanceMeters > 0);
-  assert.match(result.body.restaurants[0].recommendationReason, /테헤란로|직선거리 \d+(?:\.\d+)?[mk]/);
+  assert.equal(result.body.restaurants[0].recommendationReason, '', 'address/distance is not a recommendation reason');
   assert.equal(result.body.restaurants[0].naverPlaceId, "123");
   assert.equal(result.body.restaurants[0].naverPlaceUrl, "https://map.naver.com/p/entry/place/123");
   assert.equal(new URL(naverCall.href).searchParams.get("query"), "강남 냉면");
@@ -661,7 +662,7 @@ function semanticAnalysis(overrides = {}) {
       ],
     },
   });
-  assert.deepEqual(result.body.restaurants.map(restaurant => restaurant.name), ["신림혼밥식당"]);
+  assert.deepEqual(result.body.restaurants.map(restaurant => restaurant.name), ["신림혼밥식당"], JSON.stringify(result.body));
   assert.equal(result.body.restaurants[0].category, "한식");
   assert.ok(result.body.restaurants[0].distanceMeters > 0);
   assert.notEqual(result.body.restaurants[0].distanceMeters, 10);
@@ -1254,7 +1255,7 @@ function semanticAnalysis(overrides = {}) {
   const env = { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver", NAVER_API_HUB_CLIENT_ID: "naver-id", NAVER_API_HUB_CLIENT_SECRET: "naver-secret" };
   const first = await runCase({ message: "강남역에서 냉면 먹을 곳 추천해줘", env, naverResponse: { items: [
     { title: "강남평양냉면", category: "음식점>한식>냉면", roadAddress: "서울 강남구 강남대로 1", mapx: "1270000000", mapy: "375000000" },
-    { title: "강남함흥냉면", category: "음식점>한식>냉면", roadAddress: "서울 강남구 테헤란로 2", mapx: "1270001000", mapy: "375000100" },
+    { title: "강남함흥냉면", category: "음식점>한식>냉면", roadAddress: "서울 강남구 역삼동 테헤란로 2", mapx: "1270001000", mapy: "375000100" },
   ] } });
   assert.equal(first.body.restaurants.length, 2);
   const state = { ...first.body.meta.responseModeState, focus: first.body.restaurants[0].id };
@@ -1508,9 +1509,9 @@ assert.equal(withParticle("피자", "을/를"), "피자를");
     ] },
   });
   assert.equal(result.body.restaurants.length, 3);
-  assert.equal(new Set(result.body.restaurants.map(card => card.recommendationReason)).size, 3);
+  assert.ok(result.body.restaurants.every(card => card.recommendationReason === ''));
   for (const card of result.body.restaurants) {
-    assert.match(card.recommendationReason, /테헤란로|논현로|역삼로/);
+    assert.equal(card.recommendationReason, '');
     assert.doesNotMatch(card.recommendationReason, /고깃집|먹을 곳|살펴볼 곳/);
     assert.ok(!card.recommendationReason.includes(card.address));
     assert.doesNotMatch(card.recommendationReason, /영업 여부는 확인되지 않았어요/);
@@ -1705,7 +1706,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(menu.body.meta.mode, "A");
   for (const result of [area, here, scenario, compare, criteria]) assert.equal(result.calls.length, 0);
   assert.equal(menu.calls.length, 1, 'menu exploration now generates its three choices');
-  const items = Array.from({ length: 5 }, (_, i) => ({ title: "테스트삼겹살" + i, category: "한식>돼지고기구이", roadAddress: "서울특별시 강남구 테스트로 " + i, mapx: String(1270000000 + i), mapy: String(375000000 + i) }));
+  const items = Array.from({ length: 5 }, (_, i) => ({ title: "테스트삼겹살" + i, category: "한식>돼지고기구이", roadAddress: "서울특별시 강남구 역삼동 테스트로 " + i, mapx: String(1270000000 + i), mapy: String(375000000 + i) }));
   const id = item => "naver:" + item.title + ":" + item.mapx + ":" + item.mapy;
   const first = await runCase({ message: "강남역에서 삼겹살 먹을건데 주차 가능한 곳", env,
     naverResponse: { items }, aiResponse: { message: "5곳을 찾았어요.", suggestions: [], selectedRestaurantIds: items.slice(2).map(id) } });
@@ -2108,9 +2109,11 @@ assert.match(indexHtml, /quick-reply-chip[^}]*min-height: 32px/);
   assert.ok(routeSource && locationSource);
   const sent = [];
   let locationRequests = 0;
-  const route = new Function("ask", "requestCurrentLocation", `${locationSource}\n${routeSource}\nreturn routeQuestion;`)(value => sent.push(value), () => { locationRequests += 1; });
+  const pickerAxes = [];
+  const route = new Function("ask", "requestCurrentLocation", "openSearchPicker", `${locationSource}\n${routeSource}\nreturn routeQuestion;`)(value => sent.push(value), () => { locationRequests += 1; }, axis => pickerAxes.push(axis));
   for (const label of ["다른 곳도 보여줘", "가까운 순으로", "조건 바꾸기"]) route(label);
-  assert.deepEqual(sent, ["다른 곳도 보여줘", "가까운 순으로", "조건 바꾸기"]);
+  assert.deepEqual(sent, ["다른 곳도 보여줘", "가까운 순으로"]);
+  assert.deepEqual(pickerAxes, [null]);
   route("현재 위치 연결");
   assert.equal(locationRequests, 1, "location chip must keep the existing browser geolocation action");
 }
@@ -2122,4 +2125,5 @@ assert.match(
 
 await testTurnPolicy(runCase);
 await testConversationUI(runCase);
+await testSearchAxes(runCase);
 console.log("Inchelin data policy smoke tests passed.");

@@ -37,10 +37,11 @@ export async function testPluginActionsUI() {
   const all = situationRequest(['혼밥', '회식', '데이트', '가족 모임', '접대·비즈니스', '주차 필요', '단체석']);
   for (const phrase of ['혼자', '회식', '데이트', '가족 모임', '접대·비즈니스', '주차', '단체석']) assert.ok(all.includes(phrase));
   const sent = [], replies = [], regions = [], situations = [], pins = [];
-  let messages = [], slots = {}, busy = false, located = 0, opened = 0, faqCalls = 0;
+  let messages = [], slots = {}, busy = false, located = 0, opened = 0, faqCalls = 0; const searchOpened = [];
   try {
     globalThis.document = { body, activeElement: opener, createElement: tag => new Node(tag), createElementNS: (ns, tag) => new Node(tag) };
     const options = {
+      openSearch: axis => searchOpened.push(axis),
       getMessages: () => messages, getSlots: () => slots, isBusy: () => busy,
       send: (...args) => sent.push(args), reply: (...args) => replies.push(args),
       setRegion: (...args) => regions.push(args), setSituations: (...args) => situations.push(args),
@@ -52,32 +53,8 @@ export async function testPluginActionsUI() {
     await actions.run(1);
     assert.deepEqual(sent.pop(), ['오늘 뭐 먹을지 같이 골라줘', { freshMenu: true }]);
     await actions.run(3);
-    assert.equal(dialog.className, 'meal-tools-dialog bottom-sheet');
-    assert.equal(byText(dialog, '닫기'), undefined, 'no top-left close chip');
-    const close = nodes(dialog).find(node => node.className === 'sheet-close');
-    assert.equal(close.textContent.trim(), '');
-    assert.equal(close.children[0].tag, 'svg');
-    close.click();
+    assert.equal(searchOpened.pop(), 'region', 'region plugin delegates to shared picker');
     assert.equal(dialog.open, false);
-    await actions.run(3);
-    dialog.emit('cancel');
-    assert.equal(dialog.open, false, 'Escape/cancel closes the shared sheet');
-    await actions.run(3);
-    dialog.getBoundingClientRect = () => ({ left: 0, right: 360, top: 100, bottom: 800 });
-    dialog.listeners.click({ target: dialog, clientX: 20, clientY: 90 });
-    assert.equal(dialog.open, false, 'tap on the backdrop closes the sheet');
-    await actions.run(3);
-    assert.equal(byText(dialog, '지역 직접 입력'), undefined);
-    const input = nodes(dialog).find(node => node.tag === 'input');
-    assert.equal(byText(dialog, '이 지역으로 찾기').disabled, true);
-    input.value = '찾아줘'; input.emit('input'); byText(dialog, '이 지역으로 찾기').click();
-    assert.equal(regions.length, 0);
-    input.value = '부산 서면'; input.emit('input'); byText(dialog, '이 지역으로 찾기').click();
-    assert.deepEqual(regions.pop(), ['부산 서면']);
-    await actions.run(3); byText(dialog, '역삼').click(); byText(dialog, '이 지역으로 찾기').click();
-    assert.deepEqual(regions.pop(), ['역삼']);
-    await actions.run(3); byText(dialog, '현재 위치 연결').click();
-    assert.equal(located, 1);
     await actions.run(2); byText(dialog, '선택 완료').click();
     assert.ok(dialog.textContent.includes('누구와'));
     assert.ok(dialog.textContent.includes('조건'));
@@ -95,7 +72,7 @@ export async function testPluginActionsUI() {
     await actions.run(4);
     assert.deepEqual(replies.pop(), [NO_COMPARE, ['지역별 찾기']]);
     byText(dialog, '지역별 찾기').click();
-    assert.ok(byText(dialog, '강남역'));
+    assert.equal(searchOpened.pop(), 'region');
     const cards = [{ id: 'a', name: '가게A', address: '첫 주소' }, { id: 'b', name: '가게B', address: '둘째 주소' }, { id: 'c', name: '가게C', address: '셋째 주소' }];
     messages = [{ role: 'assistant', restaurants: cards, meta: { responseModeState: { lastCards: cards } } }];
     await actions.run(4);

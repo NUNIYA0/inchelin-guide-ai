@@ -1,8 +1,9 @@
 import { createBottomSheet } from './bottom-sheet-v1.js?v=113';
+import { SEARCH_REGIONS } from './search-axes-data-v1.js';
 // These tools collect messages/slots only. Response modes stay in the existing pipeline.
 export const PLUGIN_IDS = [1, 2, 3, 4, 5];
 // Naver local search supports these region queries; availability still depends on the menu.
-export const NAVER_REGIONS = ['강남역', '역삼', '홍대'];
+export const NAVER_REGIONS = SEARCH_REGIONS;
 export const SITUATIONS = ['혼밥', '회식', '데이트', '가족 모임', '접대·비즈니스', '주차 필요', '단체석'];
 export const NO_COMPARE = '먼저 식당을 찾아야 비교할 수 있어요. 지역과 메뉴를 알려주세요';
 export function readPins(storage) {
@@ -44,7 +45,7 @@ export function selectedComparison(cards, indexes) {
 export function validRegion(value) {
   return typeof value === 'string' && /^[가-힣a-zA-Z0-9·.\s-]{2,40}$/.test(value.trim()) && !/찾아줘|추천해줘|알려줘|먹을 곳|갈만한/.test(value);
 }
-export function mountPluginActions({ getMessages, getSlots, send, reply, setRegion, setSituations, locate, isBusy, onOpen, storage, onPins, source = 'naver' }) {
+export function mountPluginActions({ getMessages, getSlots, send, reply, setRegion, setSituations, locate, isBusy, onOpen, storage, onPins, source = 'naver', openSearch = () => {} }) {
   let pins = readPins(storage), opener;
   const el = (tag, text = '', className = '') => {
     const node = document.createElement(tag); node.textContent = text; node.className = className; return node;
@@ -60,42 +61,7 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     return sheetUI.body;
   }
   const blocked = () => isBusy();
-  function finishRegion(value) {
-    if (blocked()) return;
-    if (!validRegion(value)) return;
-    dialog.close(); setRegion(value.trim());
-  }
-  function regions() {
-    const view = sheet('어느 지역에서 찾을까요?');
-    const manual = el('form', '', 'meal-input-row');
-    const input = el('input'); input.type = 'text'; input.maxLength = 40; input.placeholder = '동네나 역 이름을 입력해 주세요';
-    input.setAttribute('aria-label', '찾을 지역');
-    const error = el('p', '', 'meal-muted'); error.setAttribute('role', 'status');
-    const submit = () => {
-      if (!validRegion(input.value)) { error.textContent = '동네나 역 이름을 2~40자로 입력해 주세요.'; return; }
-      finishRegion(input.value);
-    };
-    manual.addEventListener('submit', event => { event.preventDefault(); submit(); });
-    const find = button('이 지역으로 찾기', submit); find.className = 'primary-action'; find.disabled = true;
-    let selectedRegion = '';
-    input.addEventListener('input', () => { selectedRegion = input.value.trim(); find.disabled = !validRegion(selectedRegion); });
-    const location = button('현재 위치 연결', () => { if (blocked()) return; dialog.close(); locate(); }); location.className = 'primary-action';
-    manual.append(input);
-    view.append(location, manual, error);
-    sheetUI.setActions(find);
-    if (source === 'naver') {
-      view.append(el('p', '자주 찾는 지역이에요. 메뉴에 따라 검색 결과가 없을 수 있어요.', 'meal-muted'));
-      const chips = el('div', '', 'meal-chips');
-      NAVER_REGIONS.forEach(region => {
-        const chip = button(region, () => {
-          selectedRegion = region; input.value = region; find.disabled = false;
-          chips.querySelectorAll('button').forEach(node => node.setAttribute('aria-pressed', String(node === chip)));
-        });
-        chip.setAttribute('aria-pressed', 'false'); chips.append(chip);
-      });
-      view.append(chips);
-    }
-  }
+  function regions() { dialog.close(); openSearch('region'); }
   function situations() {
     const view = sheet('어떤 상황인가요?');
     const slots = getSlots();

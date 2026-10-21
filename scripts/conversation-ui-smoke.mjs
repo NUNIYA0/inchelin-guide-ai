@@ -19,9 +19,9 @@ export async function testConversationUI(runCase) {
   assert.equal(failed.calls.filter(call => call.body?.text?.format?.name === 'inchelin_chat_response').length, 2);
   assert.doesNotMatch(failed.body.message, FORBIDDEN_COPY);
   assert.equal(failed.body.restaurants.length, 3, 'bad copy cannot remove verified cards');
-  assert.equal(new Set(first.body.restaurants.map(card => card.recommendationReason)).size, 3);
+  assert.ok(first.body.restaurants.every(card => card.recommendationReason === ''));
   for (const card of first.body.restaurants) {
-    assert.match(card.recommendationReason, /테스트로/);
+    assert.equal(card.recommendationReason, '');
     assert.doesNotMatch(card.recommendationReason, FORBIDDEN_COPY);
     assert.doesNotMatch(card.recommendationReason, /단체석|조용|주차|평점|인기|거리/);
     assert.ok(!card.recommendationReason.includes(card.address));
@@ -29,10 +29,10 @@ export async function testConversationUI(runCase) {
   }
   const card = first.body.restaurants[0];
   const goodReason = '도로명 주소는 테스트로예요.';
-  assert.equal(safeCardReason(goodReason, card, '삼겹살', '강남역'), true);
+  assert.equal(safeCardReason(goodReason, card, '삼겹살', '강남역'), false);
   for (const bad of [`${card.name}는 단체로 앉기 편해요.`, `${card.name}는 마라탕도 맛있어요.`, `${card.name}는 인기 많은 곳이에요.`]) assert.equal(safeCardReason(bad, card, '삼겹살', '강남역'), false);
   const generated = await runCase({ message: '강남역에서 삼겹살 먹을건데', env, naverResponse: { items }, aiResponse: { ...clean, card_reasons: [{ id: card.id, reason: goodReason }] } });
-  assert.equal(generated.body.restaurants[0].recommendationReason, goodReason, 'grounded model reason is retained');
+  assert.equal(generated.body.restaurants[0].recommendationReason, '', 'address-only model reason is dropped');
   const refine = await runCase({ message: '회식이에요', env, context: { responseModeState: first.body.meta.responseModeState }, naverResponse: { items }, aiResponse: { ...clean, turn_text: { summary: '강남역 삼겹살집은 단체로 앉기 편한 쪽을 위로 올렸어요.', reason: '' } } });
   assert.doesNotMatch(refine.body.message, /앉기|단체로|검증|정렬|후보|입니다/);
   assert.match(refine.body.meta.notice, /단체석.*매장 확인/);
@@ -66,41 +66,12 @@ export async function testConversationUI(runCase) {
   assert.equal(retriedMenu.body.meta.menuSelectionSource, 'model');
   assert.doesNotMatch(groundedCardReason({ ...card, distanceMeters: null }), /거리/);
 
-  // v116: per-restaurant reasons need literal address/name evidence, not cuisine filler.
-  const factCards = [
-    { id: 'floor', name: '층수집', category: '고깃집', address: '서울 강남구 역삼동 20 1층' },
-    { id: 'branch', name: '고기 직영점', category: '고깃집', address: '서울 강남구 역삼동 21' },
-    { id: 'building', name: '모임집', category: '고깃집', address: '서울 강남구 테헤란로 22 한빛빌딩' },
-  ];
-  const varied = applyCardReasons(factCards, [], '회식');
-  assert.match(varied[0].recommendationReason, /1층/);
-  assert.match(varied[1].recommendationReason, /직영점/);
-  assert.match(varied[2].recommendationReason, /한빛빌딩|테헤란로/);
-  const variants = varied.map(item => cardReasonOptions(item, '회식').find(option => option.text === item.recommendationReason));
-  assert.equal(new Set(variants.map(option => option.start)).size, 3);
-  assert.equal(new Set(variants.map(option => option.end)).size, 3);
-  for (const item of varied) {
-    assert.doesNotMatch(item.recommendationReason, /고깃집|분류|가까|대로변|편해|헷갈|분위기|맛|웨이팅|주차/);
-  }
-  for (const floor of ['지하 1층', '지하', '3층', '4~5층', 'B1']) {
-    assert.ok(cardReasonOptions({ name: '식당', address: '서울 역삼동 1 ' + floor }).some(option => option.text.includes(floor.replace(/\s/g, ''))));
-  }
-  const unknown = { id: 'none', name: '골목집', category: '고깃집', address: '서울 강남구 역삼동 33 101호' };
-  assert.deepEqual(cardReasonOptions(unknown), [], 'unit number is not a floor');
-  assert.deepEqual(cardReasonOptions({ ...unknown, address: '서울 역삼동 지하철역 인근' }), [], 'subway is not basement evidence');
-  assert.ok(cardReasonOptions({ ...unknown, address: '서울 센터로 1' }).every(option => !option.text.includes('건물')), 'a road containing 센터 is not a building');
-  assert.deepEqual(cardReasonOptions({ ...unknown, address: '서울 역삼동 1 1층빌딩' }).filter(option => option.start === 'address'), [], 'building name is not floor evidence');
-  assert.equal(groundedCardReason(unknown), '');
-  for (const invented of ['1층이라 찾아가기 편해요.', '직영점이라 헷갈리지 않아요.', '강남역에서 가까운 대로변이에요.', '조용하고 맛있어요.', '웨이팅이 짧고 주차가 돼요.', '고깃집 먹을 곳으로 골라봤어요.']) {
-    assert.equal(safeCardReason(invented, unknown), false);
-    assert.equal(applyCardReasons([unknown], [{ id: 'none', reason: invented }])[0].recommendationReason, '');
-  }
-  assert.ok(cardReasonOptions({ name: '한결 강남역점', address: '' }).some(option => option.text.includes('강남역점')));
-  assert.ok(cardReasonOptions({ name: '한결 본점', address: '' }).some(option => option.text.includes('본점')));
-  assert.doesNotMatch(groundedCardReason({ name: '한결 강남역점' }), /가깝|거리|분 거리/);
-  assert.ok(cardReasonOptions({ ...unknown, distanceMeters: 250 }).some(option => option.text.includes('직선거리')));
-  const duplicates = applyCardReasons(factCards.map((item, i) => ({ ...unknown, id: String(i), address: '서울 역삼동 33 1층' })), factCards.map((_, i) => ({ id: String(i), reason: '주소에는 1층으로 적혀 있어요.' })));
-  assert.equal(new Set(duplicates.map(item => item.recommendationReason)).size, 3);
+  // v117 supersedes address-derived reasons: only a verified user-condition connection remains.
+  const factCard = { id: 'a', name: '식당', category: '한식', address: '서울 역삼동 1 1층', privateRoom: true, parking: true };
+  assert.deepEqual(cardReasonOptions(factCard), []);
+  assert.ok(cardReasonOptions(factCard, { companion: '회식' }).some(option => option.text.includes('룸')));
+  assert.ok(cardReasonOptions(factCard, { parking: true }).some(option => option.text.includes('주차')));
+  assert.deepEqual(cardReasonOptions({ ...factCard, privateRoom: null, parking: null }, { companion: '회식', parking: true }), []);
   const noEvidenceItems = items.map((item, index) => ({ ...item, title: '삼겹살' + ['가게가', '가게나', '가게다'][index], roadAddress: '서울 강남구 역삼동 ' + (index + 1) }));
   const noEvidence = await runCase({ message: '강남역에서 삼겹살 먹을건데', env, naverResponse: { items: noEvidenceItems }, aiResponse: { ...clean, card_reasons: [{ id: 'fake', reason: '분위기가 좋아요.' }] } });
   assert.equal(noEvidence.body.restaurants.length, 3);
@@ -126,11 +97,16 @@ export async function testConversationUI(runCase) {
   }
   const sent = [], host = new Node('div');
   const document = { createElement: tag => new Node(tag) };
-  const renderer = new Function('document', 'messagesEl', 'appendLimitedMarkdown', 'ask', 'resolveRestaurantDetail', 'showToast', 'isCurrentLocationIntent', 'canUseCurrentLocation', 'chooseMenuCard', 'routeQuestion', renderSource + '\nreturn { renderRestaurantCards, renderMessage };')(
-    document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹고 싶어요']), value => sent.push([value]));
+  const openedAxes = [];
+  const renderer = new Function('document', 'messagesEl', 'appendLimitedMarkdown', 'ask', 'resolveRestaurantDetail', 'showToast', 'isCurrentLocationIntent', 'canUseCurrentLocation', 'chooseMenuCard', 'routeQuestion', 'openSearchPicker', renderSource + '\nreturn { renderRestaurantCards, renderMessage };')(
+    document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹고 싶어요']), value => sent.push([value]), axis => openedAxes.push(axis));
   const nodes = root => [root, ...root.children.flatMap(nodes)];
   const ofClass = (root, cls) => nodes(root).filter(node => node.className.split(' ').includes(cls));
   const group = renderer.renderRestaurantCards(first.body.restaurants);
+  assert.equal(ofClass(group, 'restaurant-condition-chips').length, 3);
+  assert.equal(ofClass(group, 'restaurant-region').length, 3);
+  assert.ok(ofClass(group, 'restaurant-category').some(node => node.textContent === '삼겹살'));
+  assert.ok(ofClass(group, 'restaurant-region').every(node => node.textContent === '강남역'));
   assert.equal(ofClass(group, 'restaurant-card').length, 3);
   assert.equal(ofClass(group, 'restaurant-media').length, 0);
   assert.equal(ofClass(group, 'restaurant-image').length, 0);
@@ -155,6 +131,10 @@ export async function testConversationUI(runCase) {
   assert.equal(sent.at(-1)[1].compareCards.length, 2);
   const message = renderer.renderMessage({ role: 'assistant', content: first.body.message, restaurants: first.body.restaurants, quickReplies: first.body.suggestions, meta: first.body.meta });
   const bubble = ofClass(message, 'ai-bubble')[0];
+  const conditions = ofClass(message, 'result-conditions')[0];
+  assert.deepEqual(conditions.children.map(node => node.textContent), ['강남역', '삼겹살']);
+  conditions.children[0].click(); conditions.children[1].click();
+  assert.deepEqual(openedAxes, ['region', 'food']);
   const classes = bubble.children.map(node => node.className);
   assert.ok(classes.indexOf('message-copy') < classes.indexOf('restaurant-group'));
   assert.ok(classes.indexOf('restaurant-group') < classes.indexOf('turn-question'));

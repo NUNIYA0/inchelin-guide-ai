@@ -216,10 +216,11 @@ export function applyAnalysisToState(stateValue, analysisValue) {
   }
   const delta = analysis.slots;
   const slots = { ...state.slots };
+  if (delta.food_type && !delta.menu) slots.menu = null;
   for (const key of ["region", "food_type", "menu", "companion", "meal_time"]) {
     if (delta[key] !== null) slots[key] = delta[key];
   }
-  if (delta.region && delta.region !== state.slots.region && !delta.use_current_location && (state.lastCards.length || analysis.change?.slot === "region")) slots.use_current_location = false;
+  if (delta.region && !delta.use_current_location) slots.use_current_location = false;
   if (delta.parking !== null) slots.parking = delta.parking;
   if (delta.use_current_location) slots.use_current_location = true;
   if (delta.other.length) slots.other = [...new Set([...slots.other, ...delta.other])].slice(0, 8);

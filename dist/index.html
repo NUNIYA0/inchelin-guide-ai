@@ -197,6 +197,7 @@
       overflow: hidden;
     }
     .welcome { width: min(720px, 100%); transform: translateY(-3px); }
+    .main:not(.chat-mode) .workspace { overflow-y: auto; overflow-x: hidden; align-items: start; align-content: start; }
     h1 {
       margin: 0 0 66px;
       text-align: center;
@@ -330,6 +331,19 @@
     .quick-reply.quick-reply-chip .quick-reply-title { font-size: 12px; font-weight: 500; }
     .quick-reply.menu-more { grid-column: 1 / -1; justify-self: start; }
     .turn-notice { margin: 0 0 8px; color: #555; font: 400 14px/1.5 system-ui, sans-serif; }
+    .search-axes { margin-top: 18px; padding: 16px; border: 1px solid #e4e4e4; border-radius: 18px; text-align: left; }
+    .search-axes .meal-chip, .result-conditions .meal-chip { font: 400 14px/1.5 system-ui, sans-serif; }
+    .search-axes .primary-action { width: 100%; min-height: 48px; border-radius: 12px; font: 600 16px system-ui, sans-serif; }
+    .search-axes .primary-action:disabled { background: #ddd; color: #666; cursor: default; }
+    .axis-group h3 { margin: 0 0 8px; font: 600 14px/1.5 system-ui, sans-serif; }
+    .axis-group + .axis-group { margin-top: 16px; }
+    .axis-details { margin-top: 8px; }
+    .axis-group input { width: 100%; box-sizing: border-box; margin-top: 8px; padding: 12px; font: 400 14px/1.5 system-ui, sans-serif; border: 1px solid #ccc; border-radius: 10px; }
+    .axis-actions { display: grid; gap: 8px; margin-top: 8px; }
+    .axis-continue { min-height: 44px; padding: 8px; border: 1px solid #ddd; border-radius: 10px; background: #fff; font: 400 14px/1.5 system-ui, sans-serif; cursor: pointer; }
+    .axis-continue[hidden] { display: none; }
+    .restaurant-condition-chips { margin-top: 8px; }
+    .result-conditions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
     .quick-replies.quick-replies-actions { display: flex; flex-wrap: wrap; gap: 8px; }
     .quick-reply.quick-reply-action { width: auto; min-height: 42px; padding: 9px 14px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; box-shadow: none; }
     .quick-reply.quick-reply-action .quick-reply-title { font-size: 13px; font-weight: 650; white-space: nowrap; }
@@ -754,6 +768,7 @@
               <button class="send" id="welcomeSend" type="submit" aria-label="질문 보내기" disabled><svg viewBox="0 0 24 24" fill="none"><path d="M12 19V5m0 0-6 6m6-6 6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             </div>
           </form>
+          <section id="homeSearchAxes" class="search-axes" aria-label="음식 종류와 지역으로 찾기"></section>
           <div class="suggestions" id="suggestions" aria-label="추천 질문"></div>
         </div>
 
@@ -1073,6 +1088,8 @@
         restaurantName: String(restaurant.restaurantName || name).trim(),
         validationVersion: Number(restaurant.validationVersion || 0),
         category: categoryValue,
+        foodLabel: String(restaurant.foodLabel || categoryValue).trim(),
+        regionLabel: String(restaurant.regionLabel || '').trim(),
         address,
         roadAddress: String(restaurant.roadAddress || '').trim(),
         phone: String(restaurant.phone || restaurant.telephone || '').trim(),
@@ -1531,10 +1548,12 @@
         const content = document.createElement('div'); content.className = 'restaurant-card-content';
         const body = document.createElement('div'); body.className = 'restaurant-card-body';
         const head = document.createElement('div'); head.className = 'restaurant-card-head';
-        const title = document.createElement('h3'); title.textContent = restaurant.name; head.appendChild(title);
+        const title = document.createElement('h3'); title.textContent = restaurant.name; body.appendChild(title);
+        head.classList.add('restaurant-condition-chips');
         if (restaurant.category) {
-          const category = document.createElement('span'); category.className = 'restaurant-category'; category.textContent = restaurant.category; head.appendChild(category);
+          const category = document.createElement('span'); category.className = 'restaurant-category'; category.textContent = restaurant.foodLabel || restaurant.category; head.appendChild(category);
         }
+        if (restaurant.regionLabel) { const area = document.createElement('span'); area.className = 'restaurant-category restaurant-region'; area.textContent = restaurant.regionLabel; head.appendChild(area); }
         body.appendChild(head);
         if (restaurant.recommendationReason) {
           const reason = document.createElement('p'); reason.className = 'restaurant-reason'; reason.textContent = restaurant.recommendationReason; body.appendChild(reason);
@@ -1592,6 +1611,15 @@
         avatar.alt = 'Inchelin Guide AI';
         const bubble = document.createElement('div');
         bubble.className = 'ai-bubble';
+        if (message.meta?.searchConditions) {
+          const conditions = document.createElement('div'); conditions.className = 'result-conditions'; conditions.setAttribute('aria-label', '현재 검색 조건');
+          for (const [axis, label] of [['region', message.meta.searchConditions.region], ['food', message.meta.searchConditions.food]]) {
+            if (!label) continue;
+            const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'meal-chip'; chip.textContent = label; chip.setAttribute('aria-label', (axis === 'region' ? '지역 바꾸기: ' : '음식 바꾸기: ') + label);
+            chip.addEventListener('click', () => openSearchPicker(axis)); conditions.appendChild(chip);
+          }
+          bubble.appendChild(conditions);
+        }
         bubble.appendChild(copy);
         if (message.meta?.notice) {
           const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; bubble.appendChild(notice);
@@ -1662,7 +1690,7 @@
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup'; actions.setAttribute('aria-label', '이어서 할 일');
           message.meta.turnPolicy.actionChips.forEach(label => {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label;
-            button.addEventListener('click', () => routeQuestion(label)); actions.appendChild(button);
+            button.addEventListener('click', () => { const choice = message.meta?.turnPolicy?.expansionChoices?.find(item => item.label === label); routeQuestion(choice?.message || label); }); actions.appendChild(button);
           });
           bubble.appendChild(actions);
         }
@@ -2033,6 +2061,7 @@
       }
     }
     function routeQuestion(question) {
+      if (['지역 바꾸기', '음식 바꾸기', '메뉴 바꾸기', '조건 바꾸기'].includes(question)) { openSearchPicker(question === '지역 바꾸기' ? 'region' : question === '조건 바꾸기' ? null : 'food'); return; }
       if (question === '비교하기') {
         const cards = [...comparisonTray.values()].slice(0, 3);
         if (cards.length >= 2) ask(cards.map(card => card.name).join('랑 ') + ' 비교해줘', { compareCards: cards });
@@ -2471,10 +2500,19 @@
     renderAuthNavigation();
     renderHistory();
     renderPlugins();
-    import('/assets/plugin-actions-v1.js?v=113').then(({ mountPluginActions }) => {
+    let searchPicker = null;
+    function openSearchPicker(axis) { if (searchPicker) searchPicker.open(axis); else showToast('선택기를 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); }
+    import('/assets/search-picker-v1.js?v=117').then(({ mountSearchPicker }) => {
+      searchPicker = mountSearchPicker({ home: $('#homeSearchAxes'), getSlots: () => pluginState().slots,
+        send: message => { currentLocationCoords = null; ask(message); }, locate: message => requestCurrentLocation(message),
+        isBusy: () => generating || locationRequestInFlight,
+        onOpen: () => { closeOverlay('pluginOverlay'); taskMenu.classList.remove('open'); } });
+    }).catch(() => showToast('음식·지역 선택기를 불러오지 못했어요. 새로고침해 주세요.'));
+    import('/assets/plugin-actions-v1.js?v=117').then(({ mountPluginActions }) => {
       let storage;
       try { storage = window.localStorage; } catch (_) { /* 브라우저 저장소가 막혀도 도구를 이용해요. */ }
       pluginActions = mountPluginActions({
+        openSearch: openSearchPicker,
         getMessages: () => chatMessages, getSlots: () => pluginState().slots,
         send: (message, options) => ask(message, options), reply: pluginReply,
         setRegion: selectPluginRegion, setSituations: selectPluginSituations,
@@ -2487,8 +2525,8 @@
         }
       });
     }).catch(() => showToast('플러그인을 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/meal-tools-v2.js?v=113').then(({ mountMealTools }) => {
-      mountMealTools({ getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), onOpen: () => { closeOverlay('pluginOverlay'); return chatView.classList.contains('active') ? $('#chatForm .task-trigger') : $('#welcomeForm .task-trigger'); }, source: 'naver' });
+    import('/assets/meal-tools-v2.js?v=117').then(({ mountMealTools }) => {
+      mountMealTools({ openSearch: openSearchPicker, getMessages: () => chatMessages, isBusy: () => generating, onSend: (message, options) => ask(message, options), onOpen: () => { closeOverlay('pluginOverlay'); return chatView.classList.contains('active') ? $('#chatForm .task-trigger') : $('#welcomeForm .task-trigger'); }, source: 'naver' });
     }).catch(() => {
       document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });
     });

@@ -35,6 +35,8 @@ await mkdir(join(hostingOutputRoot, "server"), { recursive: true });
 await mkdir(join(hostingOutputRoot, ".openai"), { recursive: true });
 
 const html = await readFile(join(root, "dist", "index.html"), "utf8");
+const searchAxes = await readFile(join(root, "worker", "search-axes.js"), "utf8");
+await writeFile(join(root, "dist", "assets", "search-axes-data-v1.js"), searchAxes);
 const assetsRoot = join(root, "dist", "assets");
 const assets = {};
 for (const path of await walk(assetsRoot)) {
@@ -63,12 +65,14 @@ await Promise.all([
   writeFile(join(outputRoot, "dist", "server", "turn-policy.js"), turnPolicy),
   writeFile(join(outputRoot, "dist", "server", "conversation-copy.js"), conversationCopy),
   writeFile(join(outputRoot, "dist", "server", "korean.js"), korean),
+  writeFile(join(outputRoot, "dist", "server", "search-axes.js"), searchAxes),
   writeFile(join(outputRoot, ".openai", "hosting.json"), hostingManifest),
   writeFile(join(hostingOutputRoot, "server", "index.js"), worker),
   writeFile(join(hostingOutputRoot, "server", "response-modes.js"), responseModes),
   writeFile(join(hostingOutputRoot, "server", "turn-policy.js"), turnPolicy),
   writeFile(join(hostingOutputRoot, "server", "conversation-copy.js"), conversationCopy),
   writeFile(join(hostingOutputRoot, "server", "korean.js"), korean),
+  writeFile(join(hostingOutputRoot, "server", "search-axes.js"), searchAxes),
   writeFile(join(hostingOutputRoot, ".openai", "hosting.json"), hostingManifest),
 ]);
 console.log(`Built Worker with ${Object.keys(assets).length} embedded assets.`);

@@ -14,6 +14,7 @@ import {
 import { withParticle } from "./korean.js";
 import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
 import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons } from "./conversation-copy.js";
+import { placeMatchesRegion, cardArea } from "./search-axes.js";
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -265,7 +266,7 @@ function locationMatches(text) {
 function validRegionCandidate(value) {
   const region = String(value || "").trim();
   return Boolean(region) && !LOCATION_FALSE_POSITIVE_PATTERN.test(region)
-    && !/^(?:쪽|지역|이곳|저곳|여기|주변|근처|곳|데|중|그중)$/.test(region)
+    && !/^(?:쪽|지역|이곳|저곳|여기|주변|근처|곳|데|중|그중|출구|입구|\d+번)$/.test(region)
     && !/찾아|추천|알려|먹을|먹고|먹지|갈\s*만|처음|다시|초기화|어디|메뉴|식당|맛집|가게|그곳|거기|조건|정보|목록|결과|카드|대화|서비스|현재\s*위치/.test(region)
     && region.match(FOOD_SEARCH_PATTERN)?.[0] !== region;
 }
@@ -719,8 +720,8 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   const delta = {
     region: region || null,
     use_current_location: useCurrentLocation,
-    food_type: /^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면)$/.test(slotFood) ? slotFood : null,
-    menu: slotFood && !/^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면)$/.test(slotFood) ? slotFood : null,
+    food_type: /^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면|술집|국밥·찌개)$/.test(slotFood) ? slotFood : null,
+    menu: slotFood && !/^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면|술집|국밥·찌개)$/.test(slotFood) ? slotFood : null,
     companion: [...new Set([...latest.matchAll(/가족\s*모임|접대[·\s]*비즈니스|\d+\s*[~〜-]?\s*\d*\s*명|혼밥|혼자|연인|데이트|가족|부모님|친구|동료|회사\s*사람|팀|회식|모임/g)].map(match => match[0] === "혼자" ? "혼밥" : match[0]))].join(" · ") || null,
     meal_time: latest.match(/아침|점심|저녁|야식/)?.[0] || null,
     parking: /주차\s*(?:가|는|되는|가능|필요)/.test(latest) ? true : null,
@@ -1458,7 +1459,7 @@ function stripSearchMarkup(value) {
     .trim();
 }
 
-const FOOD_SEARCH_PATTERN = /마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회(?!식)|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고깃집|고기|국물|제육볶음|불고기덮밥|불고기|비빔밥|덮밥|가츠동|볶음밥|짬뽕|탕수육|메밀국수|칼국수|비빔국수|카레|전골|만두|죽|스테이크|(?<![가-힣])면(?![가-힣])/;
+const FOOD_SEARCH_PATTERN = /국밥·찌개|술집|마라탕|마라샹궈|국밥|냉면|찌개|돈까스|돈가스|파스타|피자|초밥|스시|라멘|우동|쌀국수|삼겹살|갈비|치킨|샐러드|포케|샌드위치|떡볶이|곱창|닭발|해산물|횟집|회(?!식)|햄버거|버거|베이커리|빵|디저트|카페|한식|중식|일식|양식|분식|고깃집|고기|국물|제육볶음|불고기덮밥|불고기|비빔밥|덮밥|가츠동|볶음밥|짬뽕|탕수육|메밀국수|칼국수|비빔국수|카레|전골|만두|죽|스테이크|(?<![가-힣])면(?![가-힣])/;
 
 function mostSpecificSearchLocation(value) {
   const parts = safeText(value, 240).split(/\s+/).filter(Boolean);
@@ -1674,12 +1675,13 @@ function sanitizeNaverPlace(item) {
 
 const NON_RESTAURANT_CATEGORY_PATTERN = /애견|반려동물|동물카페|당구|스포츠|오락|게임|노래방|미용|헤어|네일|병원|의원|약국|학원|교육|편의점|마트|부동산|숙박|호텔|모텔|세탁|자동차|주유소|사진관|공방|종교|금융|은행|보험/;
 const CAFE_CATEGORY_PATTERN = /카페|커피|디저트|베이커리|제과|제빵|케이크|빙수|차\s*전문/;
-const RESTAURANT_CATEGORY_PATTERN = /음식점|한식|중식|중국|일식|일본|양식|분식|육류|고기|구이|국밥|찌개|전골|탕|국수|냉면|면요리|샐러드|포케|샌드위치|도시락|죽|치킨|피자|햄버거|버거|초밥|스시|생선회|횟집|해산물|아시아음식|베트남|태국|인도|멕시코|족발|보쌈|곱창|닭발|백반|뷔페|패밀리레스토랑/;
+const RESTAURANT_CATEGORY_PATTERN = /술집|주점|포차|호프|음식점|한식|중식|중국|일식|일본|양식|분식|육류|고기|구이|국밥|찌개|전골|탕|국수|냉면|면요리|샐러드|포케|샌드위치|도시락|죽|치킨|피자|햄버거|버거|초밥|스시|생선회|횟집|해산물|아시아음식|베트남|태국|인도|멕시코|족발|보쌈|곱창|닭발|백반|뷔페|패밀리레스토랑/;
 
 function simplifiedRestaurantCategory(value) {
   const category = stripSearchMarkup(value).replace(/\s+/g, " ").trim();
   if (!category) return "";
   const mappings = [
+    [/술집|주점|포차|호프/, "술집"],
     [/국밥/, "국밥"], [/냉면/, "냉면"], [/찌개|전골|탕/, "찌개·전골"],
     [/육류|고기|구이|갈비|삼겹살/, "고깃집"], [/중식|중국/, "중식"],
     [/일식|일본/, "일식"], [/한식/, "한식"], [/양식|이탈리아/, "양식"],
@@ -1712,6 +1714,9 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
     || [...userMessagesOnly(messages)].reverse().map(text => text.match(FOOD_SEARCH_PATTERN)?.[0]).find(Boolean) || "";
   const menus = factValue(place, "representative_menu") || place.registered_data?.representativeMenus || place.registered_data?.representative_menu || [];
   const searchable = `${place.name} ${place.registered_data?.rawCategory || place.registered_data?.category || ""} ${Array.isArray(menus) ? menus.join(" ") : menus}`;
+  if (requested === '국밥·찌개') return /국밥|찌개|전골|탕/.test(searchable);
+  if (requested === '술집') return /술집|주점|포차|호프/.test(searchable);
+  if (requested === '카페') return CAFE_CATEGORY_PATTERN.test(searchable);
   const cuisineRules = [
     [/^면$/, /국수|냉면|라멘|우동|면|파스타/],
     [/한식/, /한식|국밥|찌개|전골|탕|백반|갈비|삼겹살|족발|보쌈/],
@@ -1733,8 +1738,9 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
   return (aliases[explicitMenu] || new RegExp(explicitMenu)).test(searchable);
 }
 
-function validateRestaurantCandidate(place, { messages, intentAnalysis, source }) {
+function validateRestaurantCandidate(place, { messages, intentAnalysis, source, locationName = '' }) {
   if (!validRestaurantIdentity(place)) return false;
+  if (intentAnalysis?.foodCategory && !placeMatchesRegion(place, locationName)) return false;
   const rawCategory = safeText(place.registered_data?.rawCategory || place.registered_data?.category, 200);
   if (NON_RESTAURANT_CATEGORY_PATTERN.test(rawCategory)) return false;
   if (source === "inchelin") return requestedCategoryMatches(place, messages, intentAnalysis);
@@ -1782,7 +1788,7 @@ class NaverRestaurantProvider {
         const places = (Array.isArray(data?.items) ? data.items : [])
           .map(sanitizeNaverPlace)
           .filter(Boolean)
-          .filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: this.source }))
+          .filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: this.source, locationName }))
           .slice(0, 5);
         providerDebugLog(this.env, "search_completed", {
           provider: this.source,
@@ -2089,6 +2095,8 @@ function restaurantCard(place, source, userText = "", locationName = "") {
     name: restaurantName,
     restaurantName,
     category: simplifiedRestaurantCategory(registered.rawCategory || registered.category) || null,
+    regionLabel: cardArea({ ...place, address, roadAddress: registered.roadAddress }, locationName),
+    privateRoom: factValue(place, 'private_room') === true ? true : null,
     address,
     roadAddress: safeText(registered.roadAddress || registered.road_address, 300) || null,
     phone: safeText(firstPresent(factValue(place, "phone"), registered.phone), 80),
@@ -2359,7 +2367,7 @@ async function handleChat(request, env) {
     } else {
       const excludedIds = new Set(decision.excludePlaceIds.map(String));
       if (excludedIds.size) lookup.places = lookup.places.filter(place => !excludedIds.has(String(place.id)));
-      lookup.places = lookup.places.filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: dataSource }));
+      lookup.places = lookup.places.filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: dataSource, locationName: signals.locationName }));
     }
 
     if (lookup.configured && !lookup.places.length) {
@@ -2418,7 +2426,7 @@ async function handleChat(request, env) {
   const webSearchEnabled = Boolean(linkedPlaceResearch && !linkedWebResearch);
   const reasonChoices = groundedPlaces.map(place => {
     const card = restaurantCard(place, dataSource, latestUserMessage, signals.locationName);
-    return { id: card.id, options: cardReasonOptions(card, responseState.slots.companion).map(option => option.text) };
+    return { id: card.id, options: cardReasonOptions(card, responseState.slots).map(option => option.text) };
   });
   const modeInstruction = decision.mode === "C"
     ? `응답 모드 C다. ${withParticle(signals.locationName ? `${signals.locationName} 지역` : "확인된 위치", "과/와")} 메뉴 요청을 turn_text.summary 한 문장으로 요약하고, 검증 후보 중 최대 3개 id만 selectedRestaurantIds로 골라라. turn_text.reason은 지역·메뉴 일치 근거 한 문장이다. 질문은 next_question 하나만 제안하고 분위기·예산은 질문하지 마라. 코드가 질문 이력과 횟수를 검증한다.`
@@ -2436,7 +2444,7 @@ async function handleChat(request, env) {
     },
     body: JSON.stringify({
       model: env.OPENAI_MODEL || "gpt-5-mini",
-      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${modeInstruction}\n\n요지·근거·질문 총 3문장 이내이며 직전 3턴과 같은 시작은 피한다. 서비스·비교·특정식당·바로 보여줘 요청은 질문하지 않는다.\n<turn_state>${JSON.stringify({ stage: responseState.stage, askedSlots: responseState.askedSlots, questionCount: responseState.questionCount, preferences: responseState.preferences })}</turn_state>\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${linkedWebResearch ? `\n\n<linked_web_research>\n${linkedWebResearch}\n</linked_web_research>\n위 웹 조사 결과를 우선 근거로 사용해 사용자의 질문에 지금 바로 답해. 조사 결과에 메뉴명이 있으면 추가 검색 여부를 되묻지 말고 카드로 제시해. 결과에 포함된 출처 링크는 답변에 1~3개 유지해.` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}` + '\n' + STYLE_RULES + '\ncard_reasons는 다음 fact_reason_options에서 해당 id에 허용된 문장을 그대로 고르거나 빈 문자열로 둔다. 옵션은 주소·상호·연결된 거리에서만 만든 것이다. 음식 종류 반복, 접근성·편리함·분위기·맛·웨이팅·주차 추측은 금지한다. 같은 응답에서 시작 구조·어미를 달리 고르며, 차별화할 근거가 없으면 이유를 만들지 않는다. 첫 안내 문장은 최근 사용자의 지역·메뉴·상황을 받아 새롭게 쓴다.\n<fact_reason_options>' + JSON.stringify(reasonChoices) + '</fact_reason_options>' + (retry ? '\n금지어·격식체가 감지되어 한 번 다시 작성한다. 해요체로만 말한다.' : ''),
+      instructions: `${SYSTEM_PROMPT}\n\n${PROVIDER_PROMPTS[dataSource]}\n\n${modeInstruction}\n\n요지·근거·질문 총 3문장 이내이며 직전 3턴과 같은 시작은 피한다. 서비스·비교·특정식당·바로 보여줘 요청은 질문하지 않는다.\n<turn_state>${JSON.stringify({ stage: responseState.stage, askedSlots: responseState.askedSlots, questionCount: responseState.questionCount, preferences: responseState.preferences })}</turn_state>\n${timeContext}\n\n<conversation_analysis>${JSON.stringify(intentAnalysis)}</conversation_analysis>${linkedPlaceResearch ? `\n\n${linkedPlaceContext(linkedPlaceResearch)}` : ""}${linkedWebResearch ? `\n\n<linked_web_research>\n${linkedWebResearch}\n</linked_web_research>\n위 웹 조사 결과를 우선 근거로 사용해 사용자의 질문에 지금 바로 답해. 조사 결과에 메뉴명이 있으면 추가 검색 여부를 되묻지 말고 카드로 제시해. 결과에 포함된 출처 링크는 답변에 1~3개 유지해.` : ""}${recentRestaurants.length ? `\n\n${recentRestaurantContext(recentRestaurants)}` : ""}${groundedPlaces.length ? `\n\n${groundingContext(groundedPlaces, dataSource)}` : ""}` + '\n' + STYLE_RULES + '\ncard_reasons는 다음 fact_reason_options에서 해당 id에 허용된 문장을 그대로 고르거나 빈 문자열로 둔다. 옵션은 사용자 조건과 실제 확인된 시설 안내의 연결에서만 만든 것이다. 주소·도로명·층수 반복은 이유로 쓰지 않는다. 음식 종류 반복, 접근성·편리함·분위기·맛·웨이팅·주차 추측은 금지한다. 같은 응답에서 시작 구조·어미를 달리 고르며, 차별화할 근거가 없으면 이유를 만들지 않는다. 첫 안내 문장은 최근 사용자의 지역·메뉴·상황을 받아 새롭게 쓴다.\n<fact_reason_options>' + JSON.stringify(reasonChoices) + '</fact_reason_options>' + (retry ? '\n금지어·격식체가 감지되어 한 번 다시 작성한다. 해요체로만 말한다.' : ''),
       input: messages,
       ...(webSearchEnabled ? {
         tools: [{
@@ -2519,7 +2527,7 @@ async function handleChat(request, env) {
       return a - b;
     });
   }
-  const restaurants = applyCardReasons(orderedPlaces.slice(0, selectionLimit).map(place => restaurantCard(place, dataSource, latestUserMessage, signals.locationName)), result.card_reasons, responseState.slots.companion);
+  const restaurants = applyCardReasons(orderedPlaces.slice(0, selectionLimit).map(place => ({ ...restaurantCard(place, dataSource, latestUserMessage, signals.locationName), foodLabel: responseState.slots.menu || responseState.slots.food_type || '' })), result.card_reasons, responseState.slots);
   if (restaurants.length && ["C", "D"].includes(decision.mode)) {
     message = restaurantResultsMessage(responseState, restaurants.length, Boolean(currentLocation));
   }

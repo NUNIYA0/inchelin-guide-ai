@@ -78,7 +78,7 @@ export function wheelLabel(value, count) {
   return letters.length > limit ? `${letters.slice(0, limit - 1).join('')}…` : letters.join('');
 }
 
-export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => null, source = 'naver' }) {
+export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => null, source = 'naver', openSearch = () => {} }) {
   const el = (tag, text = '', className = '') => {
     const node = document.createElement(tag); node.textContent = text; node.className = className; return node;
   };
@@ -96,23 +96,6 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     if (isBusy()) { result.textContent = '현재 답변이 끝나면 다시 눌러 주세요.'; return; }
     dialog.close(); onSend(message, { freshMenu });
   };
-  function renderCategories() {
-    content.replaceChildren();
-    content.append(el('p', '현재 네이버 검색에서 사용하는 음식 분류예요. 지역에 따라 검색 결과가 없을 수 있어요.', 'meal-muted'));
-    const chips = el('div', '', 'meal-chips');
-    if (source !== 'naver') { content.append(el('p', '현재 데이터 소스의 검색 가능한 분류가 확인되면 표시할게요.')); return; }
-    const details = el('div', '', 'meal-chips');
-    details.setAttribute('aria-label', '세부 메뉴');
-    CATEGORY_MENUS.forEach(category => {
-      const chip = button(category.name, () => {
-        chips.querySelectorAll('button').forEach(node => node.setAttribute('aria-pressed', String(node === chip)));
-        details.replaceChildren(...category.menus.map(menu => button(menu, () => { const request = categoryRequest(menu); send(request.message, request.freshMenu); })));
-      });
-      chip.setAttribute('aria-pressed', 'false'); chips.append(chip);
-    });
-    content.append(chips, el('h3', '세부 메뉴'), details);
-    chips.firstElementChild?.click();
-  }
   function invalidate() {
     selected = null; result.replaceChildren(); stage.replaceChildren();
     if (run) { run.disabled = busy || candidates.length < 2 || candidates.some(value => !value.trim()); sheetUI.setActions(run); }
@@ -208,6 +191,7 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     }, 1000);
   }
   function open(tool, trigger) {
+    if (tool === 'category') { if (!isBusy()) openSearch('food'); return; }
     if (isBusy()) return;
     cancel(); kind = tool; opener = onOpen(trigger) || document.querySelector('.task-trigger[aria-expanded="true"]') || trigger; selected = null;
     candidates = autoCandidates(getMessages());
@@ -216,8 +200,7 @@ export function mountMealTools({ getMessages, isBusy, onSend, onOpen = () => nul
     sheetUI.open({ category: '카테고리로 찾기', wheel: '오늘의 메뉴 돌림판', ladder: '함께 고르는 사다리게임' }[kind]);
     content = el('div', '', 'meal-tools-content'); result = el('div', '', 'meal-tools-result'); result.setAttribute('aria-live', 'polite');
     sheetUI.body.append(content, result);
-    if (kind === 'category') renderCategories();
-    else {
+    {
       content.append(el('p', kind === 'wheel' ? '최근 메뉴 후보나 식당 이름을 담았어요. 후보를 2~8개로 바꿀 수 있어요.' : '인원을 정하고 각 칸에 메뉴를 입력하세요. 결과에서 한 사람의 메뉴를 대화로 이어갈 수 있어요.', 'meal-muted'));
       if (kind === 'ladder') {
         const label = el('label', '참여 인원 '); const select = el('select');

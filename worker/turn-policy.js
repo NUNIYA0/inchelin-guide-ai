@@ -1,6 +1,7 @@
 import { normalizeResponseState } from './response-modes.js';
 import { withParticle } from './korean.js';
 import { FORBIDDEN_COPY } from './conversation-copy.js';
+import { nearbySuggestions } from './search-axes.js';
 
 export const IMMEDIATE_REQUEST = /바로\s*보여줘|그냥\s*추천해줘|질문\s*(?:없이|하지\s*마)/;
 const unique = values => [...new Set(values)];
@@ -155,12 +156,17 @@ export function applyTurnPolicy(response, payload = {}) {
   let suggestions = question ? question.chips.map(value => response.meta.mode === 'A' ? (response.suggestions || []).find(old => old.split('|')[0] === value.label) || value.label : value.label) : count ? [] : response.suggestions || [];
   if (IMMEDIATE_REQUEST.test(latest)) suggestions = [];
   // No-results and error explanations remain specific and must not claim a search succeeded.
-  const intro = [summary + '.', reason && reason + '.'].filter(Boolean).join(' ');
+  const sparse = count > 0 && count < 3;
+  const expand = sparse || response.meta.restaurantSearchStatus === 'no_results';
+  const countedSummary = sparse && !summary.includes(count + '곳') ? `${summary}, 지금은 ${count}곳을 찾았어요` : summary;
+  const intro = [countedSummary + '.', reason && reason + '.'].filter(Boolean).join(' ');
   const message = !count && !['A', 'B'].includes(response.meta.mode) ? response.message : [intro, question?.text].filter(Boolean).join(' ');
   return { ...response, message, suggestions, restaurants: (response.restaurants || []).slice(0, 3),
     meta: { ...cleanMeta, analysis, responseModeState: state, notice,
+      ...((count || response.meta.restaurantSearchStatus === 'no_results') && (state.slots.region || state.slots.use_current_location) && (state.slots.menu || state.slots.food_type) ? { searchConditions: { region: state.slots.use_current_location ? '현재 위치' : state.slots.region, food: state.slots.menu || state.slots.food_type } } : {}),
       turnPolicy: { ...analysis, cardFirst: false, intro: !count && !['A', 'B'].includes(response.meta.mode) ? response.message : intro, questionText: question?.text || '',
-        actionChips: count && !IMMEDIATE_REQUEST.test(latest) ? ['다른 곳도 보여줘', '조건 바꾸기', '비교하기'] : [],
+        actionChips: (count || expand) && !IMMEDIATE_REQUEST.test(latest) ? [...(expand ? nearbySuggestions(state.slots.region, state.slots.menu || state.slots.food_type).map(item => item.label) : ['다른 곳도 보여줘']), '조건 바꾸기', ...(count > 1 ? ['비교하기'] : [])] : [],
+        expansionChoices: expand ? nearbySuggestions(state.slots.region, state.slots.menu || state.slots.food_type) : [],
         questionSource: question && proposed?.text === question.text ? 'model' : question ? 'template' : null } } };
 }
 
