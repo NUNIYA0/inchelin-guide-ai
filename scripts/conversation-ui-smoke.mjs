@@ -303,13 +303,34 @@ export async function testConversationUI(runCase) {
   assert.doesNotMatch(html,/[⧉↻＋↓→›×✕✓★☆◉☷▧▦✣]/,'no Unicode icon glyphs in the interface');
   for(const match of html.matchAll(/<button\b([^>]*?)>([\s\S]*?)<\/button>/g))if(match[2].includes('<svg'))assert.match(match[1],/aria-label=/,'static SVG button aria-label');
   assert.match(html,/\.ui-icon \{[^}]*stroke-width:1.75;[^}]*stroke-linecap:round;[^}]*stroke-linejoin:round/);
-  assert.match(html,/\.restaurant-card \{ position:relative;[^}]*height:110px; max-height:110px; padding:14px/);
-  assert.match(html,/\.restaurant-address \{[^}]*white-space:nowrap; overflow:hidden; text-overflow:ellipsis/);
+  const responsiveCards = html.slice(html.indexOf('/* v129:'));
+  assert.match(responsiveCards,/\.restaurant-card \{[^}]*height:auto; max-height:none; min-height:206px/);
+  assert.match(responsiveCards,/\.restaurant-title-link h3 \{[^}]*-webkit-line-clamp:2;[^}]*white-space:normal;[^}]*overflow:hidden/);
+  assert.match(responsiveCards,/\.restaurant-address \{[^}]*-webkit-line-clamp:2;[^}]*padding-right:0;[^}]*overflow:hidden/);
+  assert.match(responsiveCards,/\.restaurant-title-link::after \{[^}]*inset:0; z-index:1/,'whole card opens its existing detail link without nesting a button');
+  assert.match(responsiveCards,/\.restaurant-compare.restaurant-map-link \{ position:relative; z-index:2/,'compare remains separately clickable above stretched link');
   assert.match(html,/\.message\.ai > \.ai-avatar \{[^}]*width:24px; height:24px/);
   assert.match(html,/\.composer-jump-row \{ display:none; height:52px; padding-bottom:12px; justify-content:flex-end/);
   assert.match(html,/\.conversation-bottom \{ position:static; z-index:1; width:40px; height:40px/);
   assert.ok(html.indexOf('id="comparisonTray"')<html.indexOf('id="conversationBottom"'));assert.ok(html.indexOf('id="conversationBottom"')<html.indexOf('id="chatForm"'));
-  for(const width of [360,390]){const content=width-32-34,cardInterior=content-28;assert.ok(cardInterior-106>80);assert.ok(22+4+18+4+28+28<=110,'content line budget fits 110px CSS card');}
-  console.log('v127 compact UI: header details/compare toggle, 24px identity, full block order, copy check 1500ms, condition dedupe, 24 SVG symbols/aria/no glyphs, reserved jump row, 360/390 DOM/CSS passed (pixels not checked).');
+  assert.match(responsiveCards,/grid-template-columns:minmax\(0,1fr\); grid-auto-rows:1fr; align-items:stretch; gap:12px/);
+  assert.match(responsiveCards,/@media \(min-width:768px\) \{\s*\.restaurant-list, \.quick-replies.menu-cards \{ grid-template-columns:repeat\(3, minmax\(0,1fr\)\); gap:12px; align-items:stretch/);
+  assert.doesNotMatch(responsiveCards,/repeat\(auto-fit|repeat\(auto-fill/,'1–2 results retain the three-track card width');
+  for(const width of [1024,768,767,390,360]){
+    const desktop=width>=768,columns=desktop?3:1;
+    const available=Math.min(720,width-32)-34;
+    const track=(available-12*(columns-1))/columns;
+    assert.ok(track>0 && track*columns+12*(columns-1)<=available+.01);
+    for(const count of [1,2,3]){
+      const rendered=renderer.renderRestaurantCards(first.body.restaurants.slice(0,count));
+      assert.equal(ofClass(rendered,'restaurant-card').length,count);
+      const trackWithMissingResults=(available-12*(columns-1))/columns;
+      assert.equal(trackWithMissingResults,track,'missing cards do not expand surviving tracks');
+    }
+    assert.ok(track-30>140,'name/address have usable width after padding and border');
+    assert.match(responsiveCards,/\.restaurant-detail-area \{[^}]*margin-top:auto/,'bottom action aligns across stretched cards');
+  }
+  assert.match(responsiveCards,/\.quick-replies.menu-cards \.menu-choice \{ min-width:0; width:100%; height:100%; box-sizing:border-box/);
+  console.log('v129 responsive card DOM/CSS: 1024/768 three columns; 767/390/360 one column; fixed tracks for 1–2 cards, stretch/equal-row height, two-line clipping, separate compare hit area passed (browser pixels not checked).');
   console.log('Conversation copy/card/menu mocked regressions passed.');
 }
