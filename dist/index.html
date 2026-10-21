@@ -824,6 +824,24 @@
     .history-check { display:inline-flex; align-items:center; }
     .history-check .ui-icon { width:16px; height:16px; }
     .meal-chip[aria-pressed="true"]::before { content:none; }
+    .answer-results { display:grid; gap:12px; min-width:0; }
+    .answer-results .restaurant-group { margin:0; }
+    .answer-question { display:grid; gap:12px; margin-top:24px; padding:16px; background:#fafafa; border-radius:16px; min-width:0; }
+    .answer-question .turn-question { margin:0; font-size:16px; font-weight:700; line-height:1.6; }
+    .answer-question .answer-chips { margin-top:0; gap:8px; }
+    .answer-question .quick-reply-chip { min-height:40px; border:1px solid #111; border-radius:999px; background:#fff; color:#111; }
+    .answer-question .skip-chip { border-color:#ddd; color:#666; background:transparent; margin-left:auto; }
+    .answer-question .answer-tiles .quick-reply { min-height:52px; border-radius:12px; }
+    .answer-question .answer-full-row .quick-reply { min-height:48px; border-radius:12px; }
+    .answer-question .location-primary { background:#111; color:#fff; }
+    .answer-question .quick-reply:active { background:#eee; transform:scale(.97); }
+    .answer-followup { margin-top:24px; border-top:1px solid #e7e7e7; padding-top:24px; gap:12px; }
+    .answer-followup .related-label { color:#777; font-size:13px; margin:0; }
+    .answer-followup.awaiting-answer .related-question { background:#f7f7f7; color:#666; border-color:transparent; }
+    .answer-followup.awaiting-answer .related-arrow { border-color:#ddd; color:#777; }
+    .answer-followup .related-question { border-radius:14px; background:#f3f3f3; }
+    .ai-bubble > .action-chips { margin-top:24px; }
+    @media (prefers-reduced-motion: reduce) { .answer-question .quick-reply:active { transform:none; } }
   </style>
 </head>
 <body>
@@ -1859,6 +1877,9 @@
         item.appendChild(avatar);
         const bubble = document.createElement('div');
         bubble.className = 'ai-bubble';
+        const resultSection=document.createElement('section');resultSection.className='answer-results';resultSection.setAttribute('aria-label','답변 결과');
+        const questionSection=document.createElement('section');questionSection.className='answer-question';questionSection.setAttribute('aria-label','답변 선택');
+        const hasQuestion=allowed('question')&&Boolean(message.meta?.turnPolicy?.questionText);
         const conditionKey=message.meta?.searchConditions?JSON.stringify(message.meta.searchConditions):'';
         const priorAI=[...messagesEl.children].filter(node=>node.chatRole==='assistant');
         const previousAI=extra.includes('regenerated')?priorAI.at(-2):priorAI.at(-1);
@@ -1871,14 +1892,14 @@
             chip.appendChild(uiIcon(axis==='region'?'pin':'utensils'));
             chip.addEventListener('click', () => { if (!chip.disabled) openSearchPicker(axis); }); conditions.appendChild(chip);
           }
-          bubble.appendChild(conditions);
+          resultSection.appendChild(conditions);
         }
-        if (allowed('text')) bubble.appendChild(copy);
+        if (allowed('text')) resultSection.appendChild(copy);
         const isMenuTurn = allowed('menu_cards') && message.meta?.menuCards?.length;
         if (!isMenuTurn && allowed('notice') && message.meta?.notice) {
-          const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; bubble.appendChild(notice);
+          const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; resultSection.appendChild(notice);
         }
-        if (allowed('place_cards') && message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants.slice(0,message.meta?.answer_limits?.place_cards || 3),allowed('source')));
+        if (allowed('place_cards') && message.restaurants?.length) resultSection.appendChild(renderRestaurantCards(message.restaurants.slice(0,message.meta?.answer_limits?.place_cards || 3),allowed('source')));
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
         const answerLayout = message.meta?.turnPolicy?.answerLayout || (message.meta?.flow === 'menu_category' ? 'category' : message.meta?.flow === 'region' ? 'region' : ['region','companion'].includes(message.meta?.turnPolicy?.next_question?.slot) ? message.meta.turnPolicy.next_question.slot : null);
         if (answerLayout) answers.classList.add('question-' + answerLayout);
@@ -1951,14 +1972,16 @@
             else answers.appendChild(button);
           });
         }
-        if (menus.children.length) bubble.appendChild(menus);
-        if (isMenuTurn && allowed('notice')) { const hint = document.createElement('p'); hint.className = 'menu-hint' + (message.meta?.notice ? ' turn-notice' : ''); hint.textContent = message.meta?.notice || message.meta?.turnPolicy?.menuHint || '끌리는 메뉴를 고르거나 먹고 싶은 걸 말해 주세요'; bubble.appendChild(hint); }
-        if (allowed('question') && message.meta?.turnPolicy?.questionText) {
-          const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
+        if (menus.children.length) resultSection.appendChild(menus);
+        if (isMenuTurn && allowed('notice')) { const hint = document.createElement('p'); hint.className = 'menu-hint' + (message.meta?.notice ? ' turn-notice' : ''); hint.textContent = message.meta?.notice || message.meta?.turnPolicy?.menuHint || '끌리는 메뉴를 고르거나 먹고 싶은 걸 말해 주세요'; resultSection.appendChild(hint); }
+        bubble.appendChild(resultSection);
+        if (hasQuestion) {
+          const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; questionSection.appendChild(question);
           if(message.meta.turnPolicy.next_question?.slot==='companion')question.appendChild(uiIcon('people'));
         }
         for (const group of [answerTop, answerTiles, answerBottom]) if (group.children.length) answers.appendChild(group);
-        if (allowed('chips') && answers.children.length) bubble.appendChild(answers);
+        if (allowed('chips') && answers.children.length) (hasQuestion?questionSection:bubble).appendChild(answers);
+        if(hasQuestion)bubble.appendChild(questionSection);
         if (allowed('chips') && menuActions.children.length) bubble.appendChild(menuActions);
         if (allowed('chips') && message.meta?.turnPolicy?.expansionChoices?.length) {
           const alternatives = document.createElement('div'); alternatives.className = 'quick-replies quick-replies-followup alternative-chips'; alternatives.setAttribute('aria-label','다른 지역과 비슷한 메뉴');
@@ -1975,9 +1998,9 @@
         }
         bubble.appendChild(answerActions);
         if (allowed('related_questions') && message.meta?.relatedQuestions?.length) {
-          const related=document.createElement('section');related.className='related-questions';related.setAttribute('aria-label','연관 질문');
+          const related=document.createElement('section');related.className='related-questions answer-followup'+(hasQuestion?' awaiting-answer':'');related.setAttribute('aria-label','연관 질문');
           const label=document.createElement('p');label.className='related-label';label.textContent='이어서 물어볼 수 있어요';related.appendChild(label);
-          message.meta.relatedQuestions.slice(0,3).forEach(choice=>{
+          message.meta.relatedQuestions.slice(0,hasQuestion?2:3).forEach(choice=>{
             const button=document.createElement('button');button.type='button';button.className='related-question';button.setAttribute('aria-label',choice.text);button.historyLabel=choice.text;button.historyMessage=choice.text;
             const text=document.createElement('span');text.className='related-text';text.textContent=choice.text;
             const arrow=document.createElement('span');arrow.className='related-arrow';arrow.appendChild(uiIcon('arrow-right'));arrow.setAttribute('aria-hidden','true');

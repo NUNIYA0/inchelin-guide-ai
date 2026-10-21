@@ -155,7 +155,7 @@ export async function testConversationUI(runCase) {
   assert.deepEqual(conditions.children.map(node => node.textContent), ['강남역', '삼겹살']);
   conditions.children[0].click(); conditions.children[1].click();
   assert.deepEqual(openedAxes, ['region', 'food']);
-  const classes = bubble.children.map(node => node.className);
+  const classes = nodes(bubble).map(node => node.className);
   assert.ok(classes.indexOf('message-copy') < classes.indexOf('restaurant-group'));
   assert.ok(classes.indexOf('restaurant-group') < classes.indexOf('turn-question'));
   assert.ok(classes.indexOf('turn-question') < classes.findIndex(value=>value.split(' ').includes('answer-chips')));
@@ -187,7 +187,7 @@ export async function testConversationUI(runCase) {
     assert.equal(ofClass(rendered,'turn-notice').length,answer_plan.includes('notice')?1:0);
   }
   const menuBubble = ofClass(menuNode, 'ai-bubble')[0];
-  const menuClasses = menuBubble.children.map(node => node.className);
+  const menuClasses = nodes(menuBubble).map(node => node.className);
   assert.ok(menuClasses.indexOf('message-copy') < menuClasses.indexOf('menu-hint'));
   assert.ok(menuClasses.indexOf('quick-replies menu-cards') < menuClasses.indexOf('menu-hint'));
   assert.equal(ofClass(menuNode,'turn-question').length,0,'menu-options plan has no question block');
@@ -240,13 +240,13 @@ export async function testConversationUI(runCase) {
   const relatedGroup=ofClass(relatedMessage,'related-questions')[0];
   const relatedButtons=ofClass(relatedMessage,'related-question');
   assert.equal(relatedButtons.length,first.body.meta.relatedQuestions.length);
-  assert.ok(relatedButtons.length>=2 && relatedButtons.length<=3);
+  assert.ok(relatedButtons.length>=1 && relatedButtons.length<=2,'pending question limits related rows to two and never fills failed validations');
   assert.equal(ofClass(relatedGroup,'related-label')[0].textContent,'이어서 물어볼 수 있어요');
   relatedButtons.forEach((button,index)=>{assert.equal(button.tagName,'BUTTON');assert.equal(button.type,'button');assert.equal(button.attributes['aria-label'],first.body.meta.relatedQuestions[index].text);});
   assert.equal(ofClass(relatedGroup,'related-arrow').length,relatedButtons.length);
-  const relatedBubble=ofClass(relatedMessage,'ai-bubble')[0],relatedClasses=relatedBubble.children.map(node=>node.className);
-  assert.ok(relatedClasses.findIndex(cls=>cls.includes('answer-chips'))<relatedClasses.indexOf('related-questions'));
-  assert.ok(relatedClasses.indexOf('related-questions')<relatedClasses.findIndex(cls=>cls.includes('action-chips')));
+  const relatedBubble=ofClass(relatedMessage,'ai-bubble')[0],relatedClasses=nodes(relatedBubble).map(node=>node.className);
+  assert.ok(relatedClasses.findIndex(cls=>cls.includes('answer-chips'))<relatedClasses.findIndex(cls=>cls.includes('related-questions')));
+  assert.ok(relatedClasses.findIndex(cls=>cls.includes('related-questions'))<relatedClasses.findIndex(cls=>cls.includes('action-chips')));
   const picked=first.body.meta.relatedQuestions[0].text;relatedButtons[0].click();assert.equal(sent.at(-1)[0],picked);
   renderer.renderMessage({role:'user',content:picked});
   assert.equal(ofClass(relatedMessage,'related-questions').length,1,'related group stays in history');
@@ -269,11 +269,22 @@ export async function testConversationUI(runCase) {
   assert.ok(!schema.properties.inchelin_core.required.includes('imageUrl'));
   assert.ok(first.calls.every(call => !call.href.includes('/search/image')));
   // v127 compact interface contracts, exercised against the real renderer.
-  const ordered=renderer.renderMessage({role:'assistant',content:'강남에서 골라봤어요.',restaurants:first.body.restaurants,quickReplies:['혼자','회식'],meta:{...first.body.meta,answer_plan:['text','place_cards','source','question','chips','related_questions'],relatedQuestions:[{text:'홍대에서도 삼겹살 먹을 곳 찾아줘'}],turnPolicy:{...first.body.meta.turnPolicy,intro:'강남에서 골라봤어요.',questionText:'누구와 가세요?',actionChips:['다른 곳 보기','조건 바꾸기']}}});
-  const orderedBubble=ofClass(ordered,'ai-bubble')[0],order=orderedBubble.children.map(node=>node.className.split(' '));
+  const ordered=renderer.renderMessage({role:'assistant',content:'강남에서 골라봤어요.',restaurants:first.body.restaurants,quickReplies:['혼자','회식','상관없어요'],meta:{...first.body.meta,answer_plan:['text','place_cards','source','question','chips','related_questions'],relatedQuestions:[{text:'홍대에서도 삼겹살 먹을 곳 찾아줘'},{text:'강남에서 갈비 먹을 곳 찾아줘'},{text:'성수에서도 삼겹살 먹을 곳 찾아줘'}],turnPolicy:{...first.body.meta.turnPolicy,intro:'강남에서 골라봤어요.',questionText:'누구와 가세요?',actionChips:['다른 곳 보기','조건 바꾸기']}}});
+  const orderedBubble=ofClass(ordered,'ai-bubble')[0],order=nodes(orderedBubble).map(node=>node.className.split(' '));
   const position=cls=>order.findIndex(classes=>classes.includes(cls));
   assert.ok(position('message-copy')<position('restaurant-group'));assert.ok(position('restaurant-group')<position('turn-question'));
   assert.ok(position('answer-chips')<position('answer-actions'));assert.ok(position('answer-actions')<position('related-questions'));assert.ok(position('related-questions')<position('action-chips'));
+  const resultZone=ofClass(ordered,'answer-results')[0],questionZone=ofClass(ordered,'answer-question')[0],followupZone=ofClass(ordered,'answer-followup')[0];
+  assert.equal(resultZone.tagName,'SECTION');assert.equal(questionZone.tagName,'SECTION');assert.equal(followupZone.tagName,'SECTION');
+  assert.equal(ofClass(resultZone,'restaurant-card').length,3);assert.equal(ofClass(resultZone,'turn-question').length,0);assert.equal(ofClass(resultZone,'restaurant-source').length,1);
+  assert.deepEqual(questionZone.children.map(node=>node.className.split(' ')[0]),['turn-question','quick-replies']);
+  assert.equal(ofClass(questionZone,'related-question').length,0);assert.ok(ofClass(questionZone,'quick-reply-chip').length);assert.equal(ofClass(followupZone,'related-question').length,2,'renderer caps even oversized pending-question envelopes');
+  assert.ok(followupZone.className.includes('awaiting-answer'));assert.ok(ofClass(questionZone,'skip-chip').length);
+  assert.ok(ofClass(followupZone,'related-question').every(node=>!node.className.includes('quick-reply')));
+  assert.match(html,/\.answer-question \{[^}]*gap:12px; margin-top:24px; padding:16px; background:#fafafa; border-radius:16px/);
+  assert.match(html,/\.answer-question \.turn-question \{[^}]*font-size:16px; font-weight:700/);
+  assert.match(html,/\.answer-question \.quick-reply-chip \{ min-height:40px; border:1px solid #111; border-radius:999px; background:#fff/);
+  assert.match(html,/\.answer-question \.quick-reply:active/);assert.match(html,/\.answer-followup \{ margin-top:24px; border-top:1px solid/);assert.match(html,/\.answer-followup.awaiting-answer \.related-question \{ background:#f7f7f7; color:#666/);
   assert.equal(ofClass(ordered,'restaurant-title-link').length,3);assert.equal(ofClass(ordered,'restaurant-compare').length,3);
   assert.ok(ofClass(ordered,'restaurant-title-link').every(node=>node.attributes['aria-label'].includes('상세보기')));
   assert.ok(!nodes(ordered).some(node=>node.tag==='button'&&node.text==='상세보기'),'large standalone detail action removed');

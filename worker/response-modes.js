@@ -54,6 +54,7 @@ export function buildIntentAnalysisInstructions(stateValue) {
     no_results: state.noResults,
     stage: state.stage, askedSlots: state.askedSlots, questionCount: state.questionCount, preferences: state.preferences,
     shownSuggestions: state.shownSuggestions,
+    relatedTemplateHistory: state.relatedTemplateHistory,
   };
   return `너는 인슐랭가이드 AI의 1단계 의도 분석기다. 응답 문장을 만들지 말고 JSON만 출력한다.
 맛집 검색의 최우선 축은 food_type과 region이다. 메뉴(menu)는 세부 음식이며 food_type은 상위 종류다. 음식·지역을 분위기·동행·예산보다 먼저 추출하고 확정한다.
@@ -77,6 +78,7 @@ answer_plan은 렌더할 블록 순서다. 메뉴 고민+종류 없음=text/ques
 메뉴 후보와 식당 카드, 비교, 특정식당, 음식 대화, 서비스/일반 답변에는 related_questions를 추가하되, 최종 노출은 서버 검증을 통과한 문장이 있을 때만 허용한다. 범위 밖은 시작 제안만, 종류/지역 질문 및 0건 안내에는 related_questions를 넣지 않는다. 칩과 연관 질문은 다른 블록이며 행동 칩은 최하단이다.
 confidence가 낮아도 가장 가능성 높은 분류를 내고 food_related를 정확히 표시한다.
 related_questions는 사용자가 말할 문장 12~30자 2~3개다. '찾아줘/보여줘/어때?'처럼 쓰고 '~해주세요/~찾아주세요'는 금지한다. 지역은 강남·강남역·역삼·홍대·성수·종로·여의도 안에서만 고른다. 행동/메뉴 칩과 같은 기능을 반복하지 않는다. 서로 다른 축(지역/음식/상황/비교/서비스)을 고르고 이미 한 말·보여준 제안을 반복하지 않는다. 영업시간·평점·가격·웨이팅·분위기 확인형은 금지한다. 현재 질문과 askedSlots를 다시 묻지 않는다. 메인 메뉴 사전(main_dish=true)의 음식만 제안한다: ${JSON.stringify(MAIN_DISHES)}. 사이드·반찬·음료·술·디저트를 제안하지 않는다. 종류/지역 질문과 검색 결과 0건에서는 빈 배열이다. related_questions 블록은 카드/메뉴 후보/비교/특정식당/음식대화/서비스/일반답변/범위밖시작 제안에만 허용한다.
+연관 질문은 현재 발화·intent·확정/빈 슬롯·last_cards·question_slot·askedSlots를 함께 반영한다. question_slot과 같은 내용이나 그 답변 칩의 변형을 제안하지 않는다. 장소 응답에서는 지역/메인 메뉴/상황 변경·실제 카드 상세·두 카드 비교만, 서비스 FAQ는 service/general에서만 허용한다. 대기 질문이 있으면 최대 2개다. relatedTemplateHistory의 최근 두 응답에 공통인 문형을 세 번째로 반복하지 않고 슬롯·카드에 맞춰 다른 표현을 쓴다.
 <runtime_context>${JSON.stringify(context)}</runtime_context>`;
 }
 
@@ -105,6 +107,7 @@ export function emptyResponseState() {
     aCandidates: [],
     aProposed: [],
     shownSuggestions: [],
+    relatedTemplateHistory: [],
     menuCategory: null,
     regionFlexible: false,
     noResults: false,
@@ -169,6 +172,7 @@ export function normalizeResponseState(value = {}) {
     aProposed: Array.isArray(value.aProposed || value.a_proposed) ? [...new Set((value.aProposed || value.a_proposed).map(String).filter(Boolean))].slice(0, 80) : [],
     noResults: value.noResults === true || value.no_results === true,
     shownSuggestions: Array.isArray(value.shownSuggestions) ? value.shownSuggestions.slice(0,1000).filter(item=>item && typeof item.text==='string' && typeof item.key==='string').map(item=>({text:item.text.slice(0,100),key:item.key.slice(0,240)})) : [],
+    relatedTemplateHistory: Array.isArray(value.relatedTemplateHistory) ? value.relatedTemplateHistory.slice(-2).filter(Array.isArray).map(round=>round.filter(item=>typeof item==='string').map(item=>item.slice(0,240)).slice(0,3)) : [],
     menuCategory: MENU_CATEGORIES[value.menuCategory] ? value.menuCategory : null,
     regionFlexible: value.regionFlexible === true,
     stage: ["exploring", "narrowing", "ready", "refining", "menu_category_asked", "menu_options_shown", "region_asked"].includes(value.stage) ? value.stage : "exploring",

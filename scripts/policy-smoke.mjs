@@ -18,6 +18,7 @@ import { testQuestionStages } from './question-stages-smoke.mjs';
 import { testRelatedQuestions } from './related-questions-smoke.mjs';
 import { testChatInterface } from './chat-interface-smoke.mjs';
 import { testWelcomeFirstSearch } from './welcome-first-search-smoke.mjs';
+import { testRelatedContext } from './related-context-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -2149,4 +2150,5 @@ await testQuestionStages(runCase);
 await testRelatedQuestions(runCase);
 await testChatInterface(runCase);
 await testWelcomeFirstSearch(runCase);
+await testRelatedContext(runCase);
 console.log("Inchelin data policy smoke tests passed.");

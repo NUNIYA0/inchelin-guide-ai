@@ -12,12 +12,12 @@ import {
   MODE_A_POOL,
 } from "./response-modes.js";
 import { withParticle } from "./korean.js";
-import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
+import { applyTurnPolicy, planTurn, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
 import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy, compactMenuCopy } from "./conversation-copy.js";
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION, ADJACENT_REGIONS } from "./search-axes.js";
 import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGION_ANSWERS, AUTO_MENU } from './answer-plan.js';
 import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
-import { applyRelatedQuestions, confirmedCombination } from './related-questions.js';
+import { applyRelatedQuestions, confirmedCombination, relatedContext } from './related-questions.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -695,7 +695,7 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
     intent = "service";
     sub = /와인/.test(latest) ? "wine" : /추천.{0,8}기준|원칙|데이터|등록|검증|카드|거리|영업|폐업/.test(latest) ? "data_basis" : /무료|요금|위치\s*정보|기록\s*저장|로그인해야|모바일|공개\s*범위/.test(latest) ? "policy" : /어떻게|삭제|공유|지난\s*대화|새\s*대화|로그인|로그아웃|위치\s*버튼/.test(latest) ? "how_to" : "about";
   } else if (hasPrev && isComparisonRequest(latest, state.lastCards)) intent = "compare";
-  else if (knownCard && /상세|정보/.test(latest)) intent='specific_place';
+  else if (knownCard && /상세|정보|자세/.test(latest)) intent='specific_place';
   else if (foodTalk) intent = "food_talk";
   else if (hasPrev && (/회식|혼자|혼밥|가족|데이트|\d+\s*[~〜-]?\s*\d*\s*명|예산|조용|아늑|분위기/.test(latest)) && !ordinalReference(latest)) {
     intent = "condition_change"; sub = "add";
@@ -2582,7 +2582,10 @@ async function handleChat(request, env, execution = {}) {
     const message = [`${card.name}에서 지금 알 수 있는 내용만 보여드릴게요.`,...known,...(missing.length?[`${withParticle(missingText,'은/는')} 확인된 정보가 없어요.`]:[])].join('\n');
     return json(chatResponse(message,[],[card],{mode:'E',intent:analysis.intent,analysis,responseModeState:updateStateAfterResponse(responseState,decision,{cards:[card]})}));
   }
+  const relatedTurn=planTurn({restaurants:groundedPlaces,meta:{mode:decision.mode,analysis,responseModeState:responseState}},context.responseModeState||{},latestUserMessage);
+  const suggestionContext=relatedContext({restaurants:groundedPlaces.slice(0,3).map(place=>restaurantCard(place,dataSource,latestUserMessage,responseState.slots.region)),meta:{analysis,responseModeState:responseState,turnPolicy:{next_question:relatedTurn.next_question,missing_slots:relatedTurn.missing_slots}}},{messages});
   const timeContext = [
+    `<related_question_context>${JSON.stringify(suggestionContext)}</related_question_context>`,
     `메인 메뉴 사전: ${JSON.stringify(MAIN_DISHES)}`,
     `이미 보여준 연관 질문: ${JSON.stringify(responseState.shownSuggestions)}`,
     `Current local datetime: ${String(context.currentLocalDatetime || "unknown").slice(0, 64)}`,
