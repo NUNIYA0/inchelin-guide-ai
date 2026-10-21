@@ -78,13 +78,13 @@ export async function testAISearchPolicy(runCase) {
   for (const region of ['부산', '판교', '울릉도', '신림']) {
     const result = await runCase({ message: `${region}에서 냉면 먹을 곳 찾아줘`, env });
     assert.equal(result.body.meta.unsupportedRegion, region);
-    assert.deepEqual(result.body.suggestions, SEARCH_REGIONS);
+    assert.deepEqual(result.body.suggestions, ['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
     assert.equal(result.body.meta.analysis.can_search, false);
     assert.equal(result.body.meta.responseModeState.slots.menu, '냉면');
     assert.equal(localCalls(result).length, 0); assert.equal(result.calls.length, 0);
     assert.doesNotMatch(result.body.message, /확장|계획|예정|준비|곧/);
     const choice = result.body.meta.turnPolicy.next_question.chips.find(chip => chip.label === '성수');
-    assert.equal(choice.message, '성수에서 냉면 먹을 곳 찾아줘');
+    assert.equal(choice.message, '성수예요');
   }
   // Unverified preferences never replace the two required search axes or block results.
   const optional = await runCase({ message: '역삼에서 삼겹살 회식할 건데 주차 필요하고 조용한 곳', env, naverResponse: items('역삼') });

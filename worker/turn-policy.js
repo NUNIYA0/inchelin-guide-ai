@@ -2,12 +2,12 @@ import { normalizeResponseState } from './response-modes.js';
 import { withParticle } from './korean.js';
 import { FORBIDDEN_COPY, repeatsCopySentences } from './conversation-copy.js';
 import { nearbySuggestions, SEARCH_REGIONS, searchMessage } from './search-axes.js';
-import { answerPlanFor } from './answer-plan.js';
+import { answerPlanFor, REGION_ANSWERS } from './answer-plan.js';
 
 export const IMMEDIATE_REQUEST = /바로\s*보여줘|그냥\s*추천해줘|질문\s*(?:없이|하지\s*마)/;
 const unique = values => [...new Set(values)];
 const chip = (label, message) => ({ label, message });
-export const MENU_CHIPS = ['고기', '한식', '면', '일식', '중식', '분식', '카페'].map(menu => chip(menu, menu + ' 먹고 싶어요'));
+export const MENU_CHIPS = ['고기', '한식', '면 요리', '일식', '중식', '분식', '카페'].map(menu => chip(menu, menu + ' 먹고 싶어요'));
 const text = value => typeof value === 'string' ? value.trim().slice(0, 180) : null;
 const opening = value => String(value || '').replace(/[*#\s]/g, '').split(/[.!?。]/)[0].slice(0, 12);
 
@@ -19,10 +19,7 @@ export function turnPreferences(previous, latest, slots) {
   };
 }
 export function questionTemplate(slot, state, response) {
-  if (slot === 'region') return { slot, text: '어느 지역에서 찾을까요?', chips: [
-    chip('현재 위치 연결', '내 주변에서 먹을 곳 찾아줘'), chip('강남', '강남이에요'),
-    chip('홍대', '홍대예요'), chip('역삼', '역삼이에요'), chip('성수', '성수예요'), chip('직접 입력', '지역 직접 입력'),
-  ] };
+  if (slot === 'region') return { slot, text: '지금 어디세요?', chips: REGION_ANSWERS };
   if (slot === 'menu') {
     const candidates = response.meta?.mode === 'A' ? (response.suggestions || []).filter(value => value.includes('|')).map(value => {
       const label = value.split('|')[0]; return chip(label, label + ' 먹고 싶어요');

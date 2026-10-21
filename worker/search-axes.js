@@ -1,4 +1,3 @@
-import { withParticle } from './korean.js';
 // Supported quick-entry regions. These aliases describe address areas, not walking radii.
 export const SEARCH_REGIONS = ['강남', '강남역', '역삼', '홍대', '성수', '종로', '여의도'];
 // Address-area neighbors, not proximity or walking-distance guarantees.
@@ -97,5 +96,5 @@ export function nearbySuggestions(region, food) {
   const category = SEARCH_FOODS.find(item => item.value === food || item.menus.includes(food));
   const similar = ({ 국밥:['설렁탕','곰탕'], 설렁탕:['곰탕','국밥'], 곰탕:['설렁탕','국밥'], 냉면:['메밀국수','비빔국수'] })[food] || category?.menus.filter(menu => menu !== food).slice(0, 2) || [];
   return [...adjacent.slice(0, 2).map(value => ({ label: `${value}에서 찾기`, message: searchMessage({ region: value, food }) })),
-    ...similar.map(value => ({ label: `${withParticle(value,'으로/로')} 바꾸기`, message: searchMessage({ region, food: value }) }))];
+    ...similar.map(value => ({ label: `${value} 먹기`, message: searchMessage({ region, food: value }) }))];
 }

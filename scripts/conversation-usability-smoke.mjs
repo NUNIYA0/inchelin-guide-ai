@@ -5,7 +5,7 @@ export async function testConversationUsability(runCase) {
   const naverResponse = { items: ['해정집삼겹살', '옥동식삼겹살', '홍대삼겹살'].map((title, i) => ({ title, category: '한식>돼지고기구이', roadAddress: `서울 마포구 홍대 테스트길 ${i} 1층`, mapx: '1269200000', mapy: '375500000' })) };
   const first = await runCase({ message: '홍대에서 삼겹살 먹을 곳 찾아줘', env, naverResponse });
   assert.equal(first.body.meta.turnPolicy.next_question.slot, 'companion');
-  assert.deepEqual(first.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기']);
+  assert.deepEqual(first.body.meta.turnPolicy.actionChips, ['다른 곳 보기', '조건 바꾸기']);
   assert.equal(first.body.suggestions.at(-1), '상관없어요');
   assert.ok(first.body.meta.turnPolicy.next_question.chips.every(item => item.label.length >= 2 && item.label.length <= 6));
   const skipped = await runCase({ message: '상관없어요', env, context: { responseModeState: first.body.meta.responseModeState } });

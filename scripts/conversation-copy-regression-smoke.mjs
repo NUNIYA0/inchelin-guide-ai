@@ -69,7 +69,7 @@ export async function testConversationCopyRegression(runCase) {
   assertPublic(change.body); assert.equal(change.body.meta.responseModeState.slots.region, '홍대');
   assert.equal(change.body.meta.responseModeState.slots.menu, '국밥'); assert.equal(generations(change).length, 2);
   const unsupported = await runCase({ message: '부산에서 냉면 먹을 곳 찾아줘', env, aiResponse: dirty });
-  assertPublic(unsupported.body); assert.equal(unsupported.calls.length, 0); assert.equal(unsupported.body.suggestions.length, 7);
+  assertPublic(unsupported.body); assert.equal(unsupported.calls.length, 0); assert.equal(unsupported.body.suggestions.length, 8);
   // The analyst's next_question is never copied into display text, even when superficially natural.
   const analysisOnly = await runCase({ message: '고기 먹고 싶다', env, analyzerEnabled: true, modeIntentAnalysis: {
     intent: 'menu_trouble', confidence: 1, slots: { food_type: '고기' }, flags: {}, reasoning: 'PRIVATE_REASONING', note: 'PRIVATE_NOTE',

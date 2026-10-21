@@ -15,7 +15,7 @@ import { withParticle } from "./korean.js";
 import { applyTurnPolicy, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
 import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy, compactMenuCopy } from "./conversation-copy.js";
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION, ADJACENT_REGIONS } from "./search-axes.js";
-import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_CHOICES, AUTO_MENU } from './answer-plan.js';
+import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGION_ANSWERS, AUTO_MENU } from './answer-plan.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -942,7 +942,7 @@ async function modeAResponse(analysis, state, env, messages = []) {
   const nextState = updateStateAfterResponse(state, { mode: "A", questionSlot: null, showCards: false }, { aCandidates: candidates.map(candidate => candidate.menu) });
   nextState.stage = 'menu_options_shown'; nextState.consecutiveQuestions = 0; nextState.pendingQuestionSlot = 'menu';
   const previous = state.previousOpenings;
-  const intros = candidates.length ? [menuIntro, category ? `${state.menuCategory} 안에서 골라 먹을 메뉴 ${candidates.length}가지를 준비했어요.` : `이번 한 끼는 서로 다른 메뉴 ${candidates.length}가지로 골라봤어요.`, '지금 말씀하신 쪽으로 메뉴를 조금 좁혀봤어요.', '식사할 때 즐길 만한 메뉴를 다시 골라봤어요.'].filter(Boolean) : ['이 종류에서 준비한 메뉴를 모두 보여드렸어요. 다른 음식 종류를 말씀해 주세요.'];
+  const intros = candidates.length ? [menuIntro, category ? `${state.menuCategory}이면 오늘 이런 메뉴로 골라봐요. 끌리는 걸 눌러 주세요.` : `이번 한 끼는 서로 다른 메뉴 ${candidates.length}가지로 골라봤어요.`, '지금 말씀하신 쪽으로 메뉴를 조금 좁혀봤어요.', '식사할 때 즐길 만한 메뉴를 다시 골라봤어요.'].filter(Boolean) : ['이 종류에서 준비한 메뉴를 모두 보여드렸어요. 다른 음식 종류를 말씀해 주세요.'];
   const intro = intros.find(value => !previous.includes(value.replace(/[*#\s]/g, '').split(/[.!?。]/)[0].slice(0,12))) || '먹고 싶은 메뉴를 함께 골라봐요.';
   nextState.previousOpenings = [...previous, intro.replace(/[*#\s]/g, '').split(/[.!?。]/)[0].slice(0,12)].slice(-3);
   return chatResponse(intro, suggestions, [], { responseModeState: nextState, mode: 'A', intent: 'menu_trouble', analysis: { ...analysis, intent: 'menu_trouble' }, flow: 'menu_options', menuCards: candidates.map(item => ({ name: item.menu, description: item.direction, reason: item.reason })), menuSelectionSource: source, turnPolicy: { intro, menuHint: '끌리는 메뉴를 고르거나 먹고 싶은 걸 말해 주세요' } });
@@ -951,10 +951,11 @@ async function modeAResponse(analysis, state, env, messages = []) {
 function menuQuestionResponse(stateValue, flow, analysis) {
   const state = normalizeResponseState(stateValue);
   const slot = flow === 'menu_category' ? 'menu_category' : flow === 'clarify' ? 'clarify' : 'region';
-  const question = flow === 'menu_category' ? '끌리는 쪽 있으세요?' : flow === 'clarify' ? '메뉴를 고를까요, 식당을 찾을까요?' : '지금 어디세요?';
-  const chips = flow === 'menu_category' ? CATEGORY_CHOICES.map(label => ({ label, message: label === '제가 골라드릴까요?' ? '알아서 골라줘' : `${label}으로 골라줘` }))
+  const categoryQuestions = ['한식, 중식, 일식, 양식 중에 끌리는 쪽 있으세요? 없으면 제가 골라드릴까요?', '어떤 음식 종류가 끌리세요? 아직 고민되면 제가 골라드릴까요?', '먹고 싶은 종류가 있으세요? 떠오르지 않으면 제가 골라드릴까요?'];
+  const question = flow === 'menu_category' ? categoryQuestions[state.questionCount % categoryQuestions.length] : flow === 'clarify' ? '메뉴를 고를까요, 식당을 찾을까요?' : '지금 어디세요?';
+  const chips = flow === 'menu_category' ? CATEGORY_ANSWERS
     : flow === 'clarify' ? [{ label:'메뉴 고르기',message:'오늘 뭐 먹을지 같이 골라줘' },{ label:'식당 찾기',message:'먹을 곳 찾아줘' }]
-    : [{label:'현재 위치 연결',message:'내 주변에서 먹을 곳 찾아줘'}, ...['강남','홍대','역삼','성수'].map(label => ({label,message:`${label}${label === '홍대' || label === '성수' ? '예요' : '이에요'}`})), {label:'직접 입력',message:'지역 직접 입력'}];
+    : REGION_ANSWERS;
   const food = state.slots.menu || state.slots.food_type;
   const intros = flow === 'menu_category' ? [state.slots.region ? `${state.slots.region}은 그대로 두고 먹고 싶은 종류부터 골라봐요.` : '오늘 먹을 메뉴를 함께 좁혀봐요.', '음식 종류부터 하나씩 골라볼게요.', '한 끼를 고르기 쉽게 나눠볼게요.', '먹고 싶은 방향부터 함께 정해봐요.']
     : flow === 'clarify' ? ['말씀하신 방향을 한 번만 더 알려주세요.', '어느 쪽을 도와드릴지 먼저 맞춰볼게요.', '고르고 싶은 방향부터 함께 맞춰봐요.', '도와드릴 내용이 정해지면 편하게 말해 주세요.']
@@ -2385,6 +2386,7 @@ async function handleChat(request, env, execution = {}) {
     }
   }
   let analysis = prioritizeSearchAxes(await analyzeResponseModeIntent(env, messages, responseState), messages, responseState);
+  if (/^(?:네[,，]?\s*)?골라주세요[.!]?$/.test(latestUserMessage.trim())) analysis = normalizeAnalysis({...analysis,intent:'menu_trouble',confidence:1,sub_intent:'auto_menu',slots:{...analysis.slots,menu:null}});
   const explicitRegionIndifference = /아무\s*데나|어디든/.test(latestUserMessage) || /^상관\s*없어요[.!]?$/.test(latestUserMessage.trim()) && responseState.pendingQuestionSlot === 'region';
   if (explicitRegionIndifference && (analysis.slots.menu || responseState.slots.menu || responseState.pendingQuestionSlot === 'region' && responseState.slots.food_type)) {
     analysis = normalizeAnalysis({...analysis,intent:'place_search',sub_intent:'auto_region',confidence:1,slots:{...analysis.slots,region:'강남'}});
@@ -2392,8 +2394,9 @@ async function handleChat(request, env, execution = {}) {
     responseState.askedSlots = [...new Set([...responseState.askedSlots,'region'])];
   }
   if (analysis.confidence < .6) return json(menuQuestionResponse(responseState, 'clarify', analysis));
-  const categoryChoice = Object.keys(MENU_CATEGORIES).find(name => new RegExp(name + '(?:으로|로|이|이요|을|를|\\s*먹고|$)').test(latestUserMessage));
-  if (categoryChoice && !normalizeFoodAxis(latestUserMessage)?.menu && /골라|먹고|먹을|^\S+$/.test(latestUserMessage) && !/맛집|식당|먹을\s*곳|찾아줘/.test(latestUserMessage)
+  const cafeCategoryChoice = /^카페·디저트(?:로|\s|$)/.test(latestUserMessage);
+  const categoryChoice = cafeCategoryChoice ? '카페' : Object.keys(MENU_CATEGORIES).find(name => new RegExp(name + '(?:으로|로|이|이요|을|를|\\s*먹고|$)').test(latestUserMessage));
+  if (categoryChoice && (cafeCategoryChoice || !normalizeFoodAxis(latestUserMessage)?.menu) && /골라|먹고|먹을|^\S+$/.test(latestUserMessage) && !/맛집|식당|먹을\s*곳|찾아줘/.test(latestUserMessage)
     && (responseState.pendingQuestionSlot === 'menu_category' || /(?:으로|로)\s*골라/.test(latestUserMessage) || !analysis.slots.region && !responseState.slots.region)) {
     analysis = normalizeAnalysis({ ...analysis, intent:'menu_trouble', confidence:1, sub_intent:'category_options', slots:{...analysis.slots,food_type:categoryChoice,menu:null} });
     responseState.menuCategory = categoryChoice;

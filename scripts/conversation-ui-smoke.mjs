@@ -37,7 +37,7 @@ export async function testConversationUI(runCase) {
   const refine = await runCase({ message: '회식이에요', env, context: { responseModeState: first.body.meta.responseModeState }, naverResponse: { items }, aiResponse: { ...clean, turn_text: { summary: '강남역 삼겹살집은 단체로 앉기 편한 쪽을 위로 올렸어요.', reason: '' } } });
   assert.doesNotMatch(refine.body.message, /앉기|단체로|검증|정렬|후보|입니다/);
   assert.match(refine.body.meta.notice, /단체석.*매장 확인/);
-  assert.deepEqual(refine.body.meta.turnPolicy.actionChips, ['다른 곳도 보여줘', '조건 바꾸기']);
+  assert.deepEqual(refine.body.meta.turnPolicy.actionChips, ['다른 곳 보기', '조건 바꾸기']);
 
   // Menu choices are made by the model inside the allowlist, with contextual reasons.
   const menus = { intro: '쌀쌀한 날 친구들과 나눠 먹을 메뉴를 골라볼게요.', menus: [
@@ -103,7 +103,7 @@ export async function testConversationUI(runCase) {
   const document = { createElement: tag => new Node(tag), getElementById: id => id === 'comparisonTray' ? trayHost : null };
   const openedAxes = [];
   const renderer = new Function('document', 'messagesEl', 'appendLimitedMarkdown', 'ask', 'resolveRestaurantDetail', 'showToast', 'isCurrentLocationIntent', 'canUseCurrentLocation', 'chooseMenuCard', 'routeQuestion', 'openSearchPicker', renderSource + '\nreturn { renderRestaurantCards, renderMessage };')(
-    document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹고 싶어요']), value => sent.push([value]), axis => openedAxes.push(axis));
+    document, host, (node, text) => { node.textContent = text; }, (...args) => sent.push(args), () => {}, () => {}, () => false, () => true, value => sent.push([value + ' 먹을래']), value => sent.push([value]), axis => openedAxes.push(axis));
   const nodes = root => [root, ...root.children.flatMap(nodes)];
   const ofClass = (root, cls) => nodes(root).filter(node => node.className.split(' ').includes(cls));
   const group = renderer.renderRestaurantCards(first.body.restaurants);
@@ -156,14 +156,14 @@ export async function testConversationUI(runCase) {
   const classes = bubble.children.map(node => node.className);
   assert.ok(classes.indexOf('message-copy') < classes.indexOf('restaurant-group'));
   assert.ok(classes.indexOf('restaurant-group') < classes.indexOf('turn-question'));
-  assert.ok(classes.indexOf('turn-question') < classes.indexOf('quick-replies quick-replies-followup answer-chips'));
+  assert.ok(classes.indexOf('turn-question') < classes.findIndex(value=>value.split(' ').includes('answer-chips')));
   assert.equal(ofClass(message, 'message-copy')[0].textContent, first.body.meta.turnPolicy.intro);
   assert.equal(ofClass(message, 'turn-question').length, 1);
   const menuNode = renderer.renderMessage({ role: 'assistant', content: menu.body.message, restaurants: [], quickReplies: menu.body.suggestions, meta: menu.body.meta });
   assert.equal(ofClass(menuNode, 'menu-choice').length, 3);
   assert.equal(ofClass(menuNode, 'quick-reply-reason').length, 3);
   const choice = ofClass(menuNode, 'menu-choice')[0]; choice.click();
-  assert.equal(sent.at(-1)[0], '국밥 먹고 싶어요');
+  assert.equal(sent.at(-1)[0], '국밥 먹을래');
   assert.equal(ofClass(menuNode, 'menu-more').length, 1, 'menu options always include their pale more-menu chip');
   // Two representative display envelopes per each of the eleven table rows.
   const table = [

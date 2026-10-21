@@ -13,6 +13,7 @@ import { testConversationCopyRegression } from "./conversation-copy-regression-s
 import { testConversationUsability } from "./conversation-usability-smoke.mjs";
 import { testAnswerPlan } from './answer-plan-smoke.mjs';
 import { testHistoryAlternatives } from './history-alternatives-smoke.mjs';
+import { testQuestionStages } from './question-stages-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -429,7 +430,7 @@ function semanticAnalysis(overrides = {}) {
     expectedStatus: 200,
   });
   assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','제가 골라드릴까요?']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
   assert.equal(result.calls.length, 0);
 }
 
@@ -523,7 +524,7 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
   assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','제가 골라드릴까요?']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
   assert.equal(result.calls.length, 0);
 }
 
@@ -1052,7 +1053,7 @@ function semanticAnalysis(overrides = {}) {
     }),
   });
   assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','제가 골라드릴까요?']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -1234,7 +1235,7 @@ function semanticAnalysis(overrides = {}) {
     message: "오늘 뭐 먹을지 같이 골라줘",
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','제가 골라드릴까요?']);
+  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
   assert.equal(result.body.restaurants.length, 0);
   assert.equal(result.calls.length, 0);
 }
@@ -1316,7 +1317,7 @@ function semanticAnalysis(overrides = {}) {
     assert.equal(result.body.meta.unsupportedRegion, "울릉도");
     assert.equal(result.body.meta.responseModeState.slots.menu, "마라탕");
     assert.match(result.body.message, /울릉도.*현재 검색 가능한 지역이 아니에요/);
-    assert.deepEqual(result.body.suggestions, ['강남', '강남역', '역삼', '홍대', '성수', '종로', '여의도']);
+    assert.deepEqual(result.body.suggestions, ['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
     assert.deepEqual(result.body.restaurants, []);
     const searches = result.calls.filter(call => call.href.includes("/search/v1/local"));
     assert.equal(searches.length, 0);
@@ -1687,8 +1688,8 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(area.body.meta.mode, "B");
   assert.equal(area.body.meta.responseModeState.slots.region, "홍대");
   assert.match(area.body.message, /끌리는 쪽 있으세요/);
-  assert.equal(area.body.suggestions.length, 6);
-  assert.ok(area.body.suggestions.includes("제가 골라드릴까요?"));
+  assert.equal(area.body.suggestions.length, 7);
+  assert.ok(area.body.suggestions.includes("네, 골라주세요"));
   const here = await runCase({ message: "내 주변에서 먹을 곳 찾아줘", env,
     context: { currentLocationName: "홍대", currentLocation: { latitude: 37.55, longitude: 126.92 }, responseModeState: empty } });
   assert.equal(here.body.meta.intent, "place_search");
@@ -1896,7 +1897,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(sent.at(-1)[0], '역삼에서 먹을 곳 찾아줘');
   const regionReply = await runCase({ message: sent.at(-1)[0], env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver' }, context: { responseModeState: next } });
   assert.match(regionReply.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(regionReply.body.suggestions, ['한식','중식','일식','양식','분식','제가 골라드릴까요?']);
+  assert.deepEqual(regionReply.body.suggestions, ['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);
   transitions.setState(next);
   transitions.situations({ companion: '혼밥 · 데이트', parking: true, other: [] }, '혼자 먹기 좋은 곳, 데이트하기 좋은 곳, 주차 필요한 곳으로 찾아줘');
   next = sent.at(-1)[1].responseState;
@@ -2140,4 +2141,5 @@ await testConversationCopyRegression(runCase);
 await testConversationUsability(runCase);
 await testAnswerPlan();
 await testHistoryAlternatives(runCase);
+await testQuestionStages(runCase);
 console.log("Inchelin data policy smoke tests passed.");

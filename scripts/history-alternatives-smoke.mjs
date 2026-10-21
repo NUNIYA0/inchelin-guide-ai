@@ -24,7 +24,7 @@ export async function testHistoryAlternatives(runCase) {
   }
   const menu = await run('한식으로 골라줘');
   const selected = await run('국밥 먹을래',menu.body.meta.responseModeState);
-  assert.deepEqual(selected.body.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','직접 입력']);
+  assert.deepEqual(selected.body.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
   assert.ok(!selected.body.meta.turnPolicy.next_question.chips.some(chip=>chip.label==='상관없어요'));
   const moreAfterSelection = await run('다른 메뉴 보기',selected.body.meta.responseModeState);
   assert.equal(moreAfterSelection.body.meta.responseModeState.menuCategory,'한식');

@@ -22,18 +22,18 @@ export async function testAnswerPlan() {
   try {
     const first=await run('오늘 뭐 먹을지 같이 골라줘');
     assert.deepEqual(first.meta.answer_plan,['text','question','chips']);assert.deepEqual(first.restaurants,[]);
-    assert.deepEqual(first.suggestions,['한식','중식','일식','양식','분식','제가 골라드릴까요?']);assert.match(first.message,/끌리는 쪽 있으세요/);
+    assert.deepEqual(first.suggestions,['한식','중식','일식','양식','분식','카페·디저트','네, 골라주세요']);assert.match(first.message,/끌리는 쪽 있으세요/);
     assert.equal(first.meta.responseModeState.stage,'menu_category_asked');assert.equal(calls.length,0);
     const kind=await run('한식으로 골라줘',first.meta.responseModeState);
     assert.deepEqual(kind.meta.answer_plan,['text','menu_cards','notice','chips']);assert.equal(kind.meta.menuCards.length,3);
     assert.ok(kind.meta.menuCards.every(item=>MENU_CATEGORIES.한식.includes(item.name)));assert.equal(kind.meta.responseModeState.stage,'menu_options_shown');
-    const auto=await run('제가 골라드릴까요?',first.meta.responseModeState);
+    const auto=await run('네, 골라주세요',first.meta.responseModeState);
     assert.equal(auto.meta.menuCards.length,3);assert.equal(new Set(auto.meta.menuCards.map(x=>x.name)).size,3);
     assert.equal(new Set(auto.meta.menuCards.map(x=>MODE_A_POOL.find(item=>item.menu===x.name).family)).size,3);
     for(const failure of ['status','timeout']) { failMenu=failure;const failed=await run('중식으로 골라줘');assert.equal(failed.meta.menuCards.length,3);assert.equal(failed.meta.menuSelectionSource,'fallback');assert.ok(failed.meta.menuCards.every(item=>MENU_CATEGORIES.중식.includes(item.name))); } failMenu=null;
     const selected=await run('국밥 먹을래',kind.meta.responseModeState);
     assert.equal(selected.meta.responseModeState.stage,'region_asked');assert.match(selected.message,/지금 어디세요/);
-    assert.deepEqual(selected.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','직접 입력']);
+    assert.deepEqual(selected.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
     const found=await run('강남이에요',selected.meta.responseModeState);
     assert.equal(found.restaurants.length,3);assert.match(found.meta.turnPolicy.questionText,/누구와/);
     assert.deepEqual(found.meta.answer_plan,['text','place_cards','source','question','chips']);

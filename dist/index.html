@@ -318,7 +318,7 @@
     .menu-choice:active { transform: scale(.985); background: #eee; border-color: #888; }
     .history-inactive .quick-reply, .history-inactive .restaurant-card, .history-inactive .meal-chip { opacity: .5; }
     .history-inactive .quick-reply, .history-inactive .restaurant-map-link, .history-inactive .meal-chip { cursor: default; pointer-events: none; }
-    .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 2px solid #222; background: #f7f7f7; }
+    .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 2px solid #222; background: #f7f7f7; color: #111; }
     .history-check { color: #111; font-size: 16px; font-weight: 700; margin-left: 6px; }
     .alternative-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .menu-hint { margin: 8px 0 0; font: 400 14px/1.5 system-ui, sans-serif; color: #666; }
@@ -341,6 +341,17 @@
     .quick-reply.quick-reply-chip { width: auto; min-height: 40px; padding: 8px 12px; border-radius: 999px; display: inline-flex; align-items: center; box-shadow: none; font-size: 14px; }
     .quick-reply.quick-reply-chip .quick-reply-title { font-size: 14px; font-weight: 500; }
     .answer-chips { margin-top: 8px; }
+    .answer-chips.question-category, .answer-chips.question-region { display: flex; flex-direction: column; flex-wrap: nowrap; gap: 8px; width: 100%; overflow: visible; }
+    .answer-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; min-width: 0; width: 100%; }
+    .answer-tiles .quick-reply { width: 100%; min-width: 0; min-height: 52px; padding: 8px 4px; border-radius: 12px; justify-content: center; text-align: center; }
+    .answer-tiles .quick-reply .quick-reply-title { font: 500 15px/1.4 system-ui, sans-serif; overflow-wrap: anywhere; }
+    .answer-full-row { display: flex; width: 100%; }
+    .answer-full-row .quick-reply { width: 100%; min-height: 48px; padding: 10px; border-radius: 12px; justify-content: center; text-align: center; background: transparent; border: 1px solid #ccc; }
+    .answer-full-row .quick-reply .quick-reply-title { font: 500 15px/1.4 system-ui, sans-serif; }
+    .question-region .quick-reply.location-primary { background: #111; color: #fff; border-color: #111; }
+    .answer-chips.question-companion { display: flex; flex-wrap: wrap; gap: 8px; overflow: visible; }
+    .question-companion .quick-reply { flex: 0 0 calc((100% - 24px) / 4); min-width: 0; justify-content: center; padding: 8px 4px; }
+    .question-companion .quick-reply.skip-chip { flex: 0 0 auto; padding: 8px 12px; }
     .answer-chips[hidden], .menu-cards[hidden], .action-chips[hidden], .menu-more[hidden] { display: none !important; }
     .action-chips { margin-top: 16px; border-top: 1px solid #f1f1f1; padding-top: 12px; }
     .action-chips .quick-reply-chip, .menu-more, .skip-chip { border-color: #e6e6e6; background: #fafafa; color: #555; }
@@ -1637,9 +1648,11 @@
     function quickReplyCard(reply) {
       const raw = String(reply || '').trim();
       const separator = raw.indexOf('|');
-      const title = (separator >= 0 ? raw.slice(0, separator) : raw).trim();
+      const originalTitle = (separator >= 0 ? raw.slice(0, separator) : raw).trim();
+      // Migrate old saved choices, not just newly returned payloads.
+      const title = /^제가.*까요[?？]?$/.test(originalTitle) ? '네, 골라주세요' : originalTitle === '면' ? '면 요리' : originalTitle === '다른 곳도 보여줘' ? '다른 곳 보기' : originalTitle;
       const description = separator >= 0 ? raw.slice(separator + 1).trim() : '';
-      return { title, description, prompt: title || raw };
+      return { title, originalTitle, description, prompt: title || raw };
     }
     // Replayed user messages reconstruct history state after reload/share, without
     // mutating or deleting the recorded assistant cards and chip groups.
@@ -1700,13 +1713,19 @@
         }
         if (allowed('place_cards') && message.restaurants?.length) bubble.appendChild(renderRestaurantCards(message.restaurants.slice(0,message.meta?.answer_limits?.place_cards || 3),allowed('source')));
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
+        const answerLayout = message.meta?.turnPolicy?.answerLayout || (message.meta?.flow === 'menu_category' ? 'category' : message.meta?.flow === 'region' ? 'region' : ['region','companion'].includes(message.meta?.turnPolicy?.next_question?.slot) ? message.meta.turnPolicy.next_question.slot : null);
+        if (answerLayout) answers.classList.add('question-' + answerLayout);
+        const answerTop = document.createElement('div'); answerTop.className = 'answer-full-row answer-top';
+        const answerTiles = document.createElement('div'); answerTiles.className = 'answer-tiles';
+        const answerBottom = document.createElement('div'); answerBottom.className = 'answer-full-row answer-bottom';
         const menus = document.createElement('div'); menus.className = 'quick-replies menu-cards';
         const menuActions = document.createElement('div'); menuActions.className = 'quick-replies quick-replies-followup action-chips';
         const displayReplies = [...(allowed('chips') ? (message.quickReplies || []).filter(reply=>!isMenuTurn || !reply.includes('|')) : []), ...(isMenuTurn ? message.meta.menuCards.slice(0,3).map(card=>`${card.name}|${card.description}`) : [])];
         const visibleQuickReplies = [...new Set(displayReplies)].filter(reply => {
           const card = quickReplyCard(reply);
+          if (/[?？]|제가|드릴|까요|보실래|고르실/.test(card.title)) return false;
+          if (!message.meta?.menuCards?.some(choice=>choice.name === card.title) && ([...card.title].length < 2 || [...card.title].length > 8)) return false;
           if (['비교하기', '메뉴 탐색'].includes(card.title)) return false;
-          if (isCurrentLocationIntent(card.title) && !canUseCurrentLocation()) return false;
           return true;
         });
         if (visibleQuickReplies.length) {
@@ -1723,7 +1742,8 @@
             if (card.title === '다른 메뉴 보기') button.classList.add('menu-more');
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
             button.historyLabel = card.title;
-            button.historyMessage = message.meta?.turnPolicy?.next_question?.chips?.find(choice=>choice.label === card.title)?.message;
+            button.historyMessage = (message.meta?.turnPolicy?.answerChoices || message.meta?.turnPolicy?.next_question?.chips || []).find(choice=>choice.label === card.title || choice.label === card.originalTitle)?.message;
+            if (answerLayout === 'region' && card.title === '현재 위치 연결') { button.classList.add('location-primary'); button.historyMessage = '지금 내 주변에서 찾아줘'; }
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
             title.textContent = card.title;
@@ -1748,16 +1768,18 @@
             }
             button.addEventListener('click', () => {
               if (button.disabled) return;
-              const isCuisineCategory = /^(?:한식|중식|일식|양식|분식)$/.test(card.title);
+              const isCuisineCategory = /^(?:한식|중식|일식|양식|분식|카페·디저트)$/.test(card.title);
               if (card.description && !isCuisineCategory && !isCurrentLocationIntent(card.title) && !/^(?:지역 직접 입력|직접 입력|지역 정하기)$/.test(card.title)) {
                 chooseMenuCard(card.title);
                 return;
               }
-              const policyChoice = message.meta?.turnPolicy?.next_question?.chips?.find(choice => choice.label === card.title);
-              routeQuestion(policyChoice?.message || ({ '제가 골라드릴까요?':'알아서 골라줘', '메뉴 고민하기':'오늘 뭐 먹을지 같이 골라줘', '식당 찾기':'먹을 곳 찾아줘' }[card.title]) || card.prompt);
+              const policyChoice = (message.meta?.turnPolicy?.answerChoices || message.meta?.turnPolicy?.next_question?.chips || []).find(choice => choice.label === card.title || choice.label === card.originalTitle);
+              routeQuestion(card.title === '네, 골라주세요' ? card.title : button.historyMessage || policyChoice?.message || ({ '다른 곳 보기':'다른 곳도 보여줘', '메뉴 고민하기':'오늘 뭐 먹을지 같이 골라줘', '식당 찾기':'먹을 곳 찾아줘' }[card.title]) || card.prompt);
             });
             if (menuChoice) menus.appendChild(button);
             else if (card.title === '다른 메뉴 보기') menuActions.appendChild(button);
+            else if (answerLayout === 'category') (card.title === '네, 골라주세요' ? answerBottom : answerTiles).appendChild(button);
+            else if (answerLayout === 'region') (card.title === '현재 위치 연결' ? answerTop : card.title === '직접 입력' ? answerBottom : answerTiles).appendChild(button);
             else answers.appendChild(button);
           });
         }
@@ -1766,6 +1788,7 @@
         if (allowed('question') && message.meta?.turnPolicy?.questionText) {
           const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; bubble.appendChild(question);
         }
+        for (const group of [answerTop, answerTiles, answerBottom]) if (group.children.length) answers.appendChild(group);
         if (allowed('chips') && answers.children.length) bubble.appendChild(answers);
         if (allowed('chips') && menuActions.children.length) bubble.appendChild(menuActions);
         if (allowed('chips') && message.meta?.turnPolicy?.expansionChoices?.length) {
@@ -1779,9 +1802,9 @@
         }
         if (allowed('chips') && message.meta?.turnPolicy?.actionChips?.length) {
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
-          message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
-            const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label;
-            button.addEventListener('click', () => { if (!button.disabled) routeQuestion(label); }); actions.appendChild(button);
+          message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '다른 곳 보기', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
+            const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label === '다른 곳도 보여줘' ? '다른 곳 보기' : label;
+            button.addEventListener('click', () => { if (!button.disabled) routeQuestion(label === '다른 곳 보기' ? '다른 곳도 보여줘' : label); }); actions.appendChild(button);
           });
           bubble.appendChild(actions);
         }
@@ -1977,12 +2000,12 @@
       }
     }
     function isCurrentLocationIntent(value) {
-      return /^(?:현재\s*위치(?:\s*연결)?|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*에서\s*(?:찾기|찾아줘))?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾기|찾아줘|추천해줘|검색해줘))?)?$/.test(String(value || '').trim());
+      return /^(?:지금\s*내\s*주변에서\s*찾아줘|(?:현재\s*위치(?:\s*연결)?|내\s*(?:위치|주변))(?:\s*근처)?(?:\s*에서\s*(?:찾기|찾아줘))?(?:\s*(?:맛집|식당|카페)(?:\s*(?:찾기|찾아줘|추천해줘|검색해줘))?)?)$/.test(String(value || '').trim());
     }
 
     function chooseMenuCard(menuName) {
       if (generating) return;
-      routeQuestion(menuName + ' 먹고 싶어요');
+      routeQuestion(menuName + ' 먹을래');
     }
     function showChatView() {
       if (!currentId) currentId = `chat-${Date.now()}`;
@@ -2076,10 +2099,10 @@
         clearTimeout(progressTimer);
       }
     }
-    async function requestCurrentLocation(displayPrompt = '현재 위치 근처', { selectRegionOnly = false } = {}) {
+    async function requestCurrentLocation(displayPrompt = '지금 내 주변에서 찾아줘', { selectRegionOnly = false } = {}) {
       if (generating || locationRequestInFlight) return;
       showChatView();
-      const visiblePrompt = String(displayPrompt || '').trim() || '현재 위치 근처';
+      const visiblePrompt = String(displayPrompt || '').trim() || '지금 내 주변에서 찾아줘';
       appendMessage('user', visiblePrompt);
       if (!window.isSecureContext) {
         appendLocationFallback('insecure');
