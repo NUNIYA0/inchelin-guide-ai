@@ -25,7 +25,7 @@ export async function testChatInterface(runCase) {
   const env={OPENAI_API_KEY:'test-key',RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub'};
   const result=await runCase({message:'홍대에서 냉면 먹을 곳 찾아줘',env,naverResponse:query=>({items:query==='홍대 냉면'?[{title:'홍대냉면',category:'음식점>한식>냉면',roadAddress:'서울 마포구 홍대 1'}]:[]}),
     aiResponse:{message:'홍대에서 냉면을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:[{text:'합정에서도 냉면 먹을 곳 찾아줘'},{text:'성수에서도 냉면 먹을 곳 찾아줘'},{text:'냉면 말고 국밥 먹을 곳 찾아줘'}]}});
-  assert.ok(result.body.meta.relatedQuestions.every(item=>!['region','food','place','companion','more'].includes(item.axis)),'server preflight rejects even correctly classified empty combinations');
+  assert.ok(result.body.meta.relatedQuestions.every(item=>!['region','food','place','more'].includes(item.axis)),'empty search combinations are rejected; optional preferences can reuse the current verified pool');
   assert.ok(!result.calls.some(call=>call.href.includes('query=')&&new URL(call.href).searchParams.get('query')?.includes('합정')));
   assert.ok(result.body.meta.relatedQuestions.every(item=>!mentionedSearchRegion(item.text)||SEARCH_REGIONS.includes(mentionedSearchRegion(item.text))));
 
@@ -61,7 +61,7 @@ export async function testChatInterface(runCase) {
   const oldNode=new Node(),elements={chatSend:new Node(),chatInput:{...input,value:'',closest:input.closest}};
   const host={children:[oldNode],appendChild(node){this.children.push(node);},querySelector(selector){return selector.includes('status')?this.children.find(node=>node.className?.includes('status')&&!node.removed):oldNode;}};
   const generation=new Function('document','messagesEl','requestAssistant','$','followConversation','saveConversation',`
-    let generating=false,regeneratingAnswer=false,activeRequestController=null,generationTimers=[],conversationEpoch=0,chatMessages=[arguments[6]],autoFollowConversation=false,currentLocationName='',currentLocationCoords=null;
+    let generating=false,regeneratingAnswer=false,activeRequestController=null,generationTimers=[],conversationEpoch=0,chatMessages=[arguments[6]],autoFollowConversation=false,currentLocationName='',currentLocationCoords=null,lastAIRequest={messages:[]};
     const answerRequests=new WeakMap(); const normalizeMessage=value=>value;
     const isNearConversationBottom=()=>false,resizeInput=()=>{},showRequestError=()=>{},renderMessage=(message)=>{const node=document.createElement('div');messagesEl.appendChild(node);return node;};
     const appendMessage=()=>{throw Error('replacement must not append');};

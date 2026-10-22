@@ -790,7 +790,7 @@ function prioritizeSearchAxes(value, messages, state) {
     && !normalizeFoodAxis(firstText) && !mentionedSearchRegion(firstText)
     && !/다른|처음부터|초기화|아까|첫\s*번째|두\s*번째|세\s*번째/.test(firstText)) {
     const optional=fallbackResponseModeAnalysis(messages,state);
-    if(optional.slots.companion || optional.slots.parking!==null || optional.slots.other.length) {
+    if(optional.slots.companion || optional.slots.parking!==null || optional.slots.other.length || /\d+\s*(?:만원|만 원|원)/.test(firstText)) {
       analysis.intent='condition_change';analysis.sub_intent='add';analysis.change={slot:'preferences',action:'add'};
       analysis.slots={...optional.slots,region:null,food_type:null,menu:null};analysis.flags.new_topic='none';
       return normalizeAnalysis(analysis);
@@ -989,7 +989,8 @@ function menuQuestionResponse(stateValue, flow, analysis) {
   const food = state.slots.menu || state.slots.food_type;
   const intros = flow === 'menu_category' ? [state.slots.region ? `${state.slots.region}은 그대로 두고 먹고 싶은 종류부터 골라봐요.` : '오늘 먹을 메뉴를 함께 좁혀봐요.', '음식 종류부터 하나씩 골라볼게요.', '한 끼를 고르기 쉽게 나눠볼게요.', '먹고 싶은 방향부터 함께 정해봐요.']
     : flow === 'clarify' ? ['말씀하신 방향을 한 번만 더 알려주세요.', '어느 쪽을 도와드릴지 먼저 맞춰볼게요.', '고르고 싶은 방향부터 함께 맞춰봐요.', '도와드릴 내용이 정해지면 편하게 말해 주세요.']
-    : [`${food || '메뉴'} 드시고 싶으시군요. 먹을 지역만 정하면 찾아볼 수 있어요.`, '먹고 싶은 음식은 정했으니 지역을 골라봐요.', '식사할 곳을 찾기 전에 동네만 정해볼게요.'];
+    : food ? [`${food} 드시고 싶으시군요. 먹을 지역만 정하면 찾아볼 수 있어요.`, '먹고 싶은 음식은 정했으니 지역을 골라봐요.', '식사할 곳을 찾기 전에 동네만 정해볼게요.']
+      : ['먹을 곳을 함께 찾아볼게요. 먼저 지역부터 정해봐요.', '식사할 곳을 찾기 전에 동네부터 골라봐요.'];
   const intro = intros.find(value => !state.previousOpenings.includes(value.replace(/[*#\s]/g,'').split(/[.!?。]/)[0].slice(0,12))) || '한 끼를 함께 정해볼게요.';
   const canAsk = !state.askedSlots.includes(slot) && state.consecutiveQuestions < 2;
   if (canAsk) { state.askedSlots.push(slot); state.questionCount = Math.min(3,state.questionCount+1); state.consecutiveQuestions++; }
@@ -2497,6 +2498,8 @@ async function handleChat(request, env, execution = {}) {
     }));
   }
   if (!linkedPlaceResearch && ['menu_trouble','place_search'].includes(analysis.intent)) {
+    if(analysis.intent==='place_search'&&!responseState.slots.region&&!responseState.slots.use_current_location)
+      return json(menuQuestionResponse(responseState,'region',analysis));
     if (!responseState.slots.menu && (analysis.intent === 'menu_trouble' && responseState.slots.food_type || AUTO_MENU.test(latestUserMessage))) {
       return json(await modeAResponse(analysis,responseState,env,messages));
     }

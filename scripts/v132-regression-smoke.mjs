@@ -8,7 +8,7 @@ import {withTurnDeadline} from '../worker/turn-policy.js';
 export async function testV132(runCase){
   const classify=(text)=>({intent:/비교/.test(text)?'compare':/상세|자세/.test(text)?'specific_place':'condition_change',confidence:1,slots:{region:mentionedSearchRegion(text),...normalizeFoodAxis(text),companion:/회식/.test(text)?'회식':/혼자/.test(text)?'혼자':null}});
   const cards=['땅코참숯구이 강남역직영점','강남고기집 한판도 역삼본점','강남고기한상'].map((name,i)=>({id:'place'+i,name,address:'서울 강남구 1',category:'고깃집'}));
-  let previous=normalizeResponseState({slots:{region:'강남',menu:'삼겹살',companion:'회식'},lastCards:cards,askedSlots:['companion']});
+  let previous=normalizeResponseState({slots:{region:'강남',menu:'삼겹살'},lastCards:cards});
   const rounds=[];
   let active=0,maxActive=0;
   const preflight=async()=>{active++;maxActive=Math.max(active,maxActive);await new Promise(resolve=>setTimeout(resolve,35));active--;return true;};
@@ -22,7 +22,7 @@ export async function testV132(runCase){
   }
   assert.ok(maxActive>=2,'suggestion existence checks are concurrent');
   assert.ok(rounds[0].includes('food')&&rounds[0].includes('companion'));
-  assert.notDeepEqual(rounds[0],rounds[1]);assert.ok(rounds[1].includes('detail')&&rounds[1].includes('compare'),'less recent axes rotate forward');
+  assert.notDeepEqual(rounds[0],rounds[1]);assert.ok(rounds[1].every(axis=>!rounds[0].includes(axis)),'consecutive axes do not repeat');
   const named=`${cards[0].name}랑 ${cards[1].name} 비교해줘`;
   assert.ok(named.length>30&&named.length<=40);
   const state=normalizeResponseState({lastCards:cards,slots:{region:'강남',menu:'삼겹살'}});
@@ -65,7 +65,7 @@ export async function testV132(runCase){
   const old=client.generateAnswer({messages:[]});client.newChat();assert.deepEqual(client.messages,[]);assert.equal(client.last,null);client.begin();
   const fresh=client.generateAnswer({messages:[]});assert.equal(timerMap.size,2);
   pending[0].reject(new Error('late previous conversation failure'));await old;assert.equal(errors.length,0);assert.equal(timerMap.size,2,'old finalizer must not clear new timers');assert.equal(client.busy,true);
-  [...timerMap.values()].find(t=>t.ms===15000).action();assert.match(host.children.at(-1).label.textContent,/찾는 중/);
+  [...timerMap.values()].find(t=>t.ms===20000).action();assert.match(host.children.at(-1).label.textContent,/조금 더 걸리고/);
   pending[1].resolve({content:'new response',restaurants:[],quickReplies:[],meta:{}});await fresh;
   assert.deepEqual(client.messages.map(m=>m.content),['new','new response']);assert.deepEqual(saved,['new response']);assert.equal(timerMap.size,0);
   assert.match(html,/\$\('#startButton'\)\.addEventListener\('click', newChat\)/);assert.match(html,/\$\('#mobileStartButton'\)\.addEventListener\('click', newChat\)/);

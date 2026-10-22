@@ -21,7 +21,7 @@ export async function testV134(runCase){
     assert.equal(qs.length,pending?2:3,JSON.stringify(qs));
     assert.equal(new Set(qs.map(q=>q.axis)).size,qs.length);
     assert.ok(qs.filter(q=>q.axis==='detail').length<=1);assert.ok(qs.filter(q=>q.axis==='compare').length<=1);
-    assert.ok(qs.some(q=>(pending?['region','food']:['region','food','companion']).includes(q.axis)));
+    assert.ok(qs.some(q=>(pending?['region','food']:['region','food','companion','vibe','facility']).includes(q.axis)));
     if(pending)assert.equal(qs.filter(q=>['detail','compare'].includes(q.axis)).length,1);
     assert.ok(qs.every(q=>!/첫\s*번째|두\s*번째|거기|그\s*곳|어떤 지역/.test(q.text)));
   };
@@ -33,7 +33,7 @@ export async function testV134(runCase){
       return area===region&&dish===food?realistic(region,food):alternate(area,dish);
     }});
     assert.equal(initial.body.restaurants.length,3,prompt);assert.ok(initial.body.restaurants.every(c=>c.parcelAddress));
-    contract(initial.body,true);
+    contract(initial.body,false);
     for(const [label,message] of [['혼자','혼자 가요'],['2~3명','2~3명이에요'],['회식','회식이에요'],['가족','가족과 가요']]){
       const assistant=client.normalizeMessage({role:'assistant',content:initial.body.message,restaurants:initial.body.restaurants,meta:initial.body.meta});
       const request=client.buildAIRequest([{role:'user',content:prompt},assistant,{role:'user',content:message}]);

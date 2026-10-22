@@ -19,7 +19,7 @@ export async function testV133(runCase){
   const env={OPENAI_API_KEY:'test-key',RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub'};
   const dataset=q=>{const region=mentionedSearchRegion(q)||'홍대',food=normalizeFoodAxis(q)?.menu||'냉면';return {items:[0,1,2].map(i=>({title:region+food+'식당'+i,category:'한식>'+food,roadAddress:'서울 '+region+' 테스트길 '+i}))};};
   const first=await runCase({message:'홍대에서 냉면 먹을래',env,naverResponse:dataset});
-  assert.equal(first.body.restaurants.length,3);assert.equal(first.body.meta.relatedQuestions.length,2);
+  assert.equal(first.body.restaurants.length,3);assert.equal(first.body.meta.relatedQuestions.length,3);
   assert.ok(rules.isCurrent(first.body.meta));assert.ok(rules.isCurrent(first.body.meta.responseModeState));
   const refined=await runCase({message:'회식이에요',env,context:{responseModeState:first.body.meta.responseModeState},naverResponse:q=>({items:dataset(q).items.slice(0,1)})});
   assert.deepEqual(refined.body.restaurants.map(x=>x.id),first.body.restaurants.map(x=>x.id));

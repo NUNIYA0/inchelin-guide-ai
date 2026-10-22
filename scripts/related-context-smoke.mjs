@@ -29,7 +29,7 @@ export async function testRelatedContext(runCase){
   assert.equal(relatedPattern('역삼에서도 삼겹살 먹을 곳 찾아줘',state),relatedPattern('성수에서도 국밥 먹을 곳 찾아줘',state),'slot substitutions do not disguise the same template');
   const env={OPENAI_API_KEY:'test-key',RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub'};
   const search=await runCase({message:'강남에서 삼겹살 먹을래',env,naverResponse:query=>({items:[{title:(mentionedSearchRegion(query)||'강남')+(normalizeFoodAxis(query)?.menu||'삼겹살')+'집',category:'음식점>'+(normalizeFoodAxis(query)?.menu||'삼겹살'),roadAddress:'서울 '+(mentionedSearchRegion(query)||'강남')+' 테스트길 1'}]})});
-  assert.ok(search.body.meta.relatedQuestions.length<=2);assert.ok(search.body.meta.relatedQuestions.every(item=>item.intent!=='service'&&item.axis!=='companion'));
+  assert.ok(search.body.meta.relatedQuestions.length<=3);assert.ok(search.body.meta.relatedQuestions.every(item=>item.intent!=='service'));
   const modelCall=search.calls.find(call=>call.body?.text?.format?.name==='inchelin_chat_response');assert.match(modelCall.body.instructions,/related_question_context/);assert.match(modelCall.body.instructions,/pending_question/);assert.match(modelCall.body.instructions,/askedSlots/);assert.match(modelCall.body.instructions,/template_history/);
   console.log('v128 related context: pending-slot/mixed-axis conflict, actual detail/card validation, max two, service isolation, normalized three-turn template guard and model input context passed.');
 }

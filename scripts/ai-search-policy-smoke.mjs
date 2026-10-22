@@ -34,7 +34,7 @@ export async function testAISearchPolicy(runCase) {
   assert.equal(normalized.body.meta.analysis.slots.food_type, '면');
   assert.equal(normalized.body.meta.responseModeState.slots.region, '홍대');
   assert.equal(new URL(localCalls(normalized)[0].href).searchParams.get('query'), '홍대 냉면');
-  assert.equal(normalized.body.meta.turnPolicy.next_question.slot, 'companion');
+  assert.equal(normalized.body.meta.turnPolicy.next_question, null);
   const strictDish = await runCase({ message: '성수에서 스테이크 먹을 곳 찾아줘', env, naverResponse: { items: [
     ...items('성수', '양식>스테이크', '스테이크').items.slice(0, 1),
     ...items('성수', '한식>돼지고기구이', '고깃집').items.slice(0, 1),
@@ -63,14 +63,14 @@ export async function testAISearchPolicy(runCase) {
   assert.ok(foodChange.body.restaurants.every(card => card.category === '국밥'));
   // ⑤ Vague food asks region before menu exploration; there is no guessed cuisine.
   const vague = await runCase({ message: '맛있는 거 찾아줘', env });
-  assert.equal(vague.body.meta.mode, 'B'); assert.equal(vague.body.meta.turnPolicy.next_question.slot, 'menu_category');
+  assert.equal(vague.body.meta.mode, 'B'); assert.equal(vague.body.meta.turnPolicy.next_question.slot, 'region');
   assert.equal(vague.body.meta.responseModeState.slots.food_type, null); assert.equal(vague.body.restaurants.length, 0);
   const vagueBare = await runCase({ message: '맛있는 거', env });
-  assert.equal(vagueBare.body.meta.turnPolicy.next_question.slot, 'menu_category');
+  assert.equal(vagueBare.body.meta.turnPolicy.next_question.slot, 'region');
   assert.equal(vagueBare.calls.length, 0);
   const vagueArea = await runCase({ message: '홍대입구', env, context: { responseModeState: vague.body.meta.responseModeState } });
   assert.equal(vagueArea.body.meta.responseModeState.slots.region,'홍대');
-  assert.equal(vagueArea.body.meta.menuCards.length,3);
+  assert.equal(vagueArea.body.meta.menuCards.length,0);assert.equal(vagueArea.body.meta.turnPolicy.next_question.slot,'menu_category');
   const explore = await runCase({ message: '오늘 뭐 먹을지 같이 골라줘', env, context: { responseModeState: vagueArea.body.meta.responseModeState } });
   assert.equal(explore.body.meta.mode, 'A'); assert.equal(explore.body.meta.menuCards.length, 3);
   assert.equal(explore.body.meta.responseModeState.slots.region, '홍대');

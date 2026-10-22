@@ -23,6 +23,7 @@ import { testV130 } from './v130-regression-smoke.mjs';
 import { testV132 } from './v132-regression-smoke.mjs';
 import { testV133 } from './v133-regression-smoke.mjs';
 import { testV134 } from './v134-regression-smoke.mjs';
+import { testV135 } from './v135-regression-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -92,6 +93,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   }
 }
 
+await testV135(runCase);
 {
   const result = await runCase({
     message: "https://naver.me/test 해산물 빼고, 맛있는 메뉴 추천해줘",
@@ -440,8 +442,8 @@ function semanticAnalysis(overrides = {}) {
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "inchelin" },
     expectedStatus: 200,
   });
-  assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
+  assert.match(result.body.message, /지금 어디세요/);
+  assert.deepEqual(result.body.suggestions, ['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
   assert.equal(result.calls.length, 0);
 }
 
@@ -534,8 +536,8 @@ function semanticAnalysis(overrides = {}) {
     ],
     env: { OPENAI_API_KEY: "test-key", RESTAURANT_DATA_SOURCE: "naver" },
   });
-  assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
+  assert.match(result.body.message, /지금 어디세요/);
+  assert.deepEqual(result.body.suggestions, ['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
   assert.equal(result.calls.length, 0);
 }
 
@@ -926,7 +928,7 @@ function semanticAnalysis(overrides = {}) {
     },
   });
   assert.equal(result.body.restaurants[0].name, "강남국밥");
-  assert.deepEqual(result.body.suggestions, ["혼자", "2~3명", "회식", "가족", "상관없어요"]);
+  assert.deepEqual(result.body.suggestions, []);
 }
 
 {
@@ -1063,8 +1065,8 @@ function semanticAnalysis(overrides = {}) {
       needsLocation: true,
     }),
   });
-  assert.match(result.body.message, /끌리는 쪽 있으세요/);
-  assert.deepEqual(result.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
+  assert.match(result.body.message, /지금 어디세요/);
+  assert.deepEqual(result.body.suggestions, ['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
   assert.equal(result.calls.filter(call => call.href.includes("api.openai.com")).length, 0);
 }
 
@@ -1388,7 +1390,7 @@ function semanticAnalysis(overrides = {}) {
   assert.equal(second.body.restaurants.length, 3);
   assert.equal(second.body.meta.responseModeState.slots.menu, "삼겹살");
   assert.equal(second.body.meta.responseModeState.slots.region, "역삼");
-  assert.deepEqual(second.body.suggestions, ["혼자", "2~3명", "회식", "가족", "상관없어요"]);
+  assert.deepEqual(second.body.suggestions, []);
   history.push({ role: "user", content: "역삼" }, { role: "assistant", content: second.body.message });
   const newItem = makePlace("역삼새돼지구이", "한식>돼지고기구이", 7);
   const third = await runCase({

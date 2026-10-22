@@ -11,7 +11,7 @@ export const RELATED_INTENTS = ['place_search','condition_change','followup','co
 // and named-place details, in addition to the five common routing intents.
 const TABLE_INTENTS = {place_search:['specific_place'],condition_change:['specific_place'],followup:['specific_place'],menu_trouble:['menu_trouble','place_search'],food_talk:['menu_trouble','food_talk','place_search'],compare:['specific_place','followup'],specific_place:['specific_place','followup'],service:['menu_trouble'],general:['menu_trouble'],out_of_scope:['menu_trouble']};
 export const RELATED_AXES={
-  place_search:['region','food','companion','compare','detail'],condition_change:['region','food','companion','compare','detail'],followup:['region','food','companion','compare','detail'],
+  place_search:['region','food','companion','vibe','facility','compare','detail'],condition_change:['region','food','companion','vibe','facility','compare','detail'],followup:['region','food','companion','vibe','facility','compare','detail'],
   menu_trouble:['menu_batch','category','place','region','food'],compare:['detail','compare','region','food','companion'],specific_place:['detail','region','food','more','compare'],
   food_talk:['place','food_talk','category','menu_batch','region','food'],service:['service_criteria','service_regions','service_location','service_detail','start'],general:['service_criteria','service_regions','service_location','service_detail','start'],out_of_scope:['start']
 };
@@ -44,13 +44,16 @@ function foodIn(text) {
 }
 export function relatedAllowed(response) {
   const meta=response.meta||{},intent=meta.analysis?.intent||meta.intent||'general',state=meta.responseModeState||{};
-  if (meta.variant==='hard_reset' || ['menu_category','region','clarify','side_main'].includes(meta.flow) || meta.unsupportedRegion || meta.analysis?.confidence<.6) return false;
+  if(['missing_credentials','missing_configuration','authentication_failed','api_request_failed'].includes(meta.restaurantSearchStatus))return false;
+  if (intent==='service' || meta.error || meta.variant==='hard_reset' || ['menu_category','region','clarify','side_main'].includes(meta.flow) || meta.unsupportedRegion || meta.analysis?.confidence<.6) return false;
   if ((meta.restaurantSearchStatus==='no_results' || state.noResults) && !response.restaurants?.length) return false;
   if (meta.turnPolicy?.answerLayout==='region' || meta.turnPolicy?.answerLayout==='category') return false;
   return !!RELATED_QUESTION_POLICY[intent] && (['compare','specific_place','food_talk','service','general','out_of_scope'].includes(intent) || !!response.restaurants?.length || !!meta.menuCards?.length);
 }
 function axisAndKey(text,analysis,state) {
   const intent=analysis.intent,region=mentionedSearchRegion(text),food=foodIn(text);
+  if(intent==='condition_change' && /조용|분위기/.test(text))return {axis:'vibe',key:'vibe:quiet'};
+  if(intent==='condition_change' && /단체석|주차/.test(text))return {axis:'facility',key:'facility:'+(/주차/.test(text)?'parking':'group')};
   if (intent==='service') {
     const topic=/기준/.test(text)?'criteria':/지역/.test(text)?'regions':/위치/.test(text)?'location':/상세보기/.test(text)?'detail':'';
     return topic?{axis:'service_'+topic,key:'service:'+topic}:null;
@@ -95,7 +98,8 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
   if ([...text].length<12 || [...text].length>40 || /[\r\n]/.test(text) || (text.match(/[?？]/g)||[]).length>1 || /[.!。].+/.test(text)) return null;
   const unnamed=state.lastCards.reduce((value,card)=>value.split(card.name).join(''),text);
   if(/첫\s*번째|두\s*번째|세\s*번째|처음|마지막|거기|그\s*곳|그\s*집|[123]\s*(?:번째|번\s*식당)/.test(unnamed))return null;
-  if (!/(?:줘|어|야|해|까|래|있지)[.!?？]?$/.test(text) || /주세요|해\s*주세|같이\s*찾아주세/.test(text) || FORBIDDEN_COPY.test(text) || UNSUPPORTED.test(text) || SIDE_FOOD.test(text)) return null;
+  const preferenceOnly=/조용하게.*(?:추천|찾아)|혼자.*(?:보여|찾아)|단체석.*좋겠어/.test(text)&&!/확인|보장|돼\?|있어\?/.test(text);
+  if (!/(?:줘|어|야|해|까|래|있지)[.!?？]?$/.test(text) || /주세요|해\s*주세|같이\s*찾아주세/.test(text) || FORBIDDEN_COPY.test(text) || UNSUPPORTED.test(preferenceOnly?text.replace(/조용|분위기|단체석/g,''):text) || SIDE_FOOD.test(text)) return null;
   const region=mentionedSearchRegion(text);
   if (region && !SEARCH_REGIONS.includes(region)) return null;
   const analysis=classify(text,state);
@@ -109,6 +113,10 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
   if (explicitFood && !isMainDish(explicitFood)) return null;
   const descriptor=axisAndKey(text,analysis,state);
   if (!descriptor || descriptor.axis===pendingSlot) return null;
+  if(descriptor.axis==='companion' && (state.slots.companion||state.preferences.companion||state.askedSlots.includes('companion')))return null;
+  if(descriptor.axis==='vibe' && state.preferences.vibe)return null;
+  if(descriptor.axis==='facility' && (state.slots.parking!==null || state.slots.other.some(item=>/단체석/.test(item))))return null;
+  if(['place_search','condition_change','followup'].includes(parentIntent)&&state.relatedAxisHistory.at(-1)?.includes(descriptor.axis))return null;
   if([...text].length>30&&!['detail','compare'].includes(descriptor.axis))return null;
   if (descriptor.axis.startsWith('service_') && !['service','general'].includes(parentIntent))return null;
   if (!RELATED_AXES[parentIntent]?.includes(descriptor.axis))return null;
@@ -139,7 +147,7 @@ export function relatedTemplates(state,intent,context={}) {
   if(intent==='compare') return [...details,...comparisons,...SERVICE_TEXTS];
   if(intent==='specific_place') return [`${region}에서 ${food}집 다른 곳도 찾아줘`,'상세보기는 어떻게 이용하는 거야?',...details,...search,...SERVICE_TEXTS];
   if(intent==='food_talk') return [`${food} 먹을 곳도 같이 찾아줘`,`${food} 먹는 법도 조금 더 알려줘`,...menu,...SERVICE_TEXTS];
-  return [...search,...details,...comparisons];
+  return [...search,'조용하게 대화할 수 있는 곳으로 추천해줘','단체석 있는 곳이면 좋겠어',...details,...comparisons];
 }
 // Place responses reserve a primary-axis question; grounded detail/compare never
 // substitute for a failed region/food lookup or repeat their axis to pad counts.
@@ -152,7 +160,7 @@ export function selectRelatedAxes(candidates,{placeResponse=false,pending=false,
     const grounded=unique.find(item=>['detail','compare'].includes(item.axis));
     return [grounded,primary].filter(Boolean);
   }
-  const primary=unique.find(item=>['region','food','companion'].includes(item.axis));
+  const primary=unique.find(item=>['region','food','companion','vibe','facility'].includes(item.axis));
   if(!primary)return unique.filter(item=>['detail','compare'].includes(item.axis)).slice(0,2);
   const selected=unique.slice(0,limit);
   if(!selected.includes(primary))selected[selected.length-1]=primary;
@@ -176,7 +184,7 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
     const limit=meta.answer_plan?.includes('question')&&meta.turnPolicy?.questionText?2:3;
     const attempted=new Set();
     const chips=[...(response.suggestions||[]),...(meta.turnPolicy?.actionChips||[])].join(' ');
-    const priorities=['region','food','companion','detail','compare'];
+    const priorities=['region','food','companion','vibe','facility','detail','compare'];
     const axisScore=axis=>(state.relatedAxisHistory.at(-1)?.includes(axis)?4:0)+(state.relatedAxisHistory.at(-2)?.includes(axis)?2:0)+priorities.indexOf(axis)/10;
     const candidates=[...proposed.map(item=>({text:typeof item==='string'?item:item?.text,source:'model'})),...relatedTemplates(state,parentIntent,context).map(text=>({text,source:'template'}))]
       .map(candidate=>({...candidate,validated:validateRelated(candidate.text,options)})).filter(candidate=>candidate.validated);
@@ -189,7 +197,7 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
       const validated=candidate.validated;
       if(available.some(item=>item.validated.key===validated.key))continue;
       if(validated.axis==='menu_batch' && /다른 메뉴/.test(chips) || validated.axis==='more' && /다른 곳/.test(chips))continue;
-      if(['region','food','place','companion','more'].includes(validated.axis)) {
+      if(['region','food','place','companion','vibe','facility','more'].includes(validated.axis)) {
         if(!state.slots.region && !response.restaurants?.length)continue;
         const region=mentionedSearchRegion(validated.text)||state.slots.region;
         const food=foodIn(validated.text)||state.slots.menu||state.slots.food_type;

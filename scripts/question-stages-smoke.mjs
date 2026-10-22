@@ -76,8 +76,12 @@ export async function testQuestionStages(runCase) {
   ofClass(regionNode,'answer-tiles')[0].children[0].click();assert.equal(sent.at(-1),'강남이에요');
   const places={items:Array.from({length:3},(_,i)=>({title:dish+'집'+i,category:'한식>'+dish,roadAddress:'서울 강남구 역삼동 '+i,mapx:'1270000000',mapy:'375000000'}))};
   const found=(await run(sent.at(-1),region.meta.responseModeState,{naverResponse:places})).body;
-  assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','question','chips']);checkLabels(found);
-  const companion=render(found);assert.match(found.meta.turnPolicy.questionText,/누구와/);
+  assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','chips']);checkLabels(found);
+  assert.equal(found.meta.turnPolicy.questionText,'');
+  const choices=['혼자','2~3명','회식','가족','상관없어요'];
+  // The component can still render an explicitly supplied optional question;
+  // it is no longer automatically added to a ready search response.
+  const companion=render({...found,suggestions:choices,meta:{...found.meta,answer_plan:[...found.meta.answer_plan,'question'],turnPolicy:{...found.meta.turnPolicy,questionText:'누구와 가세요?',answerLayout:'companion',answerChoices:choices.map(label=>({label,message:label==='회식'?'회식이에요':label}))}}});
   const group=ofClass(companion,'question-companion')[0];assert.equal(group.children.length,5);
   assert.deepEqual(group.children.map(button=>button.historyLabel),['혼자','2~3명','회식','가족','상관없어요']);
   assert.equal(ofClass(group,'skip-chip').length,1);assert.equal(group.children.at(-1),ofClass(group,'skip-chip')[0]);

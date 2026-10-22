@@ -23,13 +23,12 @@ export async function testTurnPolicy(runCase) {
   assert.equal(first.body.meta.analysis.can_search, true);
   assert.equal(first.body.restaurants.length, 3);
   assert.ok(first.body.restaurants.every(card => card.id.startsWith('naver:')));
-  assert.equal(questions(first.body), 1);
+  assert.equal(questions(first.body), 0);
   assert.equal(first.body.meta.turnPolicy.cardFirst, false);
   assert.ok(first.body.meta.turnPolicy.intro);
-  assert.equal(first.body.meta.turnPolicy.next_question.slot, 'companion');
-  assert.deepEqual(first.body.suggestions, ['혼자', '2~3명', '회식', '가족', '상관없어요']);
-  assert.deepEqual(first.body.suggestions, first.body.meta.turnPolicy.next_question.chips.map(chip => chip.label));
-  assert.equal(first.body.meta.turnPolicy.questionSource, 'model');
+  assert.equal(first.body.meta.turnPolicy.next_question, null);
+  assert.deepEqual(first.body.suggestions, []);
+  assert.equal(first.body.meta.turnPolicy.questionSource, null);
   assert.match(first.body.message, /^강남역 삼겹살로 먼저 식당 3곳을 골랐어요/);
   assert.equal(first.body.meta._turnDraft, undefined);
   boundedCopy(first.body);
@@ -76,7 +75,7 @@ export async function testTurnPolicy(runCase) {
   assert.deepEqual(again.body.meta.responseModeState.askedSlots, ['region']);
   // 6. At most three questions overall and at most two additional refining questions.
   let response = await runCase({ message: '강남에서 한식 먹을 곳 찾아줘', env, naverResponse: places('강남') });
-  assert.equal(response.body.meta.turnPolicy.next_question.slot, 'companion');
+  assert.equal(response.body.meta.turnPolicy.next_question, null);
   for (const [message, area, menu, next] of [
     ['가족과 함께 가요', '강남', '삼겹살', null],
     ['국밥 먹고 싶어요', '강남', '국밥', null],
@@ -88,10 +87,10 @@ export async function testTurnPolicy(runCase) {
     assert.ok(response.body.meta.responseModeState.refinementQuestionCount <= 2);
     boundedCopy(response.body);
   }
-  assert.equal(response.body.meta.responseModeState.questionCount, 1);
+  assert.equal(response.body.meta.responseModeState.questionCount, 0);
   assert.equal(response.body.meta.responseModeState.refinementQuestionCount, 0);
   assert.equal(questions(response.body), 0);
-  assert.equal(new Set(response.body.meta.responseModeState.askedSlots).size, 1);
+  assert.equal(new Set(response.body.meta.responseModeState.askedSlots).size, 0);
   // 7. FAQ, comparison and a specific restaurant cannot start a new interview.
   const faq = await runCase({ message: '추천은 어떤 기준으로 하나요?', env, context: { responseModeState: first.body.meta.responseModeState } });
   const compare = await runCase({ message: '첫 번째랑 두 번째 비교해줘', env, context: { responseModeState: first.body.meta.responseModeState } });
@@ -100,7 +99,7 @@ export async function testTurnPolicy(runCase) {
   for (const result of [faq, compare, specific]) {
     assert.equal(questions(result.body), 0);
     assert.equal(result.body.meta.turnPolicy.next_question, null);
-    assert.equal(result.body.meta.responseModeState.questionCount, 1);
+    assert.equal(result.body.meta.responseModeState.questionCount, 0);
   }
   // 8. Actual plugin/chip messages and typed messages share one path.
   const pluginMessage = situationRequest(['회식', '주차 필요']);
@@ -110,8 +109,7 @@ export async function testTurnPolicy(runCase) {
   assert.equal(plugin.body.meta.responseModeState.slots.parking, true);
   assert.match(plugin.body.meta.notice, /주차.*매장 확인/);
   assert.doesNotMatch(plugin.body.message, /주차.*가능/);
-  const choice = first.body.meta.turnPolicy.next_question.chips.find(chip => chip.label === '회식');
-  assert.equal(choice.message, '회식이에요');
+  assert.equal(first.body.meta.turnPolicy.next_question, null,'enough primary information never adds a required companion question');
   const pref = await runCase({ message: '조용한 곳으로, 예산 2만원 이하', env, context: { responseModeState: first.body.meta.responseModeState }, naverResponse: places() });
   assert.equal(pref.body.meta.responseModeState.preferences.budget, '2만원 이하');
   assert.match(pref.body.meta.responseModeState.preferences.vibe, /조용/);
@@ -133,11 +131,11 @@ export async function testTurnPolicy(runCase) {
   // Malformed/forbidden question text, generation failure and timeout use templates.
   const invalid = await runCase({ message: '강남역에서 삼겹살 먹을건데', env, naverResponse: places(),
     aiResponse: { message: '검색 결과', next_question: { slot: 'companion', text: '예산과 분위기는 어떤가요?', chips: [] }, selectedRestaurantIds: [] } });
-  assert.equal(invalid.body.meta.turnPolicy.questionSource, 'template');
-  assert.equal(invalid.body.meta.turnPolicy.next_question.text, '누구와 가세요?');
+  assert.equal(invalid.body.meta.turnPolicy.questionSource, null);
+  assert.equal(invalid.body.meta.turnPolicy.next_question, null);
   const failed = await runCase({ message: '강남역에서 삼겹살 먹을건데', env, naverResponse: places(), generationStatus: 504 });
   assert.equal(failed.body.restaurants.length, 3);
-  assert.equal(failed.body.meta.turnPolicy.questionSource, 'template');
+  assert.equal(failed.body.meta.turnPolicy.questionSource, null);
   await assert.rejects(withTurnDeadline(() => new Promise(() => {}), 5), /turn_timeout/);
   const plan = planTurn(first.body, { ...first.body.meta.responseModeState, questionCount: 3 }, '다시 추천해줘');
   assert.equal(plan.next_question, null);

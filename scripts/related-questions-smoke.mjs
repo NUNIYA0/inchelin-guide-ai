@@ -28,7 +28,7 @@ export async function testRelatedQuestions(runCase) {
     assert.ok(!body.meta.analysis?.related_questions,'raw model candidates never leak');
   };
   check(first.body,'place_search');
-  assert.ok(!first.body.meta.relatedQuestions.some(item=>item.axis==='companion'),'do not compete with the live companion question');
+  assert.equal(first.body.meta.turnPolicy.next_question,null,'ready search has examples rather than an automatic question');
   const matrix=[
     ['menu_trouble','한식으로 골라줘',{}],
     ['followup','첫 번째 집 주차돼?',state],
@@ -44,7 +44,8 @@ export async function testRelatedQuestions(runCase) {
     const result=await run(message,previous,extra);check(result.body,intent,intent==='out_of_scope'?1:0);
     if(intent==='compare') assert.ok(result.body.meta.relatedQuestions.some(item=>item.axis==='detail'));
     if(!['service','general'].includes(intent))assert.ok(result.body.meta.relatedQuestions.every(item=>!item.axis.startsWith('service_')),'FAQ questions only appear after service/general answers');
-    if(['service','general'].includes(intent)) assert.ok(result.body.meta.relatedQuestions.some(item=>item.axis==='start'));
+    if(intent==='service')assert.equal(result.body.meta.relatedQuestions.length,0);
+    if(intent==='general') assert.ok(result.body.meta.relatedQuestions.some(item=>item.axis==='start'));
   }
   for(const message of ['오늘 뭐 먹지','냉면 먹고 싶어','계란찜 먹고 싶어']){
     const result=await run(message);assert.equal(result.body.meta.relatedQuestions.length,0,message);assert.ok(!result.body.meta.answer_plan.includes('related_questions'));
@@ -53,7 +54,7 @@ export async function testRelatedQuestions(runCase) {
   const timeout=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {generationStatus:504});check(timeout.body,'timeout fallback');assert.ok(timeout.body.meta.relatedQuestions.every(item=>item.source==='template'));
   const proposed=[{text:'성수에서도 국밥 먹을 곳 찾아줘'},{text:'국밥 말고 냉면 먹을 곳 찾아줘'},{text:'국밥집 영업시간도 함께 알려줘'},{text:'삼겹살 말고 소주 마실 곳 알려줘'}];
   const model=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:proposed}});
-  check(model.body,'model filtering');assert.equal(model.body.meta.relatedQuestions.filter(item=>item.source==='model').length,1,'pending question reserves one named-card axis and one validated model search axis');
+  check(model.body,'model filtering');assert.equal(model.body.meta.relatedQuestions.filter(item=>item.source==='model').length,2,'ready response can use both validated model alternatives');
   const unknown=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:[{text:'부산에서도 국밥 먹을 곳 찾아주세요'}]}});
   assert.ok(unknown.body.meta.relatedQuestions.every(item=>!item.text.includes('부산')));
   const malformed=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:{bad:true}}});check(malformed.body,'malformed-generation fallback');
@@ -80,7 +81,7 @@ export async function testRelatedQuestions(runCase) {
   const pure={message:'알려드릴게요.',restaurants:[],meta:{intent:'service',answer_plan:['text'],responseModeState:{slots:{}}}};
   await assert.rejects(withTurnDeadline(()=>new Promise(()=>{}),1),/turn_timeout/);
   const afterDeadline=await applyRelatedQuestions(pure,{messages:[]},()=>({intent:'service',confidence:1,slots:{}}));
-  assert.ok(afterDeadline.meta.relatedQuestions.length>=2);assert.ok(afterDeadline.meta.relatedQuestions.every(item=>item.source==='template'));
+  assert.equal(afterDeadline.meta.relatedQuestions.length,0,'service never has follow-up examples');
   const seen={...state,shownSuggestions:[{text:'역삼에서도 국밥 먹을 곳 찾아주세요',key:'region:역삼:국밥'}]};
   assert.equal(validateRelated('역삼 지역에서도 국밥집 찾아주세요',{state:seen,parentIntent:'place_search',classify:()=>({intent:'condition_change',confidence:1,slots:{region:'역삼',menu:'국밥'}}),history:[]}),null,'semantic duplicates are rejected across paraphrases');
   const rejectAll=await applyRelatedQuestions(pure,{messages:[]},()=>({intent:'out_of_scope',confidence:1}));assert.equal(rejectAll.meta.relatedQuestions.length,0);assert.ok(!rejectAll.meta.answer_plan.includes('related_questions'));

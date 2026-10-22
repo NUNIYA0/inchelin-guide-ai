@@ -30,9 +30,10 @@ export function answerPlanFor(analysis = {}, state = {}, latest = '') {
   if (analysis.confidence != null && analysis.confidence < .6) return ['text', 'question', 'chips'];
   let plan;
   switch (analysis.intent) {
-    case 'menu_trouble': plan = slots.menu ? region ? ['text', 'place_cards', 'source', 'question', 'chips'] : ['text', 'question', 'chips']
+    case 'menu_trouble': plan = slots.menu ? region ? ['text', 'place_cards', 'source', 'chips'] : ['text', 'question', 'chips']
       : slots.food_type || AUTO_MENU.test(latest) ? ['text', 'menu_cards', 'notice', 'chips'] : ['text', 'question', 'chips']; break;
-    case 'place_search': plan = food && region ? ['text', 'place_cards', 'source', 'question', 'chips'] : ['text', 'question', 'chips']; break;
+    case 'place_search': plan = food && region ? ['text', 'place_cards', 'source', 'chips'] : ['text', 'question', 'chips']; break;
+    case 'service': plan = ['text','chips']; break;
     case 'followup': plan = ['text', 'place_cards', 'source']; break;
     case 'condition_change': plan = food && region ? ['text', 'place_cards', 'source', 'chips'] : ['text', 'question', 'chips']; break;
     case 'compare': plan = ['text', 'chips']; break;
@@ -59,6 +60,7 @@ export function applyAnswerPlan(response, payload = {}) {
   if (meta.turnPolicy?.expansionChoices?.length && !plan.includes('chips')) plan.push('chips');
   const allow = block => plan.includes(block);
   const policy = { ...(meta.turnPolicy || {}) };
+  if(intent==='service')policy.expansionChoices=[{label:'메뉴 고르기',message:'오늘 뭐 먹을지 같이 골라줘'},{label:'지역 고르기',message:'지역 바꾸기'}];
   const layout = meta.flow === 'menu_category' ? 'category' : meta.flow === 'region' ? 'region' : policy.next_question?.slot === 'region' || meta.mode === 'B' && policy.missing_slots?.includes('region') ? 'region' : policy.next_question?.slot === 'companion' ? 'companion' : null;
   policy.answerLayout = layout;
   policy.answerChoices = (layout === 'category' ? CATEGORY_ANSWERS : layout === 'region' ? REGION_ANSWERS : policy.next_question?.chips || []).filter(choice=>isUserAnswerLabel(choice.label));
@@ -76,6 +78,7 @@ export function applyAnswerPlan(response, payload = {}) {
   // Food conversation gets one conversational invitation, never restaurant cards.
   if (intent === 'food_talk') { policy.intro = response.message.replace(/[^.!?]*[?？]/g, '').trim(); policy.questionText = '이 음식으로 한 끼도 골라볼까요?'; policy.next_question = null; }
   const suggestions = allow('chips') ? layout ? policy.answerChoices.map(choice=>choice.label) : (response.suggestions || []).filter(value=>value.includes('|') && allow('menu_cards') ? validMenuNames.has(value.split('|')[0]) : isUserAnswerLabel(value.split('|')[0])) : allow('menu_cards') ? (response.suggestions || []).filter(value => value.includes('|') && validMenuNames.has(value.split('|')[0])) : [];
+  if(intent==='service')suggestions.length=0; // Only the two alternative actions above, not duplicate fixed chips.
   if (intent === 'compare') policy.actionChips = ['다른 곳도 보여줘','조건 바꾸기'];
   if (intent === 'out_of_scope') suggestions.push('메뉴 고민하기','식당 찾기');
   policy.actionChips = (policy.actionChips || []).map(label=>label === '다른 곳도 보여줘' ? '다른 곳 보기' : label).filter(isUserAnswerLabel);

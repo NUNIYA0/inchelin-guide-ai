@@ -16,11 +16,9 @@ export async function testWelcomeFirstSearch(runCase){
   const run=message=>runCase({message,env,naverResponse:fixture,aiResponses:[dirty,dirty]});
   const shape=body=>{
     assert.equal(body.restaurants.length,3);assert.equal(body.meta.analysis.intent,'place_search');
-    for(const block of ['text','place_cards','source','question','chips','related_questions'])assert.ok(body.meta.answer_plan.includes(block),block);
-    assert.equal(body.meta.turnPolicy.questionText,'누구와 가세요?');assert.equal(body.suggestions.length,5);
-    assert.equal(body.meta.relatedQuestions.length,2);assert.ok(body.meta.relatedQuestions.every(item=>['region','food','compare','detail'].includes(item.axis)));
-    assert.equal(body.meta.relatedQuestions.filter(item=>['compare','detail'].includes(item.axis)).length,1);
-    assert.equal(body.meta.relatedQuestions.filter(item=>['region','food'].includes(item.axis)).length,1);
+    for(const block of ['text','place_cards','source','chips','related_questions'])assert.ok(body.meta.answer_plan.includes(block),block);
+    assert.equal(body.meta.turnPolicy.questionText,'');assert.equal(body.suggestions.length,0);
+    assert.equal(body.meta.relatedQuestions.length,3);assert.ok(body.meta.relatedQuestions.every(item=>['region','food','companion','vibe','facility','compare','detail'].includes(item.axis)));
     assert.doesNotMatch(body.message,FORBIDDEN_COPY);assert.doesNotMatch(body.message,/새로 말씀|다시|준비|처리|생성|분석/);
   };
   const nodes=node=>[node,...node.children.flatMap(nodes)];
@@ -65,7 +63,7 @@ export async function testWelcomeFirstSearch(runCase){
     const {api,elements,requests}=await app();api.clickRow(rows.indexOf(row));await api.done();
     assert.equal(requests.length,1);assert.equal(requests[0].messages.length,1,'welcome clears stale history');assert.equal(requests[0].context.responseModeState,null);
     assert.equal(api.messages.length,2);assert.equal(api.messages[0].content,row.prompt);assert.equal(elements.welcome.style.display,'none');assert.ok(elements.chatView.classList.contains('active'));
-    assert.equal(cls(elements.messages,'restaurant-card').length,3,row.prompt+' actual welcome render');assert.equal(cls(elements.messages,'turn-question').length,1);assert.ok(cls(elements.messages,'related-question').length);
+    assert.equal(cls(elements.messages,'restaurant-card').length,3,row.prompt+' actual welcome render');assert.equal(cls(elements.messages,'turn-question').length,0);assert.ok(cls(elements.messages,'related-question').length);
     assert.deepEqual(api.messages[1].restaurants.map(c=>c.id),direct.body.restaurants.map(c=>c.id));assert.deepEqual(api.messages[1].meta.answer_plan,direct.body.meta.answer_plan);
     const typed=await app();typed.api.type(row.prompt);await typed.api.done();assert.equal(cls(typed.elements.messages,'restaurant-card').length,3);assert.deepEqual(typed.requests[0].messages,requests[0].messages);assert.deepEqual(typed.requests[0].context,requests[0].context);
   }
@@ -74,7 +72,7 @@ export async function testWelcomeFirstSearch(runCase){
   assert.throws(()=>check({content:'홍대에서 냉면 먹을 곳 3곳을 골라봤어요.',restaurants:[],meta:null}),/incomplete_answer/);
   assert.throws(()=>check({content:'3곳을 골라봤어요.',restaurants:[],meta:{answer_plan:['text']}}),/incomplete_answer/);
   const errorHost=new Node(),retry=new Function('document','messagesEl','isNearConversationBottom','followConversation','generateAnswer',fn('uiIcon')+html.match(/    function setIconLabel[^\n]+/)[0]+fn('showRequestError')+';return showRequestError;')({createElement:tag=>new Node(tag)},errorHost,()=>false,()=>{},()=>{});
-  retry({});assert.equal(cls(errorHost,'retry-button')[0].textContent,'다시 시도');assert.match(html,/answer_timeout/);assert.match(html,/30000/);
+  retry({});assert.equal(cls(errorHost,'retry-button')[0].textContent,'다시 시도');assert.match(html,/answer_timeout/);assert.match(html,/45000/);
   const desktop=(width,fine,coarse)=>new Function('window',fn('shouldSendOnEnter')+';return shouldSendOnEnter;')({innerWidth:width,matchMedia:q=>({matches:q.includes('fine')?fine:coarse})});
   for(const [width,fine,coarse,expected] of [[1024,true,false,true],[768,false,false,true],[600,true,false,true],[390,false,true,false],[1024,false,true,true]]){
     const send=desktop(width,fine,coarse);assert.equal(send({key:'Enter'}),expected);assert.equal(send({key:'Enter',shiftKey:true}),false);assert.equal(send({key:'Enter',isComposing:true}),false);assert.equal(send({key:'Enter',keyCode:229}),false);

@@ -35,13 +35,13 @@ export async function testAnswerPlan() {
     assert.equal(selected.meta.responseModeState.stage,'region_asked');assert.match(selected.message,/지금 어디세요/);
     assert.deepEqual(selected.suggestions,['현재 위치 연결','강남','홍대','역삼','성수','종로','여의도','직접 입력']);
     const found=await run('강남이에요',selected.meta.responseModeState);
-    assert.equal(found.restaurants.length,3);assert.match(found.meta.turnPolicy.questionText,/누구와/);
-    assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','question','chips']);
+    assert.equal(found.restaurants.length,3);assert.equal(found.meta.turnPolicy.questionText,'');
+    assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','chips']);
     const region=await run('오늘 홍대에서 뭐 먹지');assert.equal(region.meta.responseModeState.slots.region,'홍대');assert.match(region.message,/끌리는 쪽 있으세요/);assert.equal(region.restaurants.length,0);
     const regionKind=await run('한식으로 골라줘',region.meta.responseModeState);
     const typedKind=await run('중식',region.meta.responseModeState);assert.equal(typedKind.meta.menuCards.length,3);assert.ok(typedKind.meta.menuCards.every(card=>MENU_CATEGORIES.중식.includes(card.name)));assert.equal(typedKind.meta.responseModeState.slots.region,'홍대');
     const regionPick=await run('국밥 먹을래',regionKind.meta.responseModeState);
-    assert.equal(regionPick.restaurants.length,3);assert.equal(regionPick.meta.responseModeState.slots.region,'홍대');assert.equal(regionPick.meta.turnPolicy.next_question.slot,'companion');
+    assert.equal(regionPick.restaurants.length,3);assert.equal(regionPick.meta.responseModeState.slots.region,'홍대');assert.equal(regionPick.meta.turnPolicy.next_question,null);
     const known=await run('한식 먹고 싶은데');assert.equal(known.meta.menuCards.length,3);
     const narrow=await run('냉면 먹고 싶어');assert.match(narrow.message,/지금 어디세요/);assert.equal(narrow.meta.responseModeState.slots.menu,'냉면');
     const aliasDish=await run('제육 먹을래');assert.equal(aliasDish.meta.responseModeState.slots.menu,'제육볶음');assert.match(aliasDish.message,/지금 어디세요/);
@@ -59,14 +59,14 @@ export async function testAnswerPlan() {
     const table=[
       ['menu_trouble',{},['오늘 뭐 먹지','저녁 메뉴 고민돼'],['text','question','chips']],
       ['menu_trouble',{food_type:'한식'},['한식으로 골라줘','한식 먹고 싶은데'],['text','menu_cards','notice','chips']],
-      ['place_search',{region:'강남',menu:'국밥'},['강남 국밥 찾아줘','강남에서 국밥 먹을 곳 추천해줘'],['text','place_cards','source','question','chips']],
+      ['place_search',{region:'강남',menu:'국밥'},['강남 국밥 찾아줘','강남에서 국밥 먹을 곳 추천해줘'],['text','place_cards','source','chips']],
       ['place_search',{menu:'냉면'},['냉면집 찾아줘','냉면 먹을 곳 추천해줘'],['text','question','chips']],
       ['followup',{region:'강남',menu:'국밥'},['다른 곳 보여줘','첫 번째 집 주차돼?'],['text','place_cards','source']],
       ['condition_change',{region:'홍대',menu:'국밥'},['홍대로 바꿔줘','그럼 국밥으로 할래'],['text','place_cards','source','chips']],
       ['compare',{},['첫째랑 둘째 비교해줘','A랑 B 중에 어디가 나아'],['text','chips']],
       ['specific_place',{},['해정집 전화번호 알려줘','해정집 영업시간 알려줘'],['text','place_cards']],
       ['food_talk',{},['냉면은 어떻게 먹어?','파스타 유래가 궁금해'],['text','question']],
-      ['service',{},['추천 기준이 뭐야','너는 누구야'],['text']],
+      ['service',{},['추천 기준이 뭐야','너는 누구야'],['text','chips']],
       ['out_of_scope',{},['주식 추천해줘','병원 찾아줘'],['text','chips']],
     ];
     for(const [intent,slots,utterances,expected] of table) for(const content of utterances){

@@ -157,10 +157,9 @@ export async function testConversationUI(runCase) {
   assert.deepEqual(openedAxes, ['region', 'food']);
   const classes = nodes(bubble).map(node => node.className);
   assert.ok(classes.indexOf('message-copy') < classes.indexOf('restaurant-group'));
-  assert.ok(classes.indexOf('restaurant-group') < classes.indexOf('turn-question'));
-  assert.ok(classes.indexOf('turn-question') < classes.findIndex(value=>value.split(' ').includes('answer-chips')));
+  assert.equal(classes.includes('turn-question'),false,'ready response is not followed by a mandatory question');
   assert.equal(ofClass(message, 'message-copy')[0].textContent, first.body.meta.turnPolicy.intro);
-  assert.equal(ofClass(message, 'turn-question').length, 1);
+  assert.equal(ofClass(message, 'turn-question').length, 0);
   const menuNode = renderer.renderMessage({ role: 'assistant', content: menu.body.message, restaurants: [], quickReplies: menu.body.suggestions, meta: menu.body.meta });
   assert.equal(ofClass(menuNode, 'menu-choice').length, 3);
   assert.equal(ofClass(menuNode, 'quick-reply-reason').length, 3);
@@ -193,12 +192,12 @@ export async function testConversationUI(runCase) {
   assert.equal(ofClass(menuNode,'turn-question').length,0,'menu-options plan has no question block');
   assert.ok(menu.body.meta.menuCards.every(item => [...item.description].length <= 22 && [...item.reason].length <= 30));
   assert.ok(ofClass(message, 'action-chips').every(group => group.children.length <= 2));
-  assert.ok(ofClass(message, 'answer-chips')[0].textContent.includes('상관없어요'));
+  assert.equal(ofClass(message, 'answer-chips').length,0);
   assert.doesNotMatch(ofClass(message, 'action-chips')[0].textContent, /비교하기|메뉴 탐색/);
   assert.equal(ofClass(group, 'restaurant-source').length, 1);
   assert.ok(nodes(group).indexOf(ofClass(group, 'restaurant-source')[0]) > nodes(group).indexOf(ofClass(group, 'restaurant-list')[0]));
   renderer.renderMessage({ role: 'user', content: '국밥 먹고 싶어요' });
-  assert.notEqual(ofClass(message, 'answer-chips')[0].hidden, true, 'history is retained');
+  assert.equal(ofClass(message, 'restaurant-card').length,3,'result history is retained');
   assert.notEqual(ofClass(menuNode, 'menu-cards')[0].hidden, true);
   assert.equal(ofClass(menuNode, 'menu-choice').length, 3);
   assert.ok(ofClass(menuNode, 'menu-choice').every(button=>button.disabled));
@@ -213,7 +212,7 @@ export async function testConversationUI(runCase) {
   const sentBefore = sent.length; choice.click();
   assert.equal(sent.length,sentBefore,'disabled old choices cannot send a new request');
   // Newest choices stay live; earlier selections remain unchanged after later turns.
-  const nextQuestion = renderer.renderMessage({role:'assistant',content:first.body.message,restaurants:first.body.restaurants,quickReplies:first.body.suggestions,meta:first.body.meta});
+  const nextQuestion = renderer.renderMessage({role:'assistant',content:'누구와 가세요?',quickReplies:['회식'],meta:{answer_plan:['text','question','chips'],turnPolicy:{questionText:'누구와 가세요?'}}});
   renderer.renderMessage({role:'user',content:'회식이에요'});
   assert.equal(ofClass(nextQuestion,'history-selected').length,1);
   assert.match(ofClass(nextQuestion,'history-selected')[0].textContent,/회식/);assert.ok(nodes(ofClass(nextQuestion,'history-selected')[0]).some(node=>node.attributes.href==='#i-check'));
@@ -242,12 +241,12 @@ export async function testConversationUI(runCase) {
   const relatedGroup=ofClass(relatedMessage,'related-questions')[0];
   const relatedButtons=ofClass(relatedMessage,'related-question');
   assert.equal(relatedButtons.length,first.body.meta.relatedQuestions.length);
-  assert.ok(relatedButtons.length>=1 && relatedButtons.length<=2,'pending question limits related rows to two and never fills failed validations');
+  assert.ok(relatedButtons.length>=1 && relatedButtons.length<=3,'ready results have at most three examples and no forced question');
   assert.equal(ofClass(relatedGroup,'related-label')[0].textContent,'이어서 물어볼 수 있어요');
   relatedButtons.forEach((button,index)=>{assert.equal(button.tagName,'BUTTON');assert.equal(button.type,'button');assert.equal(button.attributes['aria-label'],first.body.meta.relatedQuestions[index].text);});
-  assert.equal(ofClass(relatedGroup,'related-arrow').length,relatedButtons.length);
+  assert.equal(ofClass(relatedGroup,'related-arrow').length,0,'related rows are text-only controls');
   const relatedBubble=ofClass(relatedMessage,'ai-bubble')[0],relatedClasses=nodes(relatedBubble).map(node=>node.className);
-  assert.ok(relatedClasses.findIndex(cls=>cls.includes('answer-chips'))<relatedClasses.findIndex(cls=>cls.includes('related-questions')));
+  assert.ok(relatedClasses.findIndex(cls=>cls.includes('restaurant-group'))<relatedClasses.findIndex(cls=>cls.includes('related-questions')));
   assert.ok(relatedClasses.findIndex(cls=>cls.includes('related-questions'))<relatedClasses.findIndex(cls=>cls.includes('action-chips')));
   const picked=first.body.meta.relatedQuestions[0].text;relatedButtons[0].click();assert.equal(sent.at(-1)[0],picked);
   renderer.renderMessage({role:'user',content:picked});
@@ -290,7 +289,7 @@ export async function testConversationUI(runCase) {
   assert.equal(ofClass(ordered,'restaurant-title-link').length,3);assert.equal(ofClass(ordered,'restaurant-compare').length,3);
   assert.ok(ofClass(ordered,'restaurant-title-link').every(node=>node.attributes['aria-label'].includes('상세보기')));
   assert.ok(!nodes(ordered).some(node=>node.tag==='button'&&node.text==='상세보기'),'large standalone detail action removed');
-  const add=ofClass(ordered,'restaurant-compare')[0];add.click();assert.equal(add.attributes['aria-pressed'],'true');assert.equal(add.textContent,'담음');assert.ok(nodes(add).some(node=>node.attributes.href==='#i-check'));add.click();assert.equal(add.attributes['aria-pressed'],'false');assert.equal(add.textContent,'비교에 담기');
+  const add=ofClass(ordered,'restaurant-compare')[0];add.click();assert.equal(add.attributes['aria-pressed'],'true');assert.equal(add.textContent,'담음');assert.ok(!nodes(add).some(node=>node.tag==='svg'));add.click();assert.equal(add.attributes['aria-pressed'],'false');assert.equal(add.textContent,'비교에 담기');
   const duplicate=renderer.renderMessage({role:'assistant',content:'다시 골라봤어요.',meta:{...first.body.meta,answer_plan:['text']}});
   assert.equal(ofClass(duplicate,'result-conditions').length,0,'same conditions as immediately previous AI response are omitted');
   const changed=renderer.renderMessage({role:'assistant',content:'홍대에서 골라봤어요.',meta:{...first.body.meta,searchConditions:{region:'홍대',food:'삼겹살'},answer_plan:['text']}});

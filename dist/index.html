@@ -874,6 +874,28 @@
       .restaurant-address { display:block; -webkit-line-clamp:1; height:28px; max-height:28px; line-height:28px; margin-top:4px; padding-right:106px; white-space:nowrap; text-overflow:ellipsis; }
       .restaurant-detail-area { position:absolute; right:8px; bottom:1px; width:auto; padding:0; margin:0; }
     }
+    /* v135 shared type/touch scale: controls 14, body 16, titles 16, support 13. */
+    button, .restaurant-map-link { font-family:system-ui,sans-serif; font-size:14px; min-height:44px; }
+    button:not(.menu-choice):not(.restaurant-title-link) { font-size:14px !important; }
+    .start-btn, .quick-reply-chip, .meal-chip, .retry-button, .comparison-item, .comparison-submit { font:500 14px/1.4 system-ui,sans-serif; min-height:44px; }
+    .quick-reply-title, .question-category .quick-reply-title, .question-region .quick-reply-title { font-size:14px; }
+    .quick-reply-chip, .meal-chip { border:1px solid #bbb; border-radius:999px; white-space:nowrap; min-width:fit-content; }
+    .related-question { font:400 14px/1.5 system-ui,sans-serif; min-height:44px; text-align:left; }
+    .answer-action, .restaurant-compare, .send-btn, .history-more { min-width:44px; min-height:44px; }
+    .restaurant-title-link h3, .menu-choice .quick-reply-title { font-size:16px; line-height:1.4; }
+    .restaurant-address, .restaurant-source, .turn-notice, .related-label, .menu-hint { font-size:13px; line-height:1.5; }
+    .message-copy, .turn-question { font-size:16px; line-height:1.6; }
+    .restaurant-compare { font-size:14px; }
+    .answer-tiles .quick-reply .quick-reply-title, .answer-full-row .quick-reply .quick-reply-title { font-size:14px; }
+    .plugin-name { font-size:14px; }
+    .bottom-sheet .primary-action { font-size:14px; }
+    .restaurant-card .restaurant-category { font-size:13px; }
+    .answer-question .quick-reply-chip, button.restaurant-compare.restaurant-map-link { font-size:14px; min-height:44px; }
+    .message.error .ai-bubble { display:grid; gap:12px; }
+    .suggestion-arrow-wrap, .plugin-card .plugin-icon { display:none; }
+    .plugin-card { grid-template-columns:minmax(0,1fr) 44px; }
+    button.plugin-card { grid-template-columns:minmax(0,1fr); }
+    button.plugin-card > span:last-child:not(.plugin-text) { display:none; }
   </style>
 </head>
 <body>
@@ -917,7 +939,7 @@
     <aside class="sidebar" id="sidebar" aria-hidden="true">
       <div class="sidebar-head"><span class="sidebar-title"><img src="assets/inchelin-guide-wordmark-v2.png" alt="Inchelin Guide AI" /></span><button class="icon-btn" id="sidebarClose" aria-label="사이드바 접기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-menu"/></svg></button></div>
       <button class="new-chat" id="aboutSide"><img class="nav-icon" src="assets/new-chat-icon.png" alt="" /><span>Inchelin Guide AI 소개</span></button>
-      <button class="new-chat" id="newChatSide" aria-label="새 채팅"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg><span>새 채팅</span></button>
+      <button class="new-chat" id="newChatSide" aria-label="새 채팅"><span>새 채팅</span></button>
       <button class="new-chat" id="guideSide"><img class="nav-icon" src="assets/guide-icon.png" alt="" /><span>사용 설명서</span></button>
       <div class="history-label"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg> 최근 대화</div>
       <div class="history-list" id="historyList"></div>
@@ -937,12 +959,12 @@
         </div>
         <div class="mobile-header-actions">
           <button class="share-action mobile-share-action" id="mobileShareButton" type="button" aria-label="대화 공유하기" hidden><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg></button>
-          <button class="start-btn mobile-start" id="mobileStartButton" aria-label="시작하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg>시작하기</button>
+          <button class="start-btn mobile-start" id="mobileStartButton" aria-label="시작하기">시작하기</button>
         </div>
       </header>
       <header class="topbar">
-        <button class="share-action" id="shareButton" type="button" hidden aria-label="공유하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg><span>공유하기</span></button>
-        <button class="start-btn" id="startButton" aria-label="시작하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg>시작하기</button>
+        <button class="share-action" id="shareButton" type="button" hidden aria-label="공유하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg></button>
+        <button class="start-btn" id="startButton" aria-label="시작하기">시작하기</button>
       </header>
 
       <section class="workspace">
@@ -991,9 +1013,9 @@
         <button role="menuitem" id="releaseButton"><span class="menu-icon">◴</span>업데이트 소식</button>
       </div>
       <div class="task-menu" id="taskMenu" role="menu">
-        <button data-meal-tool="category" role="menuitem" aria-label="카테고리로 찾기"><svg class="ui-icon" aria-hidden="true"><use href="#i-utensils"/></svg>카테고리로 찾기</button>
-        <button id="photoButton" role="menuitem" aria-label="사진 업로드"><svg class="ui-icon" aria-hidden="true"><use href="#i-image"/></svg>사진 업로드</button>
-        <button id="pluginButton" role="menuitem" aria-label="플러그인"><svg class="ui-icon" aria-hidden="true"><use href="#i-menu"/></svg>플러그인</button>
+        <button data-meal-tool="category" role="menuitem" aria-label="카테고리로 찾기">카테고리로 찾기</button>
+        <button id="photoButton" role="menuitem" aria-label="사진 업로드">사진 업로드</button>
+        <button id="pluginButton" role="menuitem" aria-label="플러그인">플러그인</button>
       </div>
       <input type="file" id="fileInput" accept="image/*" hidden />
     </main>
@@ -1051,8 +1073,8 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v134"></script>
-<script src="assets/naver-map.js?rules=v134"></script>
+<script src="assets/response-rules.js?rules=v135"></script>
+<script src="assets/naver-map.js?rules=v135"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1802,7 +1824,7 @@
       const svg=make('svg');svg.setAttribute('class','ui-icon');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
       const use=make('use');use.setAttribute('href','#i-'+name);svg.appendChild(use);return svg;
     }
-    function setIconLabel(node, name, label) { node.textContent=label;node.appendChild(uiIcon(name));node.setAttribute('aria-label',label); }
+    function setIconLabel(node, name, label) { node.textContent=label;node.setAttribute('aria-label',label); }
     function iconHTML(name) { return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`; }
     function comparisonMessage(cards) {
       return cards.map((card, index) => {
@@ -1820,7 +1842,7 @@
       host.innerHTML = ''; host.hidden = comparisonTray.size === 0;
       const items = document.createElement('div'); items.className = 'comparison-items';
       for (const card of comparisonTray.values()) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'comparison-item'; setIconLabel(remove,'close',card.name);
+        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'comparison-item'; setIconLabel(remove,'close',card.name+' 빼기');
         remove.setAttribute('aria-label', card.name + ' 비교에서 빼기');
         remove.addEventListener('click', () => { comparisonTray.delete(card.id); renderComparisonTray(); }); items.appendChild(remove);
       }
@@ -1844,7 +1866,7 @@
         const detail = document.createElement(restaurant.naverPlaceUrl?'a':'button');detail.className='restaurant-title-link restaurant-map-link';detail.setAttribute('aria-label',restaurant.name+' 상세보기');
         if(restaurant.naverPlaceUrl){detail.href=restaurant.naverPlaceUrl;detail.target='_blank';detail.rel='noopener noreferrer';}
         else{detail.type='button';detail.addEventListener('click',()=>{if(!detail.disabled)resolveRestaurantDetail(restaurant,actions);});}
-        const title = document.createElement('h3'); title.textContent = restaurant.name;detail.append(title,uiIcon('chevron-right'));body.appendChild(detail);
+        const title = document.createElement('h3'); title.textContent = restaurant.name;detail.appendChild(title);body.appendChild(detail);
         head.classList.add('restaurant-condition-chips');
         if (restaurant.category) {
           const category = document.createElement('span'); category.className = 'restaurant-category'; category.textContent = restaurant.foodLabel || restaurant.category; head.appendChild(category);
@@ -1953,7 +1975,6 @@
           for (const [axis, label] of [['region', message.meta.searchConditions.region], ['food', message.meta.searchConditions.food]]) {
             if (!label) continue;
             const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'meal-chip'; chip.textContent = label; chip.setAttribute('aria-label', (axis === 'region' ? '지역 바꾸기: ' : '음식 바꾸기: ') + label);
-            chip.appendChild(uiIcon(axis==='region'?'pin':'utensils'));
             chip.addEventListener('click', () => { if (!chip.disabled) openSearchPicker(axis); }); conditions.appendChild(chip);
           }
           resultSection.appendChild(conditions);
@@ -2000,7 +2021,6 @@
             title.className = 'quick-reply-title';
             title.textContent = card.title;
             button.appendChild(title);
-            if(answerLayout==='region')button.appendChild(uiIcon(card.title==='현재 위치 연결'?'locate':card.title==='직접 입력'?'search':'pin'));
             if (card.description && !actionReply) {
               const description = document.createElement('span');
               description.className = 'quick-reply-description';
@@ -2012,13 +2032,6 @@
             }
             if (menuChoice) button.classList.add('menu-choice');
             if (card.title === '상관없어요') button.classList.add('skip-chip');
-            if (!actionReply && !followupChip) {
-              const arrow = document.createElement('span');
-              arrow.className = 'quick-reply-arrow';
-              arrow.setAttribute('aria-hidden', 'true');
-              arrow.appendChild(uiIcon('chevron-right'));
-              button.appendChild(arrow);
-            }
             button.addEventListener('click', () => {
               if (button.disabled) return;
               const isCuisineCategory = /^(?:한식|중식|일식|양식|분식|카페 식사)$/.test(card.title);
@@ -2041,7 +2054,6 @@
         bubble.appendChild(resultSection);
         if (hasQuestion) {
           const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; questionSection.appendChild(question);
-          if(message.meta.turnPolicy.next_question?.slot==='companion')question.appendChild(uiIcon('people'));
         }
         for (const group of [answerTop, answerTiles, answerBottom]) if (group.children.length) answers.appendChild(group);
         if (allowed('chips') && answers.children.length) (hasQuestion?questionSection:bubble).appendChild(answers);
@@ -2067,18 +2079,21 @@
           message.meta.relatedQuestions.slice(0,hasQuestion?2:3).forEach(choice=>{
             const button=document.createElement('button');button.type='button';button.className='related-question';button.setAttribute('aria-label',choice.text);button.historyLabel=choice.text;button.historyMessage=choice.text;
             const text=document.createElement('span');text.className='related-text';text.textContent=choice.text;
-            const arrow=document.createElement('span');arrow.className='related-arrow';arrow.appendChild(uiIcon('arrow-right'));arrow.setAttribute('aria-hidden','true');
-            button.append(text,arrow);button.addEventListener('click',()=>{if(!button.disabled)routeQuestion(choice.text);});related.appendChild(button);
+            button.appendChild(text);button.addEventListener('click',()=>{if(!button.disabled)routeQuestion(choice.text);});related.appendChild(button);
           });bubble.appendChild(related);
         }
         if (allowed('chips') && message.meta?.turnPolicy?.actionChips?.length) {
           const actions = document.createElement('div'); actions.className = 'quick-replies quick-replies-followup action-chips'; actions.setAttribute('aria-label', '이어서 할 일');
           message.meta.turnPolicy.actionChips.filter(label => ['다른 곳도 보여줘', '다른 곳 보기', '조건 바꾸기'].includes(label)).slice(0, 2).forEach(label => {
             const button = document.createElement('button'); button.type = 'button'; button.className = 'quick-reply quick-reply-chip'; button.textContent = label === '다른 곳도 보여줘' ? '다른 곳 보기' : label;
-            button.setAttribute('aria-label',button.textContent);if(label==='조건 바꾸기')button.appendChild(uiIcon('sliders'));
+            button.setAttribute('aria-label',button.textContent);
             button.addEventListener('click', () => { if (!button.disabled) routeQuestion(label === '다른 곳 보기' ? '다른 곳도 보여줘' : label); }); actions.appendChild(button);
           });
           bubble.appendChild(actions);
+        }
+        if(message.meta?.recoverable) {
+          const retry=document.createElement('button');retry.type='button';retry.className='retry-button';retry.textContent='다시 시도';
+          retry.addEventListener('click',()=>{const index=chatMessages.indexOf(message);generateAnswer(buildAIRequest(chatMessages.slice(0,index)));});bubble.appendChild(retry);
         }
         item.appendChild(bubble);
       } else {
@@ -2120,8 +2135,9 @@
         updatedAt: Date.now()
       };
       histories = [record, ...histories.filter(h => h.id !== currentId)].slice(0, 20);
-      localStorage.setItem('insight-ai-history', JSON.stringify(histories));
-      renderHistory();
+      // Persistence is best-effort: quota/security errors must never stop a chat.
+      try { localStorage.setItem('insight-ai-history', JSON.stringify(histories)); } catch (_) { /* Keep the in-memory transcript; never delete stored history. */ }
+      try { renderHistory(); } catch (_) { /* Sidebar failure cannot block answer generation. */ }
     }
     function renderHistory() {
       closeHistoryMenu();
@@ -2212,7 +2228,7 @@
       activeRequestController = null;
       const status = messagesEl.querySelector('.message.status');
       if (status) status.remove();
-      if (generating && showMessage && !regeneratingAnswer) appendMessage('assistant', '답변 생성을 멈췄어요. 다시 편하게 물어봐 주세요.');
+      if (generating && showMessage) showRequestError(lastAIRequest,new Error('answer_stopped'));
       regeneratingAnswer = false;
       if (generating) setGenerating(false);
     }
@@ -2228,37 +2244,42 @@
       bubble.className = 'ai-bubble';
       const text = document.createElement('span');
       const changed=error?.message==='response_rules_changed';
-      text.textContent = changed?'새 버전으로 바뀌었어요. 새로고침하면 현재 기준으로 이용할 수 있어요.':'답변을 불러오지 못했어요. 다시 시도해 주세요.';
+      text.textContent = error?.userMessage || (changed?'새 버전으로 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.':error?.message==='answer_timeout'?'45초 안에 답변을 받지 못했어요. 다른 조건을 고르거나 다시 시도해 주세요.':error?.message==='answer_stopped'?'답변 생성을 멈췄어요. 다른 조건을 고르거나 다시 시도해 주세요.':'답변을 불러오지 못했어요. 다른 조건을 고르거나 다시 시도해 주세요.');
       const retry = document.createElement('button');
       retry.type = 'button';
       retry.className = 'retry-button';
-      setIconLabel(retry,'retry','다시 시도');retry.setAttribute('aria-label','다시 시도');
-      if(changed){setIconLabel(retry,'retry','새로고침');retry.setAttribute('aria-label','새로고침');}
+      retry.textContent='다시 시도';retry.setAttribute('aria-label','다시 시도');
       retry.addEventListener('click', () => { if(changed){location.reload();return;}item.remove(); generateAnswer(request); });
-      bubble.append(text, retry);
+      const alternatives=document.createElement('div');alternatives.className='quick-replies alternative-chips';
+      for(const [label,axis] of [['다른 지역','region'],['다른 음식','food']]) {
+        const button=document.createElement('button');button.type='button';button.className='quick-reply quick-reply-chip';button.textContent=label;
+        button.addEventListener('click',()=>openSearchPicker(axis));alternatives.appendChild(button);
+      }
+      bubble.append(text, alternatives, retry);
       item.append(avatar, bubble);
       messagesEl.appendChild(item);
       if (shouldFollow) followConversation(item);
     }
     async function generateAnswer(request, { replaceMessage = null } = {}) {
       const epoch = conversationEpoch;
+      let controller,status;
+      const timers = [];
+      try {
       regeneratingAnswer = Boolean(replaceMessage);
       setGenerating(true);
       activeRequestController = new AbortController();
-      const controller = activeRequestController;
+      controller = activeRequestController;
       const shouldFollow = isNearConversationBottom();
-      const status = document.createElement('div');
+      status = document.createElement('div');
       status.className = 'message ai status';
       status.innerHTML = '<div class="ai-bubble" role="status"><span>생각하는 중</span><span class="thinking-dots" aria-hidden="true"><i></i></span></div>';
       messagesEl.appendChild(status);
       const label = status.querySelector('.ai-bubble > span:first-child');
-      const timers = [];
       generationTimers = timers;
-      timers.push(setTimeout(()=>{if(epoch===conversationEpoch&&activeRequestController===controller&&!controller.signal.aborted&&label)label.textContent='먹을 곳을 찾는 중이에요. 조금만 기다려 주세요.';},15000));
+      timers.push(setTimeout(()=>{if(epoch===conversationEpoch&&activeRequestController===controller&&!controller.signal.aborted&&label)label.textContent='조금 더 걸리고 있어요';},20000));
       followConversation(status);
-      try {
         const answer = await Promise.race([requestAssistant(request, controller.signal),new Promise((_,reject)=>{
-          timers.push(setTimeout(()=>{reject(new Error('answer_timeout'));controller.abort();},30000));
+          timers.push(setTimeout(()=>{reject(new Error('answer_timeout'));controller.abort();},45000));
         })]);
         if (controller.signal.aborted || epoch!==conversationEpoch || activeRequestController!==controller) return;
         if (answer.meta?.variant === 'hard_reset') {
@@ -2269,7 +2290,11 @@
           currentLocationCoords = null;
           currentLocationName = answer.meta.responseModeState.slots.region || '';
         }
-        status.remove();
+        if(answer.meta?.responseModeState?.noResults || ['no_results','missing_credentials','missing_configuration','authentication_failed','api_request_failed'].includes(answer.meta?.restaurantSearchStatus)) {
+          chatMessages=[...chatMessages,normalizeMessage({role:'assistant',content:answer.content,restaurants:[],meta:{...answer.meta,recoverable:true}})];
+          saveConversation();
+          showRequestError(request,{message:'no_results',userMessage:answer.content});return;
+        }
         if (replaceMessage && chatMessages.at(-1) === replaceMessage) {
           const old = messagesEl.querySelector('.message.ai:last-child');
           const replacement=normalizeMessage({role:'assistant',content:answer.content,quickReplies:answer.quickReplies,restaurants:answer.restaurants,meta:answer.meta});
@@ -2281,10 +2306,11 @@
           answerRequests.set(chatMessages.at(-1),request);
         }
       } catch (error) {
-        status.remove();
-        if (epoch===conversationEpoch && activeRequestController===controller && error?.name !== 'AbortError') showRequestError(request,error);
+        if (epoch===conversationEpoch && (!controller || activeRequestController===controller)) showRequestError(request,error);
       } finally {
+        status?.remove();
         timers.forEach(clearTimeout);
+        if(!controller&&epoch===conversationEpoch){generating=false;regeneratingAnswer=false;try{setGenerating(false);}catch(_){}}
         if (activeRequestController === controller) {
           generationTimers = [];
           activeRequestController = null;
@@ -2522,6 +2548,7 @@
       if (!value || generating) return;
       autoFollowConversation = true;
       showChatView();
+      try {
       if (!alreadyAdded) appendMessage('user', value);
       $('#welcomeInput').value = '';
       $('#chatInput').value = '';
@@ -2539,6 +2566,9 @@
         lastAIRequest = { ...lastAIRequest, messages: [{ role: 'user', content: value }], context: { ...lastAIRequest.context, currentLocationName: '', currentLocation: null, recentRestaurants: [], hasRestaurantResults: false, responseModeState: { slots: {}, lastCards: [], shownPlaces: [], shownPlaceIds: [] } } };
       }
       generateAnswer(lastAIRequest);
+      } catch(error) {
+        showRequestError(lastAIRequest||{messages:[{role:'user',content:value}],context:{}},error);
+      }
     }
     function pluginState() {
       return JSON.parse(JSON.stringify(buildAIRequest(chatMessages).context.responseModeState || { slots: {}, lastCards: [], shownPlaces: [], shownPlaceIds: [] }));

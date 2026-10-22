@@ -58,10 +58,9 @@ export function planTurn(response, previousValue = {}, latest = '') {
   const allowedQuestion = answerPlanFor({ ...(response.meta?.analysis || {}), intent }, state, latest).includes('question');
   if (!exempt && allowedQuestion && state.consecutiveQuestions < 2 && !optionalPause && !IMMEDIATE_REQUEST.test(latest) && state.questionCount < 3 && (stage !== 'refining' || state.refinementQuestionCount < 2)) {
     const requestedRegion = response.meta?.mode === 'B' && /지역\s*(?:넓히기|바꾸기|변경)/.test(latest);
-    const axes = requestedRegion ? ['region'] : !hasFood && (hasRegion || response.meta?.mode === 'A') ? ['menu'] : !hasRegion ? ['region'] : response.restaurants?.length ? [
-      !state.slots.companion && !state.preferences.companion && 'companion',
-      !state.slots.menu && 'sub_menu', 'sub_region',
-    ].filter(Boolean) : [];
+    // Primary axes first. Once both are known, offer results and optional examples,
+    // not an automatic companion/budget interrogation on every search.
+    const axes = requestedRegion ? ['region'] : !hasFood && (hasRegion || response.meta?.mode === 'A') ? ['menu'] : !hasRegion ? ['region'] : [];
     for (const slot of axes) {
       if (!state.askedSlots.includes(slot)) next_question = questionTemplate(slot, state, response);
       if (next_question) break;
