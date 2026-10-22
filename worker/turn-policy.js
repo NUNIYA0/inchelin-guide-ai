@@ -1,7 +1,7 @@
 import { normalizeResponseState } from './response-modes.js';
 import { withParticle } from './korean.js';
 import { FORBIDDEN_COPY, repeatsCopySentences } from './conversation-copy.js';
-import { nearbySuggestions, SEARCH_REGIONS, searchMessage } from './search-axes.js';
+import { nearbySuggestions, SEARCH_REGIONS, searchMessage, mentionedSearchRegion, normalizeFoodAxis } from './search-axes.js';
 import { answerPlanFor, REGION_ANSWERS } from './answer-plan.js';
 
 export const IMMEDIATE_REQUEST = /바로\s*보여줘|그냥\s*추천해줘|질문\s*(?:없이|하지\s*마)/;
@@ -137,13 +137,13 @@ export function applyTurnPolicy(response, payload = {}) {
   ] : count ? [
     `${area}에서 ${state.slots.companion ? state.slots.companion + ' 자리로 ' : ''}${food} 먹을 곳 ${count}곳을 골라봤어요`,
     `${food} 드시고 싶으시군요, ${area}에서${state.slots.companion ? ' ' + state.slots.companion + ' 자리로' : ''} ${count}곳 골라봤어요`,
-    `이번에는 ${area}에서 ${state.slots.companion ? state.slots.companion + '으로 ' : ''}${food} 먹을 곳 ${count}곳을 살펴봤어요`,
+    `이번에는 ${area}에서 ${state.slots.companion ? withParticle(state.slots.companion,'으로/로') + ' ' : ''}${food} 먹을 곳 ${count}곳을 살펴봤어요`,
     `${area}에서 함께 살펴볼 식당 ${count}곳이에요`,
   ] : response.meta.mode === 'A' ? [
     '오늘은 서로 다른 방향의 메뉴 세 가지로 좁혀봤어요', '이번 한 끼에 어울릴 서로 다른 방향을 골랐어요',
     '말씀하신 식사 고민에 맞춰 다른 메뉴들을 골랐어요', '새로운 메뉴 방향을 함께 살펴볼게요',
   ] : !state.slots.menu && !state.slots.food_type && state.slots.region ? [
-    `${area}에서 먹을 곳을 함께 골라봐요`, `${area}로 정하셨군요, 메뉴도 골라볼게요`, '어디서 먹을지는 정했으니 메뉴만 골라봐요',
+    `${area}에서 먹을 곳을 함께 골라봐요`, `${withParticle(area,'으로/로')} 정하셨군요, 메뉴도 골라볼게요`, '어디서 먹을지는 정했으니 메뉴만 골라봐요',
   ] : [`${food} 드시고 싶으시군요`, `${food} 좋죠, 먹을 곳도 함께 찾아볼게요`, `이번 식사는 ${withParticle(food, '으로/로')} 골라볼게요`, '한 가지만 더 고르면 먹을 곳을 찾을 수 있어요'];
   const modelStart = candidateText(proposal?.summary);
   const starts = [modelStart, ...defaultStarts, '한 끼 고르는 고민을 조금 덜어볼게요', '먹고 싶은 쪽으로 조금씩 좁혀봐요', '이번에는 이렇게 골라봤어요', '함께 먹을 메뉴를 한 단계 더 골라봐요'].filter(Boolean);
@@ -190,14 +190,16 @@ export function applyTurnPolicy(response, payload = {}) {
   const expanded = response.meta.expandedRegions || [];
   const flexibleIntro = state.regionFlexible && /아무\s*데나|어디든|상관\s*없어요/.test(latest)
     ? `지역을 따로 정하지 않으셔서 강남부터 볼게요. ${expanded.length ? expanded.join('·') + '까지 함께 찾아 ' : ''}지금은 ${count}곳을 골라봤어요. 다른 지역도 골라 보세요.` : '';
-  const intro = flexibleIntro || [countedSummary + '.', reason && reason + '.'].filter(Boolean).join(' ');
+  const inheritedFood=mentionedSearchRegion(latest) && !normalizeFoodAxis(latest) && previous.slots?.menu && state.slots.menu===previous.slots.menu;
+  const inheritNotice=inheritedFood?`${previous.slots.menu} 기준으로 찾았어요.`:'';
+  const intro = flexibleIntro || [countedSummary + '.', reason && reason + '.', inheritNotice].filter(Boolean).join(' ');
   const expansionChoices = expand ? nearbySuggestions(state.slots.region, state.slots.menu || state.slots.food_type) : [];
   if (flexibleIntro) for (const region of ['강남','홍대','역삼','성수']) if (!expansionChoices.some(item=>item.message === searchMessage({region,food}))) expansionChoices.push({label:region,message:searchMessage({region,food})});
-  const message = !flexibleIntro && !count && !['A', 'B'].includes(response.meta.mode) ? response.message : [intro, question?.text].filter(Boolean).join(' ');
+  const message = !flexibleIntro && !count && !['A', 'B'].includes(response.meta.mode) ? [response.message,inheritNotice].filter(Boolean).join(' ') : [intro, question?.text].filter(Boolean).join(' ');
   return { ...response, message, suggestions, restaurants: (response.restaurants || []).slice(0, 3),
-    meta: { ...cleanMeta, analysis, responseModeState: state, notice,
+    meta: { ...cleanMeta, analysis, responseModeState: state, notice, inheritedFood:inheritedFood?previous.slots.menu:null,
       ...((count || response.meta.restaurantSearchStatus === 'no_results') && (state.slots.region || state.slots.use_current_location) && (state.slots.menu || state.slots.food_type) ? { searchConditions: { region: state.slots.use_current_location ? '현재 위치' : state.slots.region, food: state.slots.menu || state.slots.food_type } } : {}),
-      turnPolicy: { ...analysis, cardFirst: false, intro: !flexibleIntro && !count && !['A', 'B'].includes(response.meta.mode) ? response.message : intro, questionText: question?.text || '',
+      turnPolicy: { ...analysis, cardFirst: false, intro: !flexibleIntro && !count && !['A', 'B'].includes(response.meta.mode) ? message : intro, questionText: question?.text || '',
         actionChips: (count || expand) && !IMMEDIATE_REQUEST.test(latest) ? count ? ['다른 곳도 보여줘', '조건 바꾸기'] : ['조건 바꾸기'] : [],
         expansionChoices,
         questionSource: question && proposed?.text === question.text ? 'model' : question ? 'template' : null } } };

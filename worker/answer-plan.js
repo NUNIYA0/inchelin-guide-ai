@@ -2,6 +2,7 @@
 // to add blocks outside the intent table or to bypass verified-card selection.
 import { isMainDish, SIDE_FOOD } from './main-dishes.js';
 import { normalizeFoodAxis } from './search-axes.js';
+import { withParticle } from './korean.js';
 export const ANSWER_BLOCKS = ['text', 'question', 'chips', 'menu_cards', 'place_cards', 'source', 'compare', 'notice', 'related_questions'];
 export const RELATED_QUESTION_POLICY = {
   place_search:'verified_cards',menu_trouble:'menu_cards_only',followup:'cards',condition_change:'cards',
@@ -16,9 +17,9 @@ export const MENU_CATEGORIES = {
   '국밥·찌개': ['국밥', '순두부찌개', '전골', '김치찌개', '곰탕', '설렁탕'], 카페: ['샌드위치', '샐러드', '포케', '토스트', '베이글샌드위치', '오믈렛'],
 };
 export const CATEGORY_CHOICES = ['한식', '중식', '일식', '양식', '분식', '카페 식사', '네, 골라주세요'];
-export const CATEGORY_ANSWERS = CATEGORY_CHOICES.map(label=>({label,message:label === '네, 골라주세요' ? label : `${label}${label === '카페 식사' ? '로' : '으로'} 골라줘`}));
+export const CATEGORY_ANSWERS = CATEGORY_CHOICES.map(label=>({label,message:label === '네, 골라주세요' ? label : `${withParticle(label,'으로/로')} 골라줘`}));
 export const REGION_ANSWERS = [{label:'현재 위치 연결',message:'지금 내 주변에서 찾아줘'},
-  ...['강남','홍대','역삼','성수','종로','여의도'].map(label=>({label,message:label+(['강남','역삼'].includes(label)?'이에요':'예요')})),
+  ...['강남','홍대','역삼','성수','종로','여의도'].map(label=>({label,message:withParticle(label,'이에요/예요')})),
   {label:'직접 입력',message:'지역 직접 입력'}];
 export function isUserAnswerLabel(value) {
   const label=String(value || '').trim(), length=[...label].length;

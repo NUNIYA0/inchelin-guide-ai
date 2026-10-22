@@ -22,7 +22,7 @@ export async function testV135(runCase){
   const group=await runCase({message:'회식이에요',env,naverResponse:dataset,context:{responseModeState:first.body.meta.responseModeState}});
   assert.equal(group.body.restaurants.length,3);assert.equal(group.body.meta.turnPolicy.next_question,null);
   assert.ok(group.body.meta.relatedQuestions.every(q=>q.axis!=='companion'&&!/회식|누구와/.test(q.text)));
-  assert.ok(group.body.meta.relatedQuestions.every(q=>!first.body.meta.relatedQuestions.some(old=>old.axis===q.axis)),'no consecutive same axis');
+  assert.equal(new Set(group.body.meta.relatedQuestions.map(q=>['companion','vibe','facility'].includes(q.axis)?'situation':q.axis)).size,group.body.meta.relatedQuestions.length,'v136: rotate axes but never pad with two situation variants');
   const quiet=await runCase({message:'조용하게 대화할 수 있는 곳으로 추천해줘',env,naverResponse:dataset,context:{responseModeState:group.body.meta.responseModeState}});
   assert.equal(quiet.body.restaurants.length,3);assert.match(quiet.body.meta.notice,/매장 확인/);assert.ok(quiet.body.meta.relatedQuestions.every(q=>q.axis!=='vibe'));
   const budget=await runCase({message:'예산 2만원 이하로',env,naverResponse:dataset,context:{responseModeState:quiet.body.meta.responseModeState}});assert.match(budget.body.meta.responseModeState.preferences.budget,/2만원/);assert.equal(budget.body.restaurants.length,3);

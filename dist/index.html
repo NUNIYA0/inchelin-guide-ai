@@ -1073,8 +1073,8 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v135"></script>
-<script src="assets/naver-map.js?rules=v135"></script>
+<script src="assets/response-rules.js?rules=v136"></script>
+<script src="assets/naver-map.js?rules=v136"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1555,7 +1555,13 @@
       if(response.headers?.get('X-Response-Rules-Version')&&response.headers.get('X-Response-Rules-Version')!==globalThis.InchelinResponseRules.VERSION)throw new Error('response_rules_changed');
       if (!response.ok) throw new Error(`AI request failed: ${response.status}`);
       const data = await response.json();
-      if(!globalThis.InchelinResponseRules.isCurrent(data.meta))throw new Error('response_rules_changed');
+      // This is a fresh network response, not a saved response cache. Server and
+      // browser clocks need not agree; only an explicit version difference is a
+      // version error. Archive TTLs start at receipt on this device.
+      if(data.meta?.responseRulesVersion && data.meta.responseRulesVersion!==globalThis.InchelinResponseRules.VERSION)throw new Error('response_rules_changed');
+      if(!data.meta?.responseRulesVersion || !Number.isFinite(data.meta.generatedAt))throw new Error('invalid_response_metadata');
+      data.meta.generatedAt=Date.now();
+      // responseModeState retains its server timestamp for server-side TTL checks.
       const content = extractAssistantText(data);
       if (!content) throw new Error('AI response did not include assistant content.');
       const suggestions = Array.isArray(data?.suggestions) ? data.suggestions : data?.quickReplies;

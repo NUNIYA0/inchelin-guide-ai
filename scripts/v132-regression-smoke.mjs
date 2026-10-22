@@ -22,7 +22,7 @@ export async function testV132(runCase){
   }
   assert.ok(maxActive>=2,'suggestion existence checks are concurrent');
   assert.ok(rounds[0].includes('food')&&rounds[0].includes('companion'));
-  assert.notDeepEqual(rounds[0],rounds[1]);assert.ok(rounds[1].every(axis=>!rounds[0].includes(axis)),'consecutive axes do not repeat');
+  assert.notDeepEqual(rounds[0],rounds[1]);assert.ok(rounds[1].every(axis=>!['companion','vibe','facility'].includes(axis)),'v136: situation is one semantic axis, rotated out on the next response');
   const named=`${cards[0].name}랑 ${cards[1].name} 비교해줘`;
   assert.ok(named.length>30&&named.length<=40);
   const state=normalizeResponseState({lastCards:cards,slots:{region:'강남',menu:'삼겹살'}});
@@ -84,7 +84,7 @@ export async function testV132(runCase){
   const providerSource=source.match(/class NaverRestaurantProvider[^]*?\n\}/)[0];let finishBackup;
   const Provider=new Function('trustedEndpoint','safeText','naverRestaurantSearchQueries','providerDebugLog','getJsonWithTimeout','sanitizeNaverPlace','validateRestaurantCandidate','RestaurantProviderError','UpstreamHttpError',providerSource+';return NaverRestaurantProvider;')(
     x=>x,(x)=>String(x||''),()=>['primary','backup'],()=>{},async url=>new URL(url).searchParams.get('query')==='primary'?{items:[{name:'winner'}]}:new Promise(resolve=>{finishBackup=resolve;}),x=>x,()=>true,Error,Error);
-  const quick=new Provider({NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub'});let gotWinner=false;
+  const quick=new Provider({NAVER_API_HUB_CLIENT_ID:'stub',NAVER_API_HUB_CLIENT_SECRET:'stub',CHAT_TIMING_LOGS:'false'});let gotWinner=false;
   const win=quick.searchRestaurants({messages:[],locationName:'강남',intentAnalysis:{}}).then(result=>{gotWinner=true;return result;});
   await new Promise(resolve=>setTimeout(resolve,10));assert.equal(gotWinner,true,'a valid primary result must not wait for a slow parallel backup');finishBackup({items:[]});assert.equal((await win).places[0].name,'winner');
   const analyzer=source.match(/async function analyzeResponseModeIntent\([^]*?\n\}/)[0];let deadlines=[];

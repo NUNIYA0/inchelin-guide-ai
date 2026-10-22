@@ -34,12 +34,12 @@ export async function testWelcomeFirstSearch(runCase){
   }
   const cls=(root,c)=>nodes(root).filter(n=>n.className.split(' ').includes(c));
   const renderSource=html.slice(html.indexOf('    const comparisonTray = new Map();'),html.indexOf('    function appendMessage('));
-  async function app(partial=false){
+  async function app(partial=false,clockSkew=0){
     const elements=Object.fromEntries(['welcome','chatView','main','guidePanel','messages','welcomeInput','chatInput','chatSend','conversationBottom','comparisonTray','suggestions','welcomeForm'].map(id=>[id,new Node()]));
     const document={createElement:tag=>new Node(tag),getElementById:id=>elements[id]||null};
     const main=elements.main,welcome=elements.welcome,chatView=elements.chatView,guidePanel=elements.guidePanel,messagesEl=elements.messages;
     const requests=[];
-    const fetch=async(url,options)=>{const request=JSON.parse(options.body);requests.push(request);if(partial)return Response.json({message:'홍대에서 냉면 먹을 곳 3곳을 골라봤어요.'});const result=await run(request.messages.at(-1).content);return Response.json(result.body);};
+    const fetch=async(url,options)=>{const request=JSON.parse(options.body);requests.push(request);if(partial)return Response.json({message:'홍대에서 냉면 먹을 곳 3곳을 골라봤어요.'});const result=await run(request.messages.at(-1).content);result.body.meta.generatedAt+=clockSkew;return Response.json(result.body);};
     const source=`
       let currentId='old',currentLocationName='역삼',currentLocationCoords=null,chatMessages=[{role:'assistant',content:'이전 기록',restaurants:[],meta:{responseModeState:{slots:{region:'역삼'},lastCards:[{id:'old'}]}}}],generating=false,autoFollowConversation=true,lastAIRequest=null,activeRequestController=null,generationTimers=[],conversationEpoch=0,locationRequestInFlight=false,regeneratingAnswer=false,pending;
       const answerRequests=new WeakMap(),AI_API_ENDPOINT='/api/chat';
@@ -67,7 +67,20 @@ export async function testWelcomeFirstSearch(runCase){
     assert.deepEqual(api.messages[1].restaurants.map(c=>c.id),direct.body.restaurants.map(c=>c.id));assert.deepEqual(api.messages[1].meta.answer_plan,direct.body.meta.answer_plan);
     const typed=await app();typed.api.type(row.prompt);await typed.api.done();assert.equal(cls(typed.elements.messages,'restaurant-card').length,3);assert.deepEqual(typed.requests[0].messages,requests[0].messages);assert.deepEqual(typed.requests[0].context,requests[0].context);
   }
-  const partial=await app(true);partial.api.clickRow(0);await partial.api.done();assert.equal(cls(partial.elements.messages,'retry-button').length,1,'incomplete response goes through real request rejection → generation catch → retry UI');assert.equal(partial.api.messages.length,1,'do not persist incomplete text as a successful answer');
+  // Fresh 200 question responses traverse the real ask → fetch → normalize →
+  // render chain. A server clock ahead of the device used to mislabel all of
+  // these fast paths as version mismatches (long searches could hide the skew).
+  for(const prompt of ['홍대 맛집 추천해줘','냉면 먹고 싶어','먹을 곳 찾아줘','오늘 뭐 먹을지 같이 골라줘']){
+    for(const skew of [0,60000,-7200000]){
+      const client=await app(false,skew);client.api.type(prompt);await client.api.done();
+      assert.equal(client.api.messages.length,2,prompt+' stored response');
+      assert.equal(cls(client.elements.messages,'retry-button').length,0,prompt+' not version error');
+      assert.equal(cls(client.elements.messages,'restaurant-card').length,0);
+      assert.equal(cls(client.elements.messages,'turn-question').length,1,prompt+' actual client question render');
+      assert.doesNotMatch(client.elements.messages.textContent,/새 버전/);
+    }
+  }
+  const partial=await app(true);partial.api.clickRow(0);await partial.api.done();assert.equal(cls(partial.elements.messages,'retry-button').length,1,'incomplete response goes through real request rejection → generation catch → retry UI');assert.equal(partial.api.messages.length,1,'do not persist incomplete text as a successful answer');assert.doesNotMatch(partial.elements.messages.textContent,/새 버전/,'missing metadata is a generic error, not a version mismatch');
   const check=new Function(fn('assertCompleteAnswer')+';return assertCompleteAnswer;')();
   assert.throws(()=>check({content:'홍대에서 냉면 먹을 곳 3곳을 골라봤어요.',restaurants:[],meta:null}),/incomplete_answer/);
   assert.throws(()=>check({content:'3곳을 골라봤어요.',restaurants:[],meta:{answer_plan:['text']}}),/incomplete_answer/);

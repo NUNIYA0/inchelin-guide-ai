@@ -24,6 +24,7 @@ import { testV132 } from './v132-regression-smoke.mjs';
 import { testV133 } from './v133-regression-smoke.mjs';
 import { testV134 } from './v134-regression-smoke.mjs';
 import { testV135 } from './v135-regression-smoke.mjs';
+import { testV136 } from './v136-regression-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -93,6 +94,7 @@ async function runCase({ message, history = [], env, context, dbResponse, enrich
   }
 }
 
+await testV136(runCase);
 await testV135(runCase);
 {
   const result = await runCase({
@@ -1361,7 +1363,7 @@ function semanticAnalysis(overrides = {}) {
     assert.equal(result.body.message, "좋아요, 처음부터 다시 시작할게요. 오늘은 어떤 메뉴나 분위기가 끌리세요?");
     assert.equal(result.body.meta.variant, "hard_reset");
     assert.equal(result.body.meta.mode, "GENERAL");
-    assert.deepEqual(result.body.meta.responseModeState, normalizeResponseState({}));
+    assert.deepEqual({...result.body.meta.responseModeState,responseRulesVersion:null,generatedAt:null}, normalizeResponseState({}));
     assert.deepEqual(result.body.suggestions, []);
     assert.deepEqual(result.body.restaurants, []);
     assert.doesNotMatch(result.body.message, /지역|위치/);
@@ -1700,7 +1702,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(area.body.meta.intent, "place_search");
   assert.equal(area.body.meta.mode, "B");
   assert.equal(area.body.meta.responseModeState.slots.region, "홍대");
-  assert.match(area.body.message, /끌리는 쪽 있으세요/);
+  assert.match(area.body.message, /홍대에서 어떤 음식이 끌리세요/);
   assert.equal(area.body.suggestions.length, 7);
   assert.ok(area.body.suggestions.includes("네, 골라주세요"));
   const here = await runCase({ message: "내 주변에서 먹을 곳 찾아줘", env,
@@ -1909,7 +1911,7 @@ const indexHtml = await readFile(new URL("../dist/index.html", import.meta.url),
   assert.equal(next.pendingQuestionSlot, 'menu_category');
   assert.equal(sent.at(-1)[0], '역삼에서 먹을 곳 찾아줘');
   const regionReply = await runCase({ message: sent.at(-1)[0], env: { OPENAI_API_KEY: 'test-key', RESTAURANT_DATA_SOURCE: 'naver' }, context: { responseModeState: next } });
-  assert.match(regionReply.body.message, /끌리는 쪽 있으세요/);
+  assert.match(regionReply.body.message, /역삼에서 어떤 음식이 끌리세요/);
   assert.deepEqual(regionReply.body.suggestions, ['한식','중식','일식','양식','분식','카페 식사','네, 골라주세요']);
   transitions.setState(next);
   transitions.situations({ companion: '혼밥 · 데이트', parking: true, other: [] }, '혼자 먹기 좋은 곳, 데이트하기 좋은 곳, 주차 필요한 곳으로 찾아줘');

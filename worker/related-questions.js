@@ -18,6 +18,8 @@ export const RELATED_AXES={
 const UNSUPPORTED = /영업|몇\s*시|전화|평점|별점|가격|예산|얼마|웨이팅|대기|분위기|조용|주차|단체석|인기|맛있|맛집\s*순위|예약/;
 const SERVICE_TEXTS = ['추천은 어떤 기준으로 해?','오늘 뭐 먹을지 같이 골라줘','어떤 지역에서 식당을 찾을 수 있어?','현재 위치로 식당을 찾을 수 있어?'];
 const compact = text=>String(text||'').replace(/[\s.,?!？~]/g,'');
+// Companion, ambience and facilities are one user-facing situation axis.
+export const relatedAxisGroup=axis=>['companion','vibe','facility'].includes(axis)?'situation':axis;
 // Bounded, short-lived result cache: no user messages, coordinates or credentials.
 const searchCache=new Map();
 const pendingSearches=new Map();
@@ -94,7 +96,7 @@ export function relatedContext(response,payload={}) {
     shownSuggestions:state.shownSuggestions,template_history:state.relatedTemplateHistory,axis_history:state.relatedAxisHistory};
 }
 export function validateRelated(textValue,{state,parentIntent,classify,history=[],pendingSlot=null}) {
-  const text=typeof textValue==='string'?textValue.trim():'';
+  const text=typeof textValue==='string'?textValue.trim().replace(/다시\s*찾아줘/g,'찾아줘'):'';
   if ([...text].length<12 || [...text].length>40 || /[\r\n]/.test(text) || (text.match(/[?？]/g)||[]).length>1 || /[.!。].+/.test(text)) return null;
   const unnamed=state.lastCards.reduce((value,card)=>value.split(card.name).join(''),text);
   if(/첫\s*번째|두\s*번째|세\s*번째|처음|마지막|거기|그\s*곳|그\s*집|[123]\s*(?:번째|번\s*식당)/.test(unnamed))return null;
@@ -116,7 +118,7 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
   if(descriptor.axis==='companion' && (state.slots.companion||state.preferences.companion||state.askedSlots.includes('companion')))return null;
   if(descriptor.axis==='vibe' && state.preferences.vibe)return null;
   if(descriptor.axis==='facility' && (state.slots.parking!==null || state.slots.other.some(item=>/단체석/.test(item))))return null;
-  if(['place_search','condition_change','followup'].includes(parentIntent)&&state.relatedAxisHistory.at(-1)?.includes(descriptor.axis))return null;
+  if(['place_search','condition_change','followup'].includes(parentIntent)&&relatedAxisGroup(descriptor.axis)==='situation'&&state.relatedAxisHistory.at(-1)?.some(axis=>relatedAxisGroup(axis)==='situation'))return null;
   if([...text].length>30&&!['detail','compare'].includes(descriptor.axis))return null;
   if (descriptor.axis.startsWith('service_') && !['service','general'].includes(parentIntent))return null;
   if (!RELATED_AXES[parentIntent]?.includes(descriptor.axis))return null;
@@ -136,7 +138,7 @@ export function relatedTemplates(state,intent,context={}) {
   const regions=other.flatMap(area=>[`${area}에서도 ${food} 먹을 곳 찾아줘`,`${region} 말고 ${area}에서 찾아줘`,`${area} 지역에서 ${food}도 찾아줘`]);
   const foods=similar.filter(name=>name!==food && isMainDish(name)).flatMap(name=>[`${food} 말고 ${name} 먹을 곳 찾아줘`,`${region}에서 ${withParticle(name,'은/는')} 어때?`,`${region}에서 ${withParticle(name,'으로/로')} 바꿔 찾아줘`]);
   const current=state.slots.companion;
-  const situations=(current?/회식/.test(current)?[`회식하기 좋은 다른 ${food}집도 보여줘`,'회식할 곳을 같은 지역에서 다시 찾아줘']:/혼자|혼밥/.test(current)?['혼자 가기 편한 곳으로 다시 찾아줘',`혼자 먹을 다른 ${food}집도 찾아줘`]:/가족/.test(current)?['가족과 함께 먹을 곳으로 다시 찾아줘']:[`${current} 먹을 곳으로 다시 찾아줘`]:['회식하기 좋은 곳으로 다시 찾아줘','가족과 함께 먹을 곳으로 찾아줘','혼자 먹을 곳으로 다시 찾아줘']).filter(text=>context.pending_question?.slot!=='companion');
+  const situations=(current?/회식/.test(current)?[`회식하기 좋은 다른 ${food}집도 보여줘`,'회식할 곳을 같은 지역에서 찾아줘']:/혼자|혼밥/.test(current)?['혼자 가기 편한 곳으로 찾아줘',`혼자 먹을 다른 ${food}집도 찾아줘`]:/가족/.test(current)?['가족과 함께 먹을 곳으로 찾아줘']:[`${current} 먹을 곳으로 찾아줘`]:['회식하기 좋은 곳으로 찾아줘','가족과 함께 먹을 곳으로 찾아줘','혼자 먹을 곳으로 찾아줘']).filter(text=>context.pending_question?.slot!=='companion');
   const search=[regions[0],foods[0],situations[0],...regions.slice(1),...foods.slice(1),...situations.slice(1)].filter(Boolean);
   const menu=[`다른 ${state.menuCategory||'한식'} 메뉴도 보여줘`,'중식으로 먹을 메뉴를 골라줘',`${food} 먹을 곳도 같이 찾아줘`];
   const details=state.lastCards.slice(0,3).flatMap(card=>[`${card.name} 자세히 알려줘`,`${card.name} 상세 정보도 알려줘`]);
@@ -151,14 +153,18 @@ export function relatedTemplates(state,intent,context={}) {
 }
 // Place responses reserve a primary-axis question; grounded detail/compare never
 // substitute for a failed region/food lookup or repeat their axis to pad counts.
-export function selectRelatedAxes(candidates,{placeResponse=false,pending=false,limit=3}={}) {
+export function selectRelatedAxes(candidates,{placeResponse=false,pending=false,limit=3,singlePlace=false}={}) {
   const unique=[];
-  for(const candidate of candidates)if(!unique.some(old=>old.axis===candidate.axis))unique.push(candidate);
+  for(const candidate of candidates)if(!unique.some(old=>relatedAxisGroup(old.axis)===relatedAxisGroup(candidate.axis)))unique.push(candidate);
   if(!placeResponse)return unique.slice(0,limit);
   if(pending) {
     const primary=unique.find(item=>['region','food'].includes(item.axis));
     const grounded=unique.find(item=>['detail','compare'].includes(item.axis));
     return [grounded,primary].filter(Boolean);
+  }
+  if(singlePlace){
+    const situation=unique.find(item=>relatedAxisGroup(item.axis)==='situation');
+    return [situation,...unique.filter(item=>['region','food'].includes(item.axis))].filter(Boolean).slice(0,limit);
   }
   const primary=unique.find(item=>['region','food','companion','vibe','facility'].includes(item.axis));
   if(!primary)return unique.filter(item=>['detail','compare'].includes(item.axis)).slice(0,2);
@@ -209,7 +215,7 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
       available.push(candidate);
     }
     const choose=()=>selectRelatedAxes(available.filter(candidate=>!candidate.check||probeResults.get(candidate.probeKey)===true)
-      .map(candidate=>({...candidate.validated,source:candidate.source})),{placeResponse,pending,limit});
+      .map(candidate=>({...candidate.validated,source:candidate.source})),{placeResponse,pending,limit,singlePlace:placeResponse&&response.restaurants?.length===1});
     // Failed first alternatives must not end fallback exploration. Up to three
     // bounded parallel batches try different supported combinations, at most 18
     // unique probes; ordinary successful first batches still return immediately.

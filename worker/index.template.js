@@ -982,12 +982,12 @@ function menuQuestionResponse(stateValue, flow, analysis) {
   const state = normalizeResponseState(stateValue);
   const slot = flow === 'menu_category' ? 'menu_category' : flow === 'clarify' ? 'clarify' : 'region';
   const categoryQuestions = ['한식, 중식, 일식, 양식 중에 끌리는 쪽 있으세요? 없으면 제가 골라드릴까요?', '어떤 음식 종류가 끌리세요? 아직 고민되면 제가 골라드릴까요?', '먹고 싶은 종류가 있으세요? 떠오르지 않으면 제가 골라드릴까요?'];
-  const question = flow === 'menu_category' ? categoryQuestions[state.questionCount % categoryQuestions.length] : flow === 'clarify' ? '메뉴를 고를까요, 식당을 찾을까요?' : '지금 어디세요?';
+  const question = flow === 'menu_category' ? state.slots.region ? `${state.slots.region}에서 어떤 음식이 끌리세요?` : categoryQuestions[state.questionCount % categoryQuestions.length] : flow === 'clarify' ? '메뉴를 고를까요, 식당을 찾을까요?' : '지금 어디세요?';
   const chips = flow === 'menu_category' ? CATEGORY_ANSWERS
     : flow === 'clarify' ? [{ label:'메뉴 고르기',message:'오늘 뭐 먹을지 같이 골라줘' },{ label:'식당 찾기',message:'먹을 곳 찾아줘' }]
     : REGION_ANSWERS;
   const food = state.slots.menu || state.slots.food_type;
-  const intros = flow === 'menu_category' ? [state.slots.region ? `${state.slots.region}은 그대로 두고 먹고 싶은 종류부터 골라봐요.` : '오늘 먹을 메뉴를 함께 좁혀봐요.', '음식 종류부터 하나씩 골라볼게요.', '한 끼를 고르기 쉽게 나눠볼게요.', '먹고 싶은 방향부터 함께 정해봐요.']
+  const intros = flow === 'menu_category' ? [state.slots.region ? '먹고 싶은 메뉴를 함께 골라봐요.' : '오늘 먹을 메뉴를 함께 좁혀봐요.', '음식 종류부터 하나씩 골라볼게요.', '한 끼를 고르기 쉽게 나눠볼게요.', '먹고 싶은 방향부터 함께 정해봐요.']
     : flow === 'clarify' ? ['말씀하신 방향을 한 번만 더 알려주세요.', '어느 쪽을 도와드릴지 먼저 맞춰볼게요.', '고르고 싶은 방향부터 함께 맞춰봐요.', '도와드릴 내용이 정해지면 편하게 말해 주세요.']
     : food ? [`${food} 드시고 싶으시군요. 먹을 지역만 정하면 찾아볼 수 있어요.`, '먹고 싶은 음식은 정했으니 지역을 골라봐요.', '식사할 곳을 찾기 전에 동네만 정해볼게요.']
       : ['먹을 곳을 함께 찾아볼게요. 먼저 지역부터 정해봐요.', '식사할 곳을 찾기 전에 동네부터 골라봐요.'];
@@ -1822,6 +1822,9 @@ function requestedCategoryMatches(place, messages, intentAnalysis) {
   const aliases = {
     삼겹살: /삼겹살|돼지|돈육|육류|고깃집|고기구이/, 고기: /삼겹살|돼지|소고기|한우|갈비|육류|고깃집|고기구이/,
     돈까스: /돈까스|돈가스/, 돈가스: /돈까스|돈가스/, 초밥: /초밥|스시/, 스시: /초밥|스시/,
+    // Naver often labels pasta restaurants by cuisine, not individual dishes.
+    // Accept the specific Italian classification, never generic western/cafe.
+    파스타: /파스타|스파게티|이탈리아음식/,
     햄버거: /햄버거|버거/, 버거: /햄버거|버거/, 해산물: /해산물|횟집|생선회/, 횟집: /해산물|횟집|생선회/,
   };
   if (explicitMenu === "삼겹살" && /소고기|쇠고기|한우|양고기/.test(searchable) && !/삼겹살|돼지|돈육/.test(searchable)) return false;
@@ -1875,9 +1878,8 @@ class NaverRestaurantProvider {
           "X-NCP-APIGW-API-KEY-ID": clientId,
           "X-NCP-APIGW-API-KEY": clientSecret,
         }, suggestionCheck ? 650 : 3000);
-        const places = (Array.isArray(data?.items) ? data.items : [])
-          .map(sanitizeNaverPlace)
-          .filter(Boolean)
+        const candidates = (Array.isArray(data?.items) ? data.items : []).map(sanitizeNaverPlace).filter(Boolean);
+        const places = candidates
           .filter(place => validateRestaurantCandidate(place, { messages, intentAnalysis, source: this.source, locationName }))
           .slice(0, 5);
         providerDebugLog(this.env, "search_completed", {
@@ -1886,6 +1888,11 @@ class NaverRestaurantProvider {
           apiStatus: 200,
           resultCount: places.length,
         });
+        // Query/category/count diagnostics only; never headers, keys or full payloads.
+        if(!suggestionCheck && this.env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'restaurant_search',query:candidateQuery,rawCount:candidates.length,resultCount:places.length,
+          categories:[...new Set(candidates.map(p=>p.registered_data?.rawCategory))],
+          foodRejected:candidates.filter(p=>!requestedCategoryMatches(p,messages,intentAnalysis)).length,
+          regionRejected:candidates.filter(p=>!placeMatchesRegion(p,locationName)).length}));
         return { configured: true, places, ambiguous: false, query: candidateQuery, attemptedQueries: queries, apiStatus: 200 };
       });
       const matched=await Promise.any(attempts.map(async task=>{const result=await task;if(!result.places.length)throw null;return result;}))
@@ -2493,7 +2500,7 @@ async function handleChat(request, env, execution = {}) {
     && responseState.slots.region && !responseState.slots.use_current_location && ![...SEARCH_REGIONS,...Object.values(ADJACENT_REGIONS).flat()].includes(normalizeSearchRegion(responseState.slots.region))) {
     const requestedRegion = responseState.slots.region;
     const nextState = normalizeResponseState({ ...responseState, slots: { ...responseState.slots, region: null, use_current_location: false }, lastCards: [], focus: null, pendingQuestionSlot: 'region' });
-    return json(chatResponse(`‘${requestedRegion}’은 현재 검색 가능한 지역이 아니에요. 아래 지역 중에서 골라주세요.`, SEARCH_REGIONS, [], {
+    return json(chatResponse(`${withParticle(`‘${requestedRegion}’`,'은/는')} 현재 검색 가능한 지역이 아니에요. 아래 지역 중에서 골라주세요.`, SEARCH_REGIONS, [], {
       mode: 'B', intent: 'place_search', analysis, responseModeState: nextState, unsupportedRegion: requestedRegion,
     }));
   }
@@ -2842,7 +2849,7 @@ export default {
         if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'chat_timing',status:response.status,...report}));
         const current=finalizeConversationCopy(completed);
         current.meta={...current.meta,responseRulesVersion:globalThis.InchelinResponseRules.VERSION,generatedAt:Date.now()};
-        if(current.meta.responseModeState?.lastCards?.length)Object.assign(current.meta.responseModeState,{responseRulesVersion:current.meta.responseRulesVersion,generatedAt:current.meta.generatedAt});
+        if(current.meta.responseModeState)Object.assign(current.meta.responseModeState,{responseRulesVersion:current.meta.responseRulesVersion,generatedAt:current.meta.generatedAt});
         const output=json(current,response.status);
         output.headers.set('X-Response-Rules-Version',globalThis.InchelinResponseRules.VERSION);
         output.headers.set('Server-Timing',Object.entries(report.stages).map(([name,value])=>`${name};dur=${value}`).join(', '));

@@ -37,7 +37,7 @@ export async function testAnswerPlan() {
     const found=await run('강남이에요',selected.meta.responseModeState);
     assert.equal(found.restaurants.length,3);assert.equal(found.meta.turnPolicy.questionText,'');
     assert.deepEqual(found.meta.answer_plan.filter(block=>block!=='related_questions'),['text','place_cards','source','chips']);
-    const region=await run('오늘 홍대에서 뭐 먹지');assert.equal(region.meta.responseModeState.slots.region,'홍대');assert.match(region.message,/끌리는 쪽 있으세요/);assert.equal(region.restaurants.length,0);
+    const region=await run('오늘 홍대에서 뭐 먹지');assert.equal(region.meta.responseModeState.slots.region,'홍대');assert.match(region.message,/홍대에서 어떤 음식이 끌리세요/);assert.equal(region.restaurants.length,0);
     const regionKind=await run('한식으로 골라줘',region.meta.responseModeState);
     const typedKind=await run('중식',region.meta.responseModeState);assert.equal(typedKind.meta.menuCards.length,3);assert.ok(typedKind.meta.menuCards.every(card=>MENU_CATEGORIES.중식.includes(card.name)));assert.equal(typedKind.meta.responseModeState.slots.region,'홍대');
     const regionPick=await run('국밥 먹을래',regionKind.meta.responseModeState);

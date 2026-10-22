@@ -1,4 +1,5 @@
 import { MAIN_DISHES } from './main-dishes.js';
+import { normalizeKoreanParticles } from './korean.js';
 // Display copy is separate from routing/facts. Never repair factual claims by guessing.
 const REPEATED_TERMS=new RegExp([...MAIN_DISHES.map(item=>item.name),'회식','혼밥','가족','데이트','강남역','강남','역삼','홍대','성수','종로','여의도'].sort((a,b)=>b.length-a.length).join('|'),'g');
 export const FORBIDDEN_COPY = /요청|제공된\s*(?:네이버\s*)?검색\s*결과|네이버\s*지역\s*검색\s*결과|사용자가|일치하는\s*매장들|검증|정렬|후보|분류|준비|처리|생성|분석|선택했어요|입니다|습니다|[가-힣]*(?:함|음|됨|임|뀜)(?=\s*(?:[.!?。]|$))|(?:변경|추천|검색|완료|진행|정리|선택)\s*(?=[.!。]|$)/;
@@ -80,20 +81,24 @@ export function stripAnalysisFields(value, inAnalysis = false, path = []) {
 
 export function finalizeConversationCopy(response) {
   const result = stripAnalysisFields(response);
-  const safe = (value, fallback = '') => typeof value === 'string' && FORBIDDEN_COPY.test(value) ? fallback : value;
+  const slotsForCopy=result.meta?.responseModeState?.slots||{};
+  const words=[slotsForCopy.region,slotsForCopy.menu,slotsForCopy.food_type];
+  const safe = (value, fallback = '') => normalizeKoreanParticles(typeof value === 'string' && FORBIDDEN_COPY.test(value) ? fallback : value,words);
   // Fixed service FAQ is authoritative, not generated copy; never rewrite it.
   const fixedFAQ = result.meta?.variant === 'service';
   if (!fixedFAQ) {
     const slots = result.meta?.responseModeState?.slots || {};
     const count = result.restaurants?.length || 0;
     const fallback = count ? `${slots.region ? slots.region + '에서 ' : ''}${slots.menu || slots.food_type || '먹을 곳'} ${count}곳을 골라봤어요.` : '지금 알 수 있는 내용만 안내해드릴게요.';
+    const inherited=result.meta?.inheritedFood ? `${result.meta.inheritedFood} 기준으로 찾았어요.` : '';
+    const repeats=value=>repeatsCopySentences(inherited?String(value||'').replace(inherited,''):value);
     result.message = safe(result.message, fallback);
-    if(repeatsCopySentences(result.message)) result.message=fallback;
+    if(repeats(result.message)) result.message=[fallback,inherited].filter(Boolean).join(' ');
     if (result.error) result.error = safe(result.error, '답변을 불러오지 못했어요. 다시 시도해 주세요.');
     if (result.meta?.turnPolicy) {
       const policy = result.meta.turnPolicy;
       policy.intro = safe(policy.intro, result.message);
-      if(repeatsCopySentences(policy.intro))policy.intro=fallback;
+      if(repeats(policy.intro))policy.intro=[fallback,inherited].filter(Boolean).join(' ');
       policy.questionText = safe(policy.questionText);
       if (policy.next_question) policy.next_question.text = safe(policy.next_question.text, policy.questionText);
     }
