@@ -20,7 +20,7 @@ export function parseRecommendationCSV(text) {
   const restaurants=rows.map(values=>{
     if(values.length!==headers.length)throw new Error('CSV column count mismatch');
     const r=Object.fromEntries(headers.map((key,i)=>[key,values[i]]));
-    return {name:r.name,roadAddress:r.roadAddress,parcelAddress:r.parcelAddress,recommendations:r.id?[{id:r.id,recommenderName:r.recommenderName||null,reason:r.reason||null,writtenAt:r.writtenAt||null,tags:r.tags?r.tags.split('|'):[]}]:[]};
+    return {name:r.name,roadAddress:r.roadAddress,parcelAddress:r.parcelAddress,category:r.category||'',...(r.latitude&&r.longitude?{latitude:Number(r.latitude),longitude:Number(r.longitude)}:{}),imageUrl:r.imageUrl||null,menus:r.menus?JSON.parse(r.menus):[],soloEvidence:r.soloEvidence?JSON.parse(r.soloEvidence):null,recommendations:r.id?[{id:r.id,recommenderName:r.recommenderName||null,reason:r.reason||null,writtenAt:r.writtenAt||null,tags:r.tags?r.tags.split('|'):[]}]:[]};
   });
   return validateRecommendationSource({schemaVersion:1,restaurants});
 }

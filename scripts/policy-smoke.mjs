@@ -4,14 +4,24 @@ import worker from '../build/dist/server/index.js';
 import {testPhase1Client} from './phase1-client-smoke.mjs';
 import {normalizeKoreanParticles} from '../worker/korean.js';
 import {testRecommendations} from './recommendations-smoke.mjs';
+import {testPhase3} from './phase3-smoke.mjs';
 const api=globalThis.InchelinPhase1;
 const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
 const dataset=query=>{const center=api.centers.find(c=>query.startsWith(c.label))||api.centers[0];return {items:[100,400,800,1000.2,2000].map((m,i)=>item(center,m,i))};};
-export async function runCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200,workerOverride=worker}={}){
+export async function requestCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200,workerOverride=worker}={}){
   const original=globalThis.fetch,calls=[];
   globalThis.fetch=async url=>{calls.push(String(url));assert.match(String(url),/naverapihub\.apigw\.ntruss\.com\/search\/v1\/local/,'AI/image/other live calls forbidden');return Response.json(typeof data==='function'?data(new URL(url).searchParams.get('query')):data,{status});};
   try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName}})});const response=await workerOverride.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
+}
+// Legacy v137/v138 card assertions now explicitly exercise the consent continuation.
+// New v139 tests and the consent client scenario call requestCase directly.
+export async function runCase(message,options={}){
+  const initial=await requestCase(message,options);
+  if(initial.body.meta?.turnPolicy?.answerChoices?.some(c=>c.label==='미확인 후보 보기')){
+    const accepted=await requestCase('미확인 조건을 알고 후보도 보여줘',{...options,state:initial.body.meta.responseModeState});accepted.initial=initial;return accepted;
+  }
+  return initial;
 }
 const c=r=>r.body.meta.responseModeState.phase1.conditions,s=r=>r.body.meta.responseModeState;
 for(const [h,m,p] of [[9,59,'morning'],[10,0,'lunch'],[13,59,'lunch'],[14,0,'afternoon'],[16,59,'afternoon'],[17,0,'evening'],[20,59,'evening'],[21,0,'lateNight'],[23,59,'lateNight'],[0,0,'lateNight'],[4,59,'lateNight'],[5,0,'morning']]){
@@ -27,7 +37,7 @@ const radius=await runCase('500m 안으로',{state:s(move)});assert.equal(c(radi
 for(const [text,meters] of [['30m 안으로',30],['30km 이내로',30000]])assert.equal(c(await runCase(text,{state:s(move)})).radiusMeters,meters,'never clamp a requested radius silently');
 const invalidDistance=await runCase('0m 안으로',{state:s(move)});assert.equal(invalidDistance.calls.length,0);assert.equal(c(invalidDistance).radiusMeters,1000);assert.ok(invalidDistance.body.meta.turnPolicy.questionText);
 const solo=await runCase('혼자 먹을 거야',{state:s(move)});assert.equal(c(solo).companion,'혼밥');assert.equal(c(solo).food,'한식');assert.equal(solo.body.restaurants.length,3);assert.ok(solo.body.suggestions.every(q=>!/혼밥/.test(q)));
-const tomorrow=await runCase('내일 저녁에 갈 거야',{state:s(solo)});assert.equal(c(tomorrow).visit,'내일 저녁');assert.equal(c(tomorrow).radiusMeters,1000);assert.equal(c(tomorrow).companion,'혼밥');assert.match(tomorrow.body.meta.notice,/영업 여부.*확인되지/);
+const tomorrow=await runCase('내일 저녁에 갈 거야',{state:s(solo)});assert.equal(c(tomorrow).visit,'내일 저녁');assert.equal(c(tomorrow).radiusMeters,1000);assert.equal(c(tomorrow).companion,'혼밥');assert.ok(tomorrow.body.restaurants.every(card=>card.conditionVerification.checks.some(check=>check.key==='visit'&&check.status==='unknown')));
 const remove=await runCase('예산 제한 없애줘',{state:s(tomorrow)});assert.equal(c(remove).budget,null);assert.equal(c(remove).food,'한식');assert.ok(!remove.body.meta.conditionChips.some(chip=>chip.key==='budget'));
 const removeFood=await runCase('음식 조건 해제해줘',{state:s(tomorrow)});assert.equal(c(removeFood).food,null);assert.equal(c(removeFood).location.label,'역삼역');assert.equal(c(removeFood).budget,'1만 원 이하');
 const oldVersion=await runCase('500m 안으로',{state:{responseRulesVersion:'v136',generatedAt:1,slots:{region:'홍대',menu:'냉면'},preferences:{budget:'1만 원 이하'}}});assert.equal(c(oldVersion).location.label,'홍대입구역');assert.equal(c(oldVersion).food,'냉면');assert.equal(c(oldVersion).budget,'1만 원 이하');
@@ -47,7 +57,7 @@ const otherGangnam=await runCase('강남구청역에서 찾아줘');assert.equal
 for(const address of ['서울특별시 강남구 강남대로78길 25 지상1층','서울특별시 마포구 서교동 123-4','부산광역시 중구 광복로 1'])assert.equal(api.mapUrl(address),'https://map.naver.com/p/search/'+encodeURIComponent(address));assert.equal(api.mapUrl(''),'');
 const noAddress=await runCase('강남역에서 추천해줘',{data:{items:[item(api.centers[0],100,1,{roadAddress:'',address:''})]}});assert.equal(noAddress.body.restaurants.length,1);assert.equal(noAddress.body.restaurants[0].naverPlaceUrl,'');
 const compare=await runCase('첫 번째랑 두 번째 식당 비교하고 지도도 보여줘',{state:s(bulk)});assert.equal(compare.calls.length,0);assert.equal(compare.body.restaurants.length,2);assert.match(compare.body.message,/테스트 식당 0/);assert.match(compare.body.message,/테스트 식당 1/);assert.match(compare.body.message,/주소/);
-assert.ok(compare.body.meta.phase1Intents.includes('compare'));assert.ok(compare.body.meta.phase1Intents.includes('map'));assert.ok(move.body.meta.phase1Intents.includes('condition_change'));
+assert.ok(compare.body.meta.phase1Intents.includes('compare'));assert.ok(compare.body.meta.phase1Intents.includes('map'));assert.ok((move.initial||move).body.meta.phase1Intents.includes('condition_change'));
 const detail=await runCase('두 번째 집 영업시간이랑 전화번호 알려줘',{state:s(bulk)});assert.equal(detail.calls.length,0);assert.match(detail.body.message,/영업시간.*전화/);assert.equal(detail.body.restaurants[0].id,bulk.body.restaurants[1].id);
 const vague=await runCase('여기 지도 보여줘',{state:s(bulk)});assert.equal(vague.calls.length,0);assert.ok(vague.body.meta.turnPolicy.questionText);
 const focusedState=s(bulk);focusedState.phase1.focusCardId=bulk.body.restaurants[1].id;const focused=await runCase('여기 지도 보여줘',{state:focusedState});assert.equal(focused.body.restaurants[0].id,bulk.body.restaurants[1].id);
@@ -59,6 +69,7 @@ assert.ok(bulk.body.meta.notice.split(/[.!?]/).filter(x=>x.trim()).length<=2);
 assert.ok(!/주차|분위기|시간|좌석/.test(bulk.body.meta.notice),'only applicable conditions');
 assert.ok(!/영업 여부|방문 시간/.test(remove.body.meta.notice),'do not repeat a retained visit notice');
 const v138Samples=await testRecommendations(runCase);
-await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples});
+const v139Samples=await testPhase3(requestCase);
+await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples},requestCase);
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
-console.log('v138 policy smoke passed: authored source/CSV/identity/representative ranking/exact text/count/flag off; enabled real Worker fixture and actual client toggle/render; concise notices/no early chips; all v137 time/location/distance/conditions/map/recovery cases. All upstream calls mocked; no keys or AI calls.');
+console.log('v139 policy smoke passed: registered-first source fixture; no silent Naver substitution; per-condition evidence; explicit unknown consent + invalidation; over-budget exclusion; exact authored recommendations; v137/v138 continuation regression. All upstream calls mocked; no keys or AI calls.');

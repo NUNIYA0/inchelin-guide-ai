@@ -6,6 +6,9 @@
     "schemaVersion":{"const":1},
     "restaurants":{"type":"array","items":{"type":"object","required":["recommendations"],"anyOf":[{"required":["roadAddress"]},{"required":["parcelAddress"]}],"properties":{
       "name":{"type":"string"},"roadAddress":{"type":"string","minLength":1},"parcelAddress":{"type":"string"},
+      "category":{"type":"string"},"latitude":{"type":"number","minimum":-90,"maximum":90},"longitude":{"type":"number","minimum":-180,"maximum":180},"imageUrl":{"type":["string","null"],"format":"uri"},
+      "menus":{"type":"array","items":{"type":"object","required":["name"],"properties":{"name":{"type":"string","minLength":1},"priceKRW":{"type":["number","null"],"minimum":0},"mainDish":{"type":"boolean"}}}},
+      "soloEvidence":{"type":["object","null"],"required":["confirmed","source"],"properties":{"confirmed":{"type":"boolean"},"source":{"type":"string","minLength":1}}},
       "recommendations":{"type":"array","items":{"type":"object","required":["id"],"properties":{
         "id":{"type":"string","minLength":1},"recommenderName":{"type":["string","null"]},"reason":{"type":["string","null"]},
         "writtenAt":{"type":["string","null"],"format":"date-time"},"tags":{"type":"array","items":{"type":"string"}}

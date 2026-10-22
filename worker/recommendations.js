@@ -32,7 +32,12 @@ export function validateRecommendationSource(source) {
       if(ids.has(clean.id)&&ids.get(clean.id)!==signature)throw new Error('Recommendation: conflicting duplicate id '+clean.id);
       ids.set(clean.id,signature);return clean;
     });
-    return {name:row.name||'',roadAddress:row.roadAddress||'',parcelAddress:row.parcelAddress||'',address:row.address||'',recommendations};
+    const menus=Array.isArray(row.menus)?row.menus.map(menu=>{
+      if(typeof menu.name!=='string'||!menu.name.trim()||menu.priceKRW!=null&&(!Number.isFinite(menu.priceKRW)||menu.priceKRW<0))throw new Error('Invalid registered menu');
+      return {name:menu.name,priceKRW:menu.priceKRW??null,mainDish:menu.mainDish===true};
+    }):[];
+    const location=Number.isFinite(row.latitude)&&Number.isFinite(row.longitude)&&Math.abs(row.latitude)<=90&&Math.abs(row.longitude)<=180?{latitude:row.latitude,longitude:row.longitude}:{};
+    return {name:row.name||'',roadAddress:row.roadAddress||'',parcelAddress:row.parcelAddress||'',address:row.address||'',recommendations,category:typeof row.category==='string'?row.category:'',menus,...location,imageUrl:typeof row.imageUrl==='string'&&/^https:\/\//.test(row.imageUrl)?row.imageUrl:null,soloEvidence:row.soloEvidence?.confirmed===true&&typeof row.soloEvidence.source==='string'&&row.soloEvidence.source.trim()?{confirmed:true,source:row.soloEvidence.source}:null};
   });
   return {schemaVersion:1,restaurants};
 }
@@ -45,6 +50,7 @@ function relevance(rec,c) {
 export function createRecommendationCatalog(source={enabled:false,connected:false,restaurants:[]}) {
   const active=source.enabled===true&&source.connected===true;
   const rows=active?validateRecommendationSource(source).restaurants:[];
+  function match(card){const matches=rows.filter(row=>sameAddress(card,row)),exact=matches.filter(row=>normalizeName(row.name)===normalizeName(card.name)),owners=new Set(matches.map(row=>normalizeName(row.name)));return {matches,selected:exact.length?exact:owners.size===1&&owners.has('')?matches:[]};}
   function bundle(card,conditions={}) {
     if(!active)return undefined;
     const matches=rows.filter(row=>sameAddress(card,row));
@@ -56,5 +62,6 @@ export function createRecommendationCatalog(source={enabled:false,connected:fals
     records.sort((a,b)=>relevance(b,conditions)-relevance(a,conditions)||authoredTime(b)-authoredTime(a)||(a.id<b.id?-1:a.id>b.id?1:0));
     return {status:matches.length&&!selected.length?'ambiguous':selected.length?'matched':'unmatched',representative:records[0]||null,additional:records.slice(1),totalCount:records.length};
   }
-  return {active,enrich(cards,conditions){return dedupeRestaurants(cards).map(card=>{const {recommendationBundle,...clean}=card;return active?{...clean,recommendationBundle:bundle(clean,conditions)}:clean;});}};
+  function enrich(cards,conditions){return dedupeRestaurants(cards).map(card=>{const {recommendationBundle,registeredFacts,...clean}=card;if(!active)return clean;const row=match(clean).selected[0];return {...clean,...(row?{registeredFacts:{category:row.category,menus:row.menus,soloEvidence:row.soloEvidence},imageUrl:row.imageUrl||null}:{}),recommendationBundle:bundle(clean,conditions)};});}
+  return {active,enrich,search(){return dedupeRestaurants(rows.filter(row=>row.name&&Number.isFinite(row.latitude)&&Number.isFinite(row.longitude)).map(row=>({id:'registered:'+normalizeAddress(row.roadAddress||row.parcelAddress||row.address)+'|'+normalizeName(row.name),name:row.name,restaurantName:row.name,address:row.roadAddress||row.parcelAddress||row.address,roadAddress:row.roadAddress,parcelAddress:row.parcelAddress,latitude:row.latitude,longitude:row.longitude,category:row.category||'음식점',rawCategory:row.category||'음식점',dataSource:'inchelin',isRegisteredInInchelin:true,validationVersion:2})));}};
 }

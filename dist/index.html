@@ -916,6 +916,29 @@
     .recommendations-separator {font-size:13px;color:#555;margin:12px 0;}
     .recommendations-empty {font-size:14px;color:#555;margin:0;}
     .restaurant-card.has-registered-recommendations {height:auto;max-height:none;}
+    /* v139: evidence and attribution are card-specific. */
+    .verification-group {grid-column:1/-1;margin:8px 0 0;font:600 14px/1.5 system-ui,sans-serif;}
+    .conditions-hint {width:100%;color:#555;font:400 13px/1.5 system-ui,sans-serif;}
+    .phase1-conditions[hidden] {display:none!important;}
+    .card-source,.photo-missing {color:#555;font:400 13px/1.5 system-ui,sans-serif;margin:8px 0;}
+    .registered-menu {font:600 14px/1.6 system-ui,sans-serif;margin:8px 0;overflow-wrap:anywhere;}
+    .condition-evidence {border-top:1px solid #eee;padding-top:8px;margin-top:8px;}
+    .condition-evidence p {font:400 13px/1.6 system-ui,sans-serif;color:#555;white-space:normal;overflow-wrap:anywhere;margin:4px 0;}
+    .restaurant-card {height:auto;max-height:none;min-width:0;}
+    .restaurant-media {position:static;width:100%;height:140px;max-width:100%;margin-bottom:12px;}
+    .restaurant-card:has(.restaurant-media) .restaurant-title-link h3 {padding-right:0;}
+    .restaurant-title-link::after {content:none;}
+    .restaurant-title-link.restaurant-map-link {min-height:44px;height:auto;}
+    .restaurant-address {padding-right:0;line-height:1.6;height:auto;max-height:none;}
+    .meal-chip.condition-selected {background:#111;color:white;border-color:#111;}
+    .sheet-body input[type="text"] {box-sizing:border-box;width:100%;min-height:48px;border:1px solid #ccc;border-radius:12px;padding:12px;font:400 16px/1.5 system-ui,sans-serif;}
+    .suggestion {transition:background .15s,border-color .15s;min-height:52px;}
+    .suggestion:hover {background:#eee;}
+    .suggestion:focus-visible,button:focus-visible,a:focus-visible,input:focus-visible {outline:2px solid #111;outline-offset:3px;}
+    .suggestion-arrow-wrap {display:inline-flex;width:24px;min-width:24px;align-items:center;}
+    .location-manual-fallback {display:block;margin-top:12px;min-height:44px;}
+    @media(max-width:767px){.restaurant-title-link h3{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}.registered-recommendations{margin-top:12px;}.restaurant-card{padding:16px;}.restaurant-address{white-space:normal;-webkit-line-clamp:2;display:-webkit-box;}.chat-input{scroll-margin-bottom:150px;}}
+    @media(prefers-reduced-motion:reduce){.suggestion{transition:none;}}
   </style>
 </head>
 <body>
@@ -979,12 +1002,12 @@
         </div>
         <div class="mobile-header-actions">
           <button class="share-action mobile-share-action" id="mobileShareButton" type="button" aria-label="대화 공유하기" hidden><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg></button>
-          <button class="start-btn mobile-start" id="mobileStartButton" aria-label="시작하기">시작하기</button>
+          <button class="start-btn mobile-start" id="mobileStartButton" aria-label="새 대화">새 대화</button>
         </div>
       </header>
       <header class="topbar">
         <button class="share-action" id="shareButton" type="button" hidden aria-label="공유하기"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-share"/></svg></button>
-        <button class="start-btn" id="startButton" aria-label="시작하기">시작하기</button>
+        <button class="start-btn" id="startButton" aria-label="새 대화">새 대화</button>
       </header>
 
       <section class="workspace">
@@ -1093,11 +1116,11 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v138"></script>
-<script src="assets/naver-map.js?rules=v138"></script>
-<script src="assets/phase1-core.js?rules=v138"></script>
-<script src="assets/recommendation-flags.js?rules=v138"></script>
-<script src="assets/recommendations-ui.js?rules=v138"></script>
+<script src="assets/response-rules.js?rules=v139"></script>
+<script src="assets/naver-map.js?rules=v139"></script>
+<script src="assets/phase1-core.js?rules=v139"></script>
+<script src="assets/recommendation-flags.js?rules=v139"></script>
+<script src="assets/recommendations-ui.js?rules=v139"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1120,7 +1143,7 @@
     const FUN_PLUGINS = [{ tool: 'wheel', name: '돌림판', desc: '후보를 돌려 오늘의 메뉴를 정해요', icon: 'regenerate' }, { tool: 'ladder', name: '사다리게임', desc: '여러 명이 함께 메뉴를 정해요', icon: 'compare' }];
     const GUIDES = [
       ['처음 이용하기', '추천 질문을 선택하면 일반 질문과 같은 방식으로 바로 대화를 시작합니다. 직접 입력한 질문도 전송 버튼으로 이어서 물어볼 수 있습니다.'],
-      ['회원가입', '시작하기 또는 로그인 버튼을 눌러 계정 화면을 열 수 있습니다. 현재 데모에서는 가입 없이 계속하기도 가능합니다.'],
+      ['회원가입', '사이드바의 로그인 · 회원가입에서 계정 화면을 열 수 있어요. 새 대화 버튼은 빈 대화를 시작해요.'],
       ['채팅 기록', '완료된 대화는 이 브라우저에 자동 저장됩니다. 사이드바에서 다시 열거나 이름을 바꾸고 삭제할 수 있습니다.'],
       ['플러그인', '입력창의 + 버튼에서 맛집 탐색 기능을 선택하거나 자주 쓰는 기능을 고정할 수 있습니다.'],
       ['정보 연결', '상단 더 보기 메뉴의 데이터 연결에서 연결 흐름을 시작할 수 있습니다.'],
@@ -1347,6 +1370,8 @@
         distanceKind:restaurant.distanceKind||'straight',originLabel:String(restaurant.originLabel||restaurant.regionLabel||''),
         recommendationReason: String(restaurant.recommendationReason || '').trim(),
         recommendationBundle: globalThis.InchelinRecommendationsUI?.normalize(restaurant.recommendationBundle)||null,
+        registeredFacts: restaurant.registeredFacts||null,
+        conditionVerification: restaurant.conditionVerification||null,
         openingHours: String(restaurant.openingHours || '').trim(),
         representativeMenus: Array.isArray(restaurant.representativeMenus) ? restaurant.representativeMenus.map(item => String(item).trim()).filter(Boolean).slice(0, 8) : [],
         menuPrice: restaurant.menuPrice ?? null,
@@ -1711,6 +1736,7 @@
       clearComparisonTray();
       currentId = null;
       chatMessages = [];
+      try{sessionStorage.removeItem('inchelin-active-chat');sessionStorage.removeItem('inchelin-resume-chat');}catch{}
       currentLocationName = '';
       currentLocationCoords = null;
       lastAIRequest = null;
@@ -1809,14 +1835,15 @@
     const comparisonButtons = new Map();
     let phase1Sheets=null;
     async function openPhase1Condition(key='location') {
-      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=137');phase1Sheets=mountPhase1Sheets({send:routeQuestion,locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight});}phase1Sheets.open(key);}
+      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=139');phase1Sheets=mountPhase1Sheets({send:routeQuestion,locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
       catch{showToast('선택창을 열지 못했어요. 입력창에 원하는 조건을 말씀해 주세요.');$('#chatInput').focus();}
     }
     function setPhase1Focus(card){const message=[...chatMessages].reverse().find(m=>m.meta?.responseModeState?.phase1);if(message){const state=message.meta.responseModeState;state.phase1.focusCardId=card.id;state.shownPlaces=[...new Map([...(state.shownPlaces||[]),card].map(c=>[c.id,c])).values()].slice(-50);saveConversation();}}
     function renderPhase1Conditions(chips){
       const group=document.createElement('div');group.className='result-conditions phase1-conditions';group.setAttribute('aria-label','적용 중인 조건');
+      const hint=document.createElement('small');hint.className='conditions-hint';hint.textContent='현재 조건 · 눌러 변경';group.appendChild(hint);
       const removeMessages={food:'음식 조건 해제해줘',budget:'예산 제한 없애줘',companion:'동행 조건 해제해줘',people:'인원 조건 해제해줘',visit:'방문 시간 조건 해제해줘',purpose:'목적 조건 해제해줘',vibe:'분위기 조건 해제해줘',parking:'주차 조건 해제해줘'};
-      for(const chip of chips){const item=document.createElement('span');item.className='phase1-condition';const edit=document.createElement('button');edit.type='button';edit.className='meal-chip';edit.textContent=chip.label;edit.setAttribute('aria-label',chip.label+' 변경');edit.addEventListener('click',()=>openPhase1Condition(chip.key));item.appendChild(edit);
+      for(const chip of chips){const item=document.createElement('span');item.className='phase1-condition';const edit=document.createElement('button');edit.type='button';edit.className='meal-chip';edit.textContent=chip.label+' ▾';edit.setAttribute('aria-label',chip.label+' 변경');edit.addEventListener('click',()=>openPhase1Condition(chip.key));item.appendChild(edit);
         if(chip.removable){const remove=document.createElement('button');remove.type='button';remove.className='phase1-remove';remove.textContent='×';remove.setAttribute('aria-label',chip.label+' 해제');remove.addEventListener('click',()=>routeQuestion(removeMessages[chip.key]));item.appendChild(remove);}group.appendChild(item);}
       return group;
     }
@@ -1858,7 +1885,11 @@
       const group = document.createElement('section'); group.className = 'restaurant-group';
       const list = document.createElement('div'); list.className = 'restaurant-list';
       list.setAttribute('aria-label', '맛집 목록');
+      let lastVerification='';
       restaurants.slice(0, 3).forEach(restaurant => {
+        const verification=restaurant.conditionVerification;
+        const groupLabel=verification?.status==='unconfirmed'?'미확인 후보 · 조건 충족 보장 아님':verification?.status==='experience'?'추천인의 경험을 참고한 식당':'확인된 조건에 맞는 식당';
+        if(verification&&lastVerification!==groupLabel){const label=document.createElement('p');label.className='verification-group';label.textContent=groupLabel;list.appendChild(label);lastVerification=groupLabel;}
         const card = document.createElement('article'); card.className = 'restaurant-card';
         card.historyLabel = restaurant.name;
         const content = document.createElement('div'); content.className = 'restaurant-card-content';
@@ -1876,18 +1907,24 @@
         }
         if (restaurant.regionLabel) { const area = document.createElement('span'); area.className = 'restaurant-category restaurant-region'; area.textContent = restaurant.regionLabel; head.appendChild(area); }
         body.appendChild(head);
-        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address; address.setAttribute('title',address.textContent);body.appendChild(address);
+        const menus=restaurant.registeredFacts?.menus||[];
+        const menu=document.createElement('p');menu.className='registered-menu';menu.textContent=menus.length?menus.slice(0,2).map(m=>m.name+' · '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(' / '):'메뉴·가격 정보 없음';body.appendChild(menu);
         if(Number.isFinite(restaurant.distanceMeters)&&restaurant.originLabel){const distance=document.createElement('p');distance.className='restaurant-distance';distance.textContent=restaurant.originLabel+'에서 직선 '+restaurant.distanceMeters+'m';body.appendChild(distance);}
-        content.appendChild(body);
+        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address || '주소 정보 없음'; address.setAttribute('title',address.textContent);body.appendChild(address);
+        const source=document.createElement('p');source.className='card-source';source.textContent=restaurant.dataSource==='inchelin'?'인슐랭 앱 등록 식당':restaurant.recommendationBundle?.status==='matched'?'네이버 검색 · 앱 등록 추천 연결':'네이버 검색 · 앱 등록 추천 아님';body.appendChild(source);
+        let evidence=null;
+        if(verification?.checks?.some(check=>check.key!=='distance')){evidence=document.createElement('div');evidence.className='condition-evidence';for(const check of verification.checks.filter(check=>check.key!=='distance')){const line=document.createElement('p');line.textContent=check.label+': '+(check.status==='confirmed'?'확인':check.status==='experience'?'추천인 경험':'미확인')+' — '+check.basis;evidence.appendChild(line);}}
         if (restaurant.imageUrl) {
           const media = document.createElement('div'); media.className = 'restaurant-media';
           const image = document.createElement('img'); image.className = 'restaurant-image'; image.src = restaurant.imageUrl;
           image.alt = restaurant.name + ' 사진'; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
-          image.addEventListener('error', () => media.remove(), { once: true }); media.appendChild(image); content.appendChild(media);
-        }
+          image.addEventListener('error', () => {media.replaceChildren();const fallback=document.createElement('span');fallback.textContent='사진을 불러오지 못했어요';media.appendChild(fallback);}, { once: true }); media.appendChild(image); content.appendChild(media);
+        }else{const noPhoto=document.createElement('p');noPhoto.className='photo-missing';noPhoto.textContent='사진 정보 없음';content.appendChild(noPhoto);}
+        content.appendChild(body);
         card.appendChild(content);
         const authored=globalThis.InchelinRecommendationsUI?.render(restaurant.recommendationBundle);
         if(authored){card.classList.add('has-registered-recommendations');card.appendChild(authored);}
+        if(evidence)card.appendChild(evidence);
         const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-compare restaurant-map-link';
         compare.restaurantName=restaurant.name;
         if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());
@@ -1904,9 +1941,6 @@
         actions.append(map,compare); card.appendChild(actions); list.appendChild(card);
       });
       group.appendChild(list);
-      if (showSource && restaurants.some(restaurant => restaurant.dataSource === 'naver')) {
-        const source = document.createElement('p'); source.className = 'restaurant-source'; source.textContent = '네이버 검색 기준'; group.appendChild(source);
-      }
       renderComparisonTray(); return group;
     }
     function quickReplyCard(reply) {
@@ -1924,6 +1958,7 @@
       messagesEl.querySelectorAll('.menu-cards, .restaurant-group, .answer-chips, .menu-more, .action-chips, .alternative-chips, .result-conditions, .related-questions').forEach(group => {
         if (group.historyRetired) return;
         group.historyRetired = true;
+        if(group.classList.contains('phase1-conditions')){group.hidden=true;group.setAttribute('aria-hidden','true');}
         group.classList.add('history-inactive');
         group.querySelectorAll('.restaurant-card').forEach((card,index)=> {
           const ordinal = [/(?:첫\s*번째|처음|1\s*번째)/,/(?:두\s*번째|2\s*번째)/,/(?:세\s*번째|3\s*번째)/][index];
@@ -2148,6 +2183,7 @@
       histories = [record, ...histories.filter(h => h.id !== currentId)].slice(0, 20);
       // Persistence is best-effort: quota/security errors must never stop a chat.
       try { localStorage.setItem('insight-ai-history', JSON.stringify(histories)); } catch (_) { /* Keep the in-memory transcript; never delete stored history. */ }
+      try { sessionStorage.setItem('inchelin-active-chat',currentId); } catch (_) {}
       try { renderHistory(); } catch (_) { /* Sidebar failure cannot block answer generation. */ }
     }
     function renderHistory() {
@@ -2163,6 +2199,7 @@
       stopGeneration(false);
       leaveSharedConversation();
       currentId = id;
+      try { sessionStorage.setItem('inchelin-active-chat',id); } catch (_) {}
       currentLocationName = String(history.locationName || '');
       currentLocationCoords = history.locationCoords && Number.isFinite(Number(history.locationCoords.latitude)) && Number.isFinite(Number(history.locationCoords.longitude))
         ? { latitude: Number(history.locationCoords.latitude), longitude: Number(history.locationCoords.longitude) }
@@ -2384,8 +2421,9 @@
       return '**현재 위치를 확인하지 못했어요.**\n\n**어느 지역에서 찾고 계세요?** 지역명을 편하게 입력해 주세요.';
     }
     function appendLocationFallback(reason) {
-      const choices=[{label:'지역·역 선택',message:'지역·역 선택'},{label:'직접 입력',message:'직접 입력'}];
-      appendMessage('assistant', '현재 위치를 확인하지 못했어요. 동네나 역을 선택하거나 직접 입력해 주세요.', {
+      const choices=[{label:'지역·역 선택',message:'지역·역 선택'},{label:'직접 입력',message:'직접 입력'},{label:'현재 위치 재시도',message:'지금 내 주변에서 찾아줘'}];
+      const reasonText={denied:'위치 권한이 허용되지 않았어요.',timeout:'위치 조회 시간이 초과됐어요.',unavailable:'기기에서 위치를 전달하지 못했어요.',unsupported:'이 브라우저는 위치 조회를 지원하지 않아요.',insecure:'보안 연결에서 위치를 사용할 수 있어요.'}[reason]||'현재 위치를 확인하지 못했어요.';
+      appendMessage('assistant', reasonText+' 조건은 유지했어요. 지역·역을 선택하거나 직접 입력해 주세요.', {
         quickReplies: choices.map(c=>c.label), meta:{phase1:true,answer_plan:['text','chips'],responseModeState:pluginState(),turnPolicy:{answerChoices:choices}}
       });
     }
@@ -2434,6 +2472,7 @@
       if (generating || locationRequestInFlight) return;
       const epoch = conversationEpoch;
       showChatView();
+      if(!currentId)currentId=`chat-${typeof crypto.randomUUID==='function'?crypto.randomUUID():Date.now()+'-'+conversationEpoch}`;
       const visiblePrompt = String(displayPrompt || '').trim() || '지금 내 주변에서 찾아줘';
       appendMessage('user', visiblePrompt);
       if (!window.isSecureContext) {
@@ -2446,18 +2485,22 @@
       }
 
       locationRequestInFlight = true;
+      let cancelled=false,manualTimer;
       const status = document.createElement('div');
       status.className = 'message ai status location-status';
       status.innerHTML = '<div class="ai-bubble"><span>현재 위치를 확인하고 있어요</span><span class="thinking-dots" aria-hidden="true"><i></i></span></div>';
+      status.setAttribute('role','status');status.setAttribute('aria-live','polite');
       messagesEl.appendChild(status);
       followConversation(status);
       try {
         let permissionTimer;const permission=await Promise.race([geolocationPermissionState(),new Promise(resolve=>{permissionTimer=setTimeout(()=>resolve(''),500);})]);clearTimeout(permissionTimer);
         if(permission==='denied')throw Object.assign(new Error('permission_denied'),{code:1});
+        const permissionLabel=status.querySelector('.ai-bubble > span:first-child');if(permissionLabel)permissionLabel.textContent=permission==='granted'?'위치 권한은 허용됐어요. 기기에서 현재 위치를 받고 있어요.':'브라우저에서 위치 사용 허용을 기다리고 있어요.';
+        manualTimer=setTimeout(()=>{if(cancelled||epoch!==conversationEpoch)return;const manual=document.createElement('button');manual.type='button';manual.className='location-manual-fallback meal-chip';manual.textContent='지역·역 직접 입력';manual.addEventListener('click',()=>{cancelled=true;locationRequestInFlight=false;status.remove();openPhase1Condition('location');});status.appendChild(manual);},5000);
         // A granted permission causes no permission prompt; still obtain a fresh
         // position rather than relying on coordinates from an old conversation.
         const position = await geolocationPosition({enableHighAccuracy:false,maximumAge:60000,timeout:12000});
-        if(epoch!==conversationEpoch)return;
+        if(cancelled||epoch!==conversationEpoch)return;
         clearLocationPermissionDenied();
         currentLocationCoords={latitude:Number(position.coords.latitude),longitude:Number(position.coords.longitude)};
         currentLocationName='';
@@ -2473,7 +2516,7 @@
         });
         if(response.ok){const data=await response.json();currentLocationName=String(data?.locationName||'').trim();}}
         catch{/* Coordinates remain valid even when a search locality cannot be resolved. */}finally{clearTimeout(reverseTimer);}
-        if(epoch!==conversationEpoch)return;
+        if(cancelled||epoch!==conversationEpoch)return;
         clearLocationPermissionDenied();
         saveConversation();
         status.remove();
@@ -2481,7 +2524,7 @@
         generateAnswer(lastAIRequest);
       } catch (error) {
         status.remove();
-        if(epoch!==conversationEpoch)return;
+        if(cancelled||epoch!==conversationEpoch)return;
         let reason = String(error?.locationReason || '');
         const permissionState = await geolocationPermissionState();
         if(epoch!==conversationEpoch)return;
@@ -2492,7 +2535,7 @@
         if (reason === 'denied') rememberLocationPermissionDenied();
         appendLocationFallback(reason || 'unknown');
       } finally {
-        if(epoch===conversationEpoch)locationRequestInFlight = false;
+        clearTimeout(manualTimer);if(!cancelled&&epoch===conversationEpoch)locationRequestInFlight = false;
       }
     }
     function routeQuestion(question) {
@@ -2948,7 +2991,7 @@
     window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
     renderAuthNavigation();
     renderHistory();
-    try{const resume=sessionStorage.getItem('inchelin-resume-chat');if(resume){sessionStorage.removeItem('inchelin-resume-chat');openHistory(resume);}}catch{}
+    try{if(!location.hash.startsWith('#share=')){const resume=sessionStorage.getItem('inchelin-resume-chat')||sessionStorage.getItem('inchelin-active-chat');if(resume){sessionStorage.removeItem('inchelin-resume-chat');openHistory(resume);}}}catch{}
     renderPlugins();
     let searchPicker = null;
     function openSearchPicker(axis) { openPhase1Condition(axis==='food'?'food':'location'); }

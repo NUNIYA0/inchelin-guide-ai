@@ -3,7 +3,7 @@ import {readFile} from 'node:fs/promises';
 import '../dist/assets/recommendation-flags.js';
 import '../dist/assets/recommendations-ui.js';
 
-export async function testPhase1Client(runCase,samples){
+export async function testPhase1Client(runCase,samples,requestCase=runCase){
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
   const fn=name=>{const value=html.match(new RegExp('    (?:async )?function '+name+'\\([^]*?\\n    \\}'))?.[0];assert.ok(value,name);return value;};
   const flatten=n=>[n,...n.children.flatMap(flatten)],cls=(root,name)=>flatten(root).filter(n=>n.className.split(' ').includes(name));
@@ -30,7 +30,7 @@ export async function testPhase1Client(runCase,samples){
         if(kind==='network')throw new Error('network');
         if(kind==='hang')return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('stopped'),{name:'AbortError'}))));
         if(kind==='json')return new Response('{');
-        const result=await runCase(request.messages.at(-1).content,{state:request.context.responseModeState,...(kind==='zero'?{data:{items:[]}}:{})});
+        const result=await(kind==='consent'?requestCase:runCase)(request.messages.at(-1).content,{state:request.context.responseModeState,...(kind==='zero'?{data:{items:[]}}:{})});
         result.body.meta.generatedAt+=skew;if(kind==='version')result.body.meta.responseRulesVersion='v136';return Response.json(result.body);
       };
       const source=`
@@ -39,8 +39,9 @@ export async function testPhase1Client(runCase,samples){
         const $=s=>document.getElementById(s.slice(1)),qsa=()=>[],saveConversation=()=>{},updateShareVisibility=()=>{},leaveSharedConversation=()=>{},setSidebar=()=>{},showToast=()=>{},followConversation=()=>{},isNearConversationBottom=()=>true;
         const appendLimitedMarkdown=(node,text)=>node.textContent=text,resolveRestaurantDetail=()=>{},canUseCurrentLocation=()=>false,chooseMenuCard=()=>{},runPlugin=()=>{},copyAnswer=()=>{},regenerateAnswer=()=>{},openSearchPicker=()=>{},requestCurrentLocation=()=>{},focusManualLocationInput=()=>{};
         const getLocalTimeState=()=>({localDateTime:'2026-10-22T12:00:00+09:00',timeZone:'Asia/Seoul',periodLabel:'점심'});
+        const pluginState=()=>[...chatMessages].reverse().find(m=>m.meta?.responseModeState)?.meta.responseModeState||{};
         ${fn('safeHttpUrl')}${fn('normalizeNaverPlaceDetails')}${fn('normalizeRestaurant')}${fn('hasExplicitTimeCondition')}${fn('buildAIRequest')}${fn('extractAssistantText')}${fn('assertCompleteAnswer')}${fn('requestAssistant')}${fn('normalizeMessage')}${fn('resizeInput')}
-        ${html.slice(html.indexOf('    const comparisonTray = new Map();'),html.indexOf('    function appendMessage(')).replace("import('/assets/phase1-sheets.js?v=137')",'loadSheetModule()')}
+        ${html.slice(html.indexOf('    const comparisonTray = new Map();'),html.indexOf('    function appendMessage(')).replace(/import\('\/assets\/phase1-sheets.js\?v=\d+'\)/,'loadSheetModule()')}
         ${fn('appendMessage')}${fn('showWelcome')}${fn('newChat')}${fn('showChatView')}${fn('isCurrentLocationIntent')}${fn('routeQuestion')}${fn('ask')}${fn('submitWelcomeQuestion')}${fn('setGenerating')}${fn('showRequestError')}${fn('stopGeneration')}
         ${fn('generateAnswer').replace('async function generateAnswer','async function performGeneration')}
         function generateAnswer(...args){pending=performGeneration(...args);return pending;}
@@ -58,6 +59,7 @@ export async function testPhase1Client(runCase,samples){
       if(!hasLocation)assert.equal(cls(a.elements.messages,'phase1-conditions').length,0,'no chips until location is resolved');
     }
     for(let index=0;index<3;index++){const a=app();a.api.clickRow(index);await a.api.done();assert.equal(a.api.messages.length,2);assert.equal(cls(a.elements.messages,'turn-question').length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);}
+    const gated=app({kind:'consent'});gated.api.type('강남역에서 한식, 만 원 이하로 혼자 먹을 거야');await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,0);assert.match(gated.elements.messages.textContent,/연결되지|미확인/);const consent=cls(gated.elements.messages,'quick-reply').find(n=>n.textContent==='미확인 후보 보기');assert.ok(consent);consent.click();await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,3);assert.ok(cls(gated.elements.messages,'condition-evidence').length);assert.match(gated.elements.messages.textContent,/미확인/);assert.equal(gated.api.request().context.responseModeState.phase1.conditions.budget,'1만 원 이하');
     const a=app();a.api.type('강남역에서 한식, 만 원 이하로');await a.api.done();
     assert.equal(cls(a.elements.messages,'registered-recommendations').length,0,'production flag off');
     const oldFlags=globalThis.InchelinRecommendationFlags;
@@ -79,7 +81,7 @@ export async function testPhase1Client(runCase,samples){
     }finally{globalThis.InchelinRecommendationFlags=oldFlags;globalThis.document=a.document;}
     assert.ok(cls(a.elements.messages,'phase1-condition').length>=4);assert.match(a.elements.messages.textContent,/강남역에서 직선 100m/);
     const before=JSON.stringify(a.api.messages);const link=cls(a.elements.messages,'restaurant-map-link').find(n=>n.tagName==='A');assert.ok(link.href.includes(encodeURIComponent('서울특별시')));link.click();assert.equal(a.api.messages.length,2);assert.equal(a.api.request().context.responseModeState.phase1.focusCardId,a.api.messages[1].restaurants[0].id);assert.ok(before.includes('강남역'));
-    await a.api.edit('radiusMeters');const dialog=a.document.body.children.at(-1);assert.equal(dialog.open,true);const five=flatten(dialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='500m 이내');five.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);assert.equal(a.api.request().context.responseModeState.phase1.conditions.food,'한식');
+    await a.api.edit('radiusMeters');const dialog=a.document.body.children.at(-1);assert.equal(dialog.open,true);assert.equal(flatten(dialog).find(n=>n.textContent==='1km 이내').attributes['aria-pressed'],'true');assert.ok(flatten(dialog).some(n=>n.placeholder==='예: 800m, 1.5km'));const five=flatten(dialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='500m 이내');five.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);assert.equal(a.api.request().context.responseModeState.phase1.conditions.food,'한식');
     const latestConditions=cls(a.elements.messages,'phase1-conditions').at(-1);const remove=flatten(latestConditions).find(n=>n.attributes['aria-label']==='1만 원 이하 해제');remove.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.budget,null);assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
     await a.api.edit('location');const regionDialog=a.document.body.children.at(-1);flatten(regionDialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='역삼역').click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.location.label,'역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
     const missing=app();missing.api.render({role:'assistant',content:samples.noAddress.body.message,restaurants:samples.noAddress.body.restaurants,meta:samples.noAddress.body.meta});assert.ok(cls(missing.elements.messages,'restaurant-map-link').some(n=>n.disabled&&n.textContent==='주소 정보 없음'));assert.equal(cls(missing.elements.messages,'restaurant-media').length,0);
@@ -90,7 +92,7 @@ export async function testPhase1Client(runCase,samples){
       const messages=[],sent=[],host=new Node(),position=globalThis.InchelinPhase1.centers[0];let geoCalls=0;
       const navigator={permissions:{query:async()=>({state:variant==='denied'?'denied':variant==='prompt'?'prompt':'granted'})},geolocation:variant==='unsupported'?null:{getCurrentPosition:(ok,fail)=>{geoCalls++;if(variant==='unavailable'||variant==='timeout')fail({code:variant==='timeout'?3:2});else ok({coords:position});}}};
       const locate=new Function('navigator','window','document','messagesEl','fetch','appendMessage','generateAnswer',`
-        let generating=false,locationRequestInFlight=false,conversationEpoch=0,currentLocationName='',currentLocationCoords=null,lastAIRequest=null;
+        let currentId=null,generating=false,locationRequestInFlight=false,conversationEpoch=0,currentLocationName='',currentLocationCoords=null,lastAIRequest=null;
         const chatMessages=[],REVERSE_GEOCODE_ENDPOINT='/api/reverse-geocode',showChatView=()=>{},followConversation=()=>{},clearLocationPermissionDenied=()=>{},rememberLocationPermissionDenied=()=>{},saveConversation=()=>{},pluginState=()=>({phase1:{conditions:{food:'냉면'}}}),buildAIRequest=()=>({context:{currentLocationName,currentLocation:currentLocationCoords,responseModeState:pluginState()}});
         ${fn('geolocationPermissionState')}${fn('geolocationPosition')}${fn('appendLocationFallback')}${fn('requestCurrentLocation')}
         return requestCurrentLocation;
@@ -101,6 +103,7 @@ export async function testPhase1Client(runCase,samples){
     }
     const script=html.match(/<script>\s*([^]*?)<\/script>/g).at(-1)?.replace(/^<script>|<\/script>$/g,'');if(script)new Function(script);
     assert.match(html,/white-space:nowrap/);assert.match(html,/flex-wrap:wrap/);assert.match(html,/45000/);assert.match(html,/20000/);assert.match(html,/pointer: fine/);assert.match(html,/prefers-reduced-motion/);
-    console.log('v138 actual client smoke: authored exact pairs/missing fields/0-1-many counts/local expand-collapse/history/flag off; no early conditions; v137 missing-location/ready render, condition sheets, maps, retry/stop and mobile DOM/CSS contracts passed (no pixel/browser QA).');
+    assert.match(html,/\.restaurant-title-link::after\s*\{content:none;/,'no stretched link intercepting authored toggles');assert.match(html,/inchelin-active-chat/);assert.match(html,/aria-label="새 대화"/);
+    console.log('v139 client DOM smoke passed: consent gate; card attribution/evidence; exact authored pairs and local toggles; condition sheets; maps/state; geolocation success/failure mocks; retry/stop. Actual browser QA is reported separately.');
   }finally{globalThis.document=originalDocument;globalThis.sessionStorage=originalStorage;}
 }
