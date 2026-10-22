@@ -117,7 +117,7 @@ export function mountPluginActions({ getMessages, getSlots, send, reply, setRegi
     if (!PLUGIN_IDS.includes(id) || blocked()) return;
     opener = trigger || document.activeElement;
     onOpen();
-    if (id === 1) send('오늘 뭐 먹을지 같이 골라줘', { freshMenu: true });
+    if (id === 1) send('오늘 먹을 곳 추천해줘'); // v137: keep location and optional conditions.
     if (id === 2) situations();
     if (id === 3) regions();
     if (id === 4) compare();

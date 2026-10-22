@@ -42,6 +42,8 @@ const relatedQuestions = await readFile(join(root,'worker','related-questions.js
 const naverMap = await readFile(join(root,'dist','assets','naver-map.js'),'utf8');
 const requestTiming=await readFile(join(root,'worker','request-timing.js'),'utf8');
 const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8');
+const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');
+await writeFile(join(root,'dist','assets','phase1-core.js'),phase1Core);
 await writeFile(join(root,'dist','assets','response-rules.js'),responseRules);
 await writeFile(join(root, "dist", "assets", "search-axes-data-v1.js"), searchAxes);
 await writeFile(join(root, "dist", "assets", "korean.js"), korean);
@@ -71,7 +73,7 @@ const hostingManifest = await readFile(join(root, ".openai", "hosting.json"));
 await Promise.all([
   ...[outputRoot,hostingOutputRoot].flatMap(directory=>{
     const server=directory===outputRoot?join(directory,'dist','server'):join(directory,'server');
-    return [writeFile(join(server,'main-dishes.js'),mainDishes),writeFile(join(server,'related-questions.js'),relatedQuestions),writeFile(join(server,'naver-map.js'),naverMap),writeFile(join(server,'request-timing.js'),requestTiming),writeFile(join(server,'response-rules.js'),responseRules)];
+    return [writeFile(join(server,'phase1-core.js'),phase1Core),writeFile(join(server,'main-dishes.js'),mainDishes),writeFile(join(server,'related-questions.js'),relatedQuestions),writeFile(join(server,'naver-map.js'),naverMap),writeFile(join(server,'request-timing.js'),requestTiming),writeFile(join(server,'response-rules.js'),responseRules)];
   }),
   writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(hostingOutputRoot, 'server', 'answer-plan.js'), answerPlan),

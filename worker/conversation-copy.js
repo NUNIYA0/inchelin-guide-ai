@@ -91,7 +91,7 @@ export function finalizeConversationCopy(response) {
     const count = result.restaurants?.length || 0;
     const fallback = count ? `${slots.region ? slots.region + '에서 ' : ''}${slots.menu || slots.food_type || '먹을 곳'} ${count}곳을 골라봤어요.` : '지금 알 수 있는 내용만 안내해드릴게요.';
     const inherited=result.meta?.inheritedFood ? `${result.meta.inheritedFood} 기준으로 찾았어요.` : '';
-    const repeats=value=>repeatsCopySentences(inherited?String(value||'').replace(inherited,''):value);
+    const repeats=value=>result.meta?.phase1&&['compare','specific_place'].includes(result.meta.intent)?false:repeatsCopySentences(inherited?String(value||'').replace(inherited,''):value);
     result.message = safe(result.message, fallback);
     if(repeats(result.message)) result.message=[fallback,inherited].filter(Boolean).join(' ');
     if (result.error) result.error = safe(result.error, '답변을 불러오지 못했어요. 다시 시도해 주세요.');
@@ -104,7 +104,8 @@ export function finalizeConversationCopy(response) {
     }
     if (result.meta?.analysis?.next_question) result.meta.analysis.next_question.text = safe(result.meta.analysis.next_question.text, result.meta?.turnPolicy?.questionText || '');
     if (result.meta?.notice) result.meta.notice = safe(result.meta.notice);
-    if (result.suggestions) result.suggestions = result.suggestions.filter(value => !FORBIDDEN_COPY.test(value));
+    // Phase-1 labels are code-owned user actions (e.g. 지역·역 선택), not AI sentences.
+    if (result.suggestions && !result.meta?.phase1) result.suggestions = result.suggestions.filter(value => !FORBIDDEN_COPY.test(value));
     if (result.meta?.menuCards) result.meta.menuCards = result.meta.menuCards.map(card => ({ ...card, description: safe(card.description), reason: safe(card.reason) }));
     if (result.restaurants) result.restaurants = result.restaurants.map(card => ({ ...card, recommendationReason: safe(card.recommendationReason) }));
   }

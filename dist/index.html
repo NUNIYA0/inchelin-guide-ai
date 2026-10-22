@@ -896,6 +896,16 @@
     .plugin-card { grid-template-columns:minmax(0,1fr) 44px; }
     button.plugin-card { grid-template-columns:minmax(0,1fr); }
     button.plugin-card > span:last-child:not(.plugin-text) { display:none; }
+    /* v137: editable applied conditions; map action and straight-line evidence. */
+    .phase1-conditions {display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px;}
+    .phase1-condition {display:inline-flex;align-items:center;border:1px solid #ddd;border-radius:24px;max-width:100%;}
+    .phase1-condition .meal-chip {border:0;background:transparent;white-space:nowrap;}
+    .phase1-remove {border:0;background:transparent;min-width:44px;min-height:44px;border-radius:50%;font-size:18px;}
+    .restaurant-distance {font:400 13px/1.5 system-ui,sans-serif;color:#555;margin:6px 0 0;}
+    .restaurant-detail-area {position:static;display:flex;flex-wrap:wrap;gap:8px;margin-top:auto;padding:12px 0 0;width:auto;}
+    .restaurant-detail-area .restaurant-map-link {font-size:14px;min-height:44px;white-space:nowrap;}
+    .disclaimer {font-size:13px;line-height:1.5;}
+    @media(max-width:767px){.restaurant-card{height:auto;max-height:none;min-height:0;}.restaurant-address{padding-right:0;}.restaurant-detail-area{position:static;right:auto;bottom:auto;}}
   </style>
 </head>
 <body>
@@ -995,7 +1005,7 @@
               <button class="send" id="chatSend" type="submit" aria-label="질문 보내기" disabled><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-send"/></svg></button>
             </div>
           </form>
-          <div class="disclaimer">AI 답변은 참고용이며 중요한 결정 전에는 원문과 전문가 확인이 필요합니다.</div>
+          <div class="disclaimer">메뉴·가격·영업시간은 변경될 수 있어요. 방문 전 식당 정보를 확인해 주세요.</div>
           </div></div>
         </div>
 
@@ -1073,8 +1083,9 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v136"></script>
-<script src="assets/naver-map.js?rules=v136"></script>
+<script src="assets/response-rules.js?rules=v137"></script>
+<script src="assets/naver-map.js?rules=v137"></script>
+<script src="assets/phase1-core.js?rules=v137"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1083,13 +1094,7 @@
       placeholder: '먹고 싶은 메뉴나 분위기를 편하게 말해보세요',
       answer: '말씀하신 내용과 이전 대화를 함께 살펴보고, 현재 연결된 맛집 검색 결과에서 자연스럽게 찾아드릴게요.'
     };
-    const CORE_SUGGESTIONS = [
-      { label: '홍대에서 냉면 먹을래', prompt: '홍대에서 냉면 먹을래' },
-      { label: '강남에서 삼겹살 먹을래', prompt: '강남에서 삼겹살 먹을래' },
-      { label: '역삼에서 국밥 먹을 곳 찾아줘', prompt: '역삼에서 국밥 먹을 곳 찾아줘' },
-      { label: '성수에서 파스타 먹을 곳 찾아줘', prompt: '성수에서 파스타 먹을 곳 찾아줘' },
-      { label: '여의도에서 초밥 먹을 곳 찾아줘', prompt: '여의도에서 초밥 먹을 곳 찾아줘' }
-    ];
+    const CORE_SUGGESTIONS = globalThis.InchelinPhase1.welcome(new Date().getHours());
     const PERIOD_LABELS = { morning: '아침', lunch: '점심', afternoon: '오후', evening: '저녁', lateNight: '야식/늦은 시간' };
     const PLUGINS = [
       ['메뉴 탐색', '오늘 뭐 먹을지 후보를 좁혀드려요', 'explore', 'utensils'],
@@ -1213,8 +1218,8 @@
 
     function getMealPeriod(date = new Date()) {
       const hour = date.getHours();
-      if (hour >= 5 && hour < 11) return 'morning';
-      if (hour >= 11 && hour < 14) return 'lunch';
+      if (hour >= 5 && hour < 10) return 'morning';
+      if (hour >= 10 && hour < 14) return 'lunch';
       if (hour >= 14 && hour < 17) return 'afternoon';
       if (hour >= 17 && hour < 21) return 'evening';
       return 'lateNight';
@@ -1234,10 +1239,10 @@
     }
     function refreshTimeSuggestions(force = false) {
       const state = getLocalTimeState();
-      const nextKey = `core:${state.timeZone}`;
+      const nextKey = `phase1:${state.period}:${state.timeZone}`;
       if (!force && nextKey === activeSuggestionKey) return;
       activeSuggestionKey = nextKey;
-      activeSuggestions = CORE_SUGGESTIONS.map(item => ({ ...item }));
+      activeSuggestions = globalThis.InchelinPhase1.welcome(new Date().getHours());
       const container = $('#suggestions');
       container.dataset.period = state.period;
       container.dataset.timezone = state.timeZone;
@@ -1299,7 +1304,7 @@
       const name = globalThis.InchelinMapLinks.cleanName(restaurant.name);
       const address = String(restaurant.address || '').trim();
       const categoryValue = String(restaurant.category || '').trim();
-      if (!id || !name || !address || (dataSource === 'naver' && !categoryValue)) return null;
+      if (!id || !name || (dataSource === 'naver' && !categoryValue)) return null;
       if (/[<>�\r\n\t]|https?:\/\//i.test(name) || name.length > 80) return null;
       if (/애견|반려동물|동물카페|당구|스포츠|오락|게임|노래방|미용|헤어|네일|병원|의원|약국|학원|교육|편의점|마트|부동산/.test(categoryValue)) return null;
       const naverPlace = normalizeNaverPlaceDetails(
@@ -1327,6 +1332,7 @@
         imageUrl: safeHttpUrl(restaurant.imageUrl),
         businessStatus: String(restaurant.businessStatus || 'unknown').trim(),
         distanceMeters: restaurant.distanceMeters !== null && restaurant.distanceMeters !== undefined && Number.isFinite(Number(restaurant.distanceMeters)) ? Math.max(0, Math.round(Number(restaurant.distanceMeters))) : null,
+        distanceKind:restaurant.distanceKind||'straight',originLabel:String(restaurant.originLabel||restaurant.regionLabel||''),
         recommendationReason: String(restaurant.recommendationReason || '').trim(),
         openingHours: String(restaurant.openingHours || '').trim(),
         representativeMenus: Array.isArray(restaurant.representativeMenus) ? restaurant.representativeMenus.map(item => String(item).trim()).filter(Boolean).slice(0, 8) : [],
@@ -1334,7 +1340,7 @@
         parking: restaurant.parking ?? null,
         privateRoom: typeof restaurant.privateRoom === 'boolean' ? restaurant.privateRoom : null,
         naverPlaceId: naverPlace.placeId,
-        naverPlaceUrl: globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
+        naverPlaceUrl: globalThis.InchelinPhase1.mapUrl(restaurant.roadAddress||restaurant.address||restaurant.parcelAddress),
         naverLink: globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
         isRegisteredInInchelin: dataSource === 'inchelin',
         dataSource
@@ -1492,12 +1498,13 @@
       }
     }
     function buildAIRequest(nextMessages) {
+      const archivedStateMessage=[...nextMessages].reverse().find(message=>message.role==='assistant'&&message.meta?.responseModeState);
       nextMessages=nextMessages.filter(message=>message.role==='user'||!message.meta?.staleResponse&&globalThis.InchelinResponseRules.isCurrent(message.meta));
       const state = getLocalTimeState();
       const latestQuestion = [...nextMessages].reverse().find(message => message.role === 'user')?.content || '';
       const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
       const latestRestaurantMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.restaurants?.length);
-      const latestStateMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.meta?.responseModeState);
+      const latestStateMessage = [...nextMessages].reverse().find(message => message.role === 'assistant' && message.meta?.responseModeState) || archivedStateMessage;
       const activeCardIds = latestStateMessage?.meta?.responseModeState?.lastCards?.map(card => card.id);
       const recentRestaurants = (latestRestaurantMessage?.restaurants || []).filter(restaurant => !activeCardIds || activeCardIds.includes(restaurant.id)).slice(0, 3).map(restaurant => ({
         id: restaurant.id,
@@ -1781,49 +1788,25 @@
       showToast(message.textContent);
     }
     async function resolveRestaurantDetail(restaurant, detailArea) {
-      if (restaurant.naverPlaceUrl) {
-        window.open(restaurant.naverPlaceUrl, '_blank', 'noopener,noreferrer');
-        return;
-      }
-      detailArea.innerHTML = '';
-      const loading = document.createElement('button');
-      loading.type = 'button';
-      loading.className = 'restaurant-map-link';
-      loading.disabled = true;
-      loading.textContent = '정확한 매장 확인 중...';
-      detailArea.appendChild(loading);
-      const retry = () => resolveRestaurantDetail(restaurant, detailArea);
-      try {
-        const response = await fetch('/api/naver-place-match', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            restaurantName: restaurant.restaurantName || restaurant.name,
-            address: restaurant.address,
-            roadAddress: restaurant.roadAddress
-          })
-        });
-        const data = await response.json().catch(() => ({}));
-        const details = normalizeNaverPlaceDetails(data?.naverPlaceUrl, data?.naverPlaceId);
-        if (!response.ok || data?.matched !== true || !details.url) throw new Error(data?.code || 'exact_match_not_found');
-        restaurant.naverPlaceId = details.placeId;
-        restaurant.naverPlaceUrl = details.url;
-        restaurant.naverLink = details.url;
-        window.open(details.url, '_blank', 'noopener,noreferrer');
-        detailArea.innerHTML = '';
-        const link = document.createElement('a');
-        link.className = 'restaurant-map-link';
-        link.href = details.url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = '상세보기';
-        detailArea.appendChild(link);
-      } catch (_) {
-        showRestaurantDetailFallback(detailArea, restaurant, retry);
-      }
+      const addressUrl=globalThis.InchelinPhase1.mapUrl(restaurant.roadAddress||restaurant.address||restaurant.parcelAddress);
+      if(addressUrl){setPhase1Focus(restaurant);window.open(addressUrl,'_blank','noopener,noreferrer');return;}
+      showToast('주소 정보 없음');
     }
     const comparisonTray = new Map();
     const comparisonButtons = new Map();
+    let phase1Sheets=null;
+    async function openPhase1Condition(key='location') {
+      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=137');phase1Sheets=mountPhase1Sheets({send:routeQuestion,locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight});}phase1Sheets.open(key);}
+      catch{showToast('선택창을 열지 못했어요. 입력창에 원하는 조건을 말씀해 주세요.');$('#chatInput').focus();}
+    }
+    function setPhase1Focus(card){const message=[...chatMessages].reverse().find(m=>m.meta?.responseModeState?.phase1);if(message){const state=message.meta.responseModeState;state.phase1.focusCardId=card.id;state.shownPlaces=[...new Map([...(state.shownPlaces||[]),card].map(c=>[c.id,c])).values()].slice(-50);saveConversation();}}
+    function renderPhase1Conditions(chips){
+      const group=document.createElement('div');group.className='result-conditions phase1-conditions';group.setAttribute('aria-label','적용 중인 조건');
+      const removeMessages={food:'음식 조건 해제해줘',budget:'예산 제한 없애줘',companion:'동행 조건 해제해줘',people:'인원 조건 해제해줘',visit:'방문 시간 조건 해제해줘',purpose:'목적 조건 해제해줘',vibe:'분위기 조건 해제해줘',parking:'주차 조건 해제해줘'};
+      for(const chip of chips){const item=document.createElement('span');item.className='phase1-condition';const edit=document.createElement('button');edit.type='button';edit.className='meal-chip';edit.textContent=chip.label;edit.setAttribute('aria-label',chip.label+' 변경');edit.addEventListener('click',()=>openPhase1Condition(chip.key));item.appendChild(edit);
+        if(chip.removable){const remove=document.createElement('button');remove.type='button';remove.className='phase1-remove';remove.textContent='×';remove.setAttribute('aria-label',chip.label+' 해제');remove.addEventListener('click',()=>routeQuestion(removeMessages[chip.key]));item.appendChild(remove);}group.appendChild(item);}
+      return group;
+    }
     function uiIcon(name) {
       const ns='http://www.w3.org/2000/svg';
       const make=tag=>document.createElementNS?document.createElementNS(ns,tag):document.createElement(tag);
@@ -1869,9 +1852,10 @@
         const body = document.createElement('div'); body.className = 'restaurant-card-body';
         const head = document.createElement('div'); head.className = 'restaurant-card-head';
         const actions = document.createElement('div'); actions.className = 'restaurant-detail-area';
-        const detail = document.createElement(restaurant.naverPlaceUrl?'a':'button');detail.className='restaurant-title-link restaurant-map-link';detail.setAttribute('aria-label',restaurant.name+' 상세보기');
+        const detail = document.createElement(restaurant.naverPlaceUrl?'a':'button');detail.className='restaurant-title-link restaurant-map-link';detail.setAttribute('aria-label',restaurant.name+' 주소로 네이버지도 보기');
         if(restaurant.naverPlaceUrl){detail.href=restaurant.naverPlaceUrl;detail.target='_blank';detail.rel='noopener noreferrer';}
-        else{detail.type='button';detail.addEventListener('click',()=>{if(!detail.disabled)resolveRestaurantDetail(restaurant,actions);});}
+        else{detail.type='button';detail.disabled=true;detail.setAttribute('aria-label',restaurant.name+' 주소 정보 없음');}
+        detail.addEventListener('click',()=>setPhase1Focus(restaurant));
         const title = document.createElement('h3'); title.textContent = restaurant.name;detail.appendChild(title);body.appendChild(detail);
         head.classList.add('restaurant-condition-chips');
         if (restaurant.category) {
@@ -1880,6 +1864,7 @@
         if (restaurant.regionLabel) { const area = document.createElement('span'); area.className = 'restaurant-category restaurant-region'; area.textContent = restaurant.regionLabel; head.appendChild(area); }
         body.appendChild(head);
         const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address; address.setAttribute('title',address.textContent);body.appendChild(address);
+        if(Number.isFinite(restaurant.distanceMeters)&&restaurant.originLabel){const distance=document.createElement('p');distance.className='restaurant-distance';distance.textContent=restaurant.originLabel+'에서 직선 '+restaurant.distanceMeters+'m';body.appendChild(distance);}
         content.appendChild(body);
         if (restaurant.imageUrl) {
           const media = document.createElement('div'); media.className = 'restaurant-media';
@@ -1899,7 +1884,9 @@
           else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
           renderComparisonTray();
         });
-        actions.appendChild(compare); card.appendChild(actions); list.appendChild(card);
+        const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link';map.textContent=restaurant.naverPlaceUrl?'네이버지도 보기':'주소 정보 없음';
+        if(restaurant.naverPlaceUrl){map.href=restaurant.naverPlaceUrl;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
+        actions.append(map,compare); card.appendChild(actions); list.appendChild(card);
       });
       group.appendChild(list);
       if (showSource && restaurants.some(restaurant => restaurant.dataSource === 'naver')) {
@@ -1972,6 +1959,7 @@
         const resultSection=document.createElement('section');resultSection.className='answer-results';resultSection.setAttribute('aria-label','답변 결과');
         const questionSection=document.createElement('section');questionSection.className='answer-question';questionSection.setAttribute('aria-label','답변 선택');
         const hasQuestion=allowed('question')&&Boolean(message.meta?.turnPolicy?.questionText);
+        if(message.meta?.phase1&&message.meta.conditionChips?.length)resultSection.appendChild(renderPhase1Conditions(message.meta.conditionChips));
         const conditionKey=message.meta?.searchConditions?JSON.stringify(message.meta.searchConditions):'';
         const priorAI=[...messagesEl.children].filter(node=>node.chatRole==='assistant');
         const previousAI=extra.includes('regenerated')?priorAI.at(-2):priorAI.at(-1);
@@ -2003,7 +1991,7 @@
         const visibleQuickReplies = [...new Set(displayReplies)].filter(reply => {
           const card = quickReplyCard(reply);
           if (/[?？]|제가|드릴|까요|보실래|고르실/.test(card.title)) return false;
-          if (!message.meta?.menuCards?.some(choice=>choice.name === card.title) && ([...card.title].length < 2 || [...card.title].length > 8)) return false;
+          if (!message.meta?.phase1 && !message.meta?.menuCards?.some(choice=>choice.name === card.title) && ([...card.title].length < 2 || [...card.title].length > 8)) return false;
           if (['비교하기', '메뉴 탐색'].includes(card.title)) return false;
           return true;
         });
@@ -2046,6 +2034,8 @@
                 return;
               }
               const policyChoice = (message.meta?.turnPolicy?.answerChoices || message.meta?.turnPolicy?.next_question?.chips || []).find(choice => choice.label === card.title || choice.label === card.originalTitle);
+              if(policyChoice?.url){window.open(policyChoice.url,'_blank','noopener,noreferrer');return;}
+              if(policyChoice?.disabled)return;
               routeQuestion(card.title === '네, 골라주세요' ? card.title : button.historyMessage || policyChoice?.message || ({ '다른 곳 보기':'다른 곳도 보여줘', '메뉴 고민하기':'오늘 뭐 먹을지 같이 골라줘', '식당 찾기':'먹을 곳 찾아줘' }[card.title]) || card.prompt);
             });
             if (menuChoice) menus.appendChild(button);
@@ -2255,7 +2245,7 @@
       retry.type = 'button';
       retry.className = 'retry-button';
       retry.textContent='다시 시도';retry.setAttribute('aria-label','다시 시도');
-      retry.addEventListener('click', () => { if(changed){location.reload();return;}item.remove(); generateAnswer(request); });
+      retry.addEventListener('click', () => { if(changed){try{sessionStorage.setItem('inchelin-resume-chat',currentId);saveConversation();}catch{}location.reload();return;}item.remove(); generateAnswer(request); });
       const alternatives=document.createElement('div');alternatives.className='quick-replies alternative-chips';
       for(const [label,axis] of [['다른 지역','region'],['다른 음식','food']]) {
         const button=document.createElement('button');button.type='button';button.className='quick-reply quick-reply-chip';button.textContent=label;
@@ -2296,7 +2286,7 @@
           currentLocationCoords = null;
           currentLocationName = answer.meta.responseModeState.slots.region || '';
         }
-        if(answer.meta?.responseModeState?.noResults || ['no_results','missing_credentials','missing_configuration','authentication_failed','api_request_failed'].includes(answer.meta?.restaurantSearchStatus)) {
+        if(!answer.meta?.phase1 && (answer.meta?.responseModeState?.noResults || ['no_results','missing_credentials','missing_configuration','authentication_failed','api_request_failed'].includes(answer.meta?.restaurantSearchStatus))) {
           chatMessages=[...chatMessages,normalizeMessage({role:'assistant',content:answer.content,restaurants:[],meta:{...answer.meta,recoverable:true}})];
           saveConversation();
           showRequestError(request,{message:'no_results',userMessage:answer.content});return;
@@ -2379,9 +2369,9 @@
       return '**현재 위치를 확인하지 못했어요.**\n\n**어느 지역에서 찾고 계세요?** 지역명을 편하게 입력해 주세요.';
     }
     function appendLocationFallback(reason) {
-      const retryable = ['denied', 'timeout', 'unavailable', 'reverse-geocode'].includes(reason);
-      appendMessage('assistant', locationFallbackMessage(reason), {
-        quickReplies: retryable ? ['내 주변에서 찾기'] : [], meta:{answer_plan:['text','chips']}
+      const choices=[{label:'지역·역 선택',message:'지역·역 선택'},{label:'직접 입력',message:'직접 입력'}];
+      appendMessage('assistant', '현재 위치를 확인하지 못했어요. 동네나 역을 선택하거나 직접 입력해 주세요.', {
+        quickReplies: choices.map(c=>c.label), meta:{phase1:true,answer_plan:['text','chips'],responseModeState:pluginState(),turnPolicy:{answerChoices:choices}}
       });
     }
     async function geolocationPermissionState() {
@@ -2447,45 +2437,31 @@
       messagesEl.appendChild(status);
       followConversation(status);
       try {
-        // Start both coordinate requests immediately inside the user's click gesture.
-        // Some embedded browsers stop delivering a position when permission probing is awaited first.
-        const position = await geolocationPositionWithRetry(status);
+        let permissionTimer;const permission=await Promise.race([geolocationPermissionState(),new Promise(resolve=>{permissionTimer=setTimeout(()=>resolve(''),500);})]);clearTimeout(permissionTimer);
+        if(permission==='denied')throw Object.assign(new Error('permission_denied'),{code:1});
+        // A granted permission causes no permission prompt; still obtain a fresh
+        // position rather than relying on coordinates from an old conversation.
+        const position = await geolocationPosition({enableHighAccuracy:false,maximumAge:60000,timeout:12000});
         if(epoch!==conversationEpoch)return;
         clearLocationPermissionDenied();
-        status.querySelector('.ai-bubble > span:last-child').textContent = '현재 위치의 지역명을 확인하고 있어요';
-        const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
+        currentLocationCoords={latitude:Number(position.coords.latitude),longitude:Number(position.coords.longitude)};
+        currentLocationName='';
+        const reverseController=new AbortController(),reverseTimer=setTimeout(()=>reverseController.abort(),1500);
+        try{const response = await fetch(REVERSE_GEOCODE_ENDPOINT, {
           method: 'POST',
+          signal:reverseController.signal,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
           })
         });
-        if (!response.ok) {
-          const reverseGeocodeError = new Error(`Reverse geocoding failed: ${response.status}`);
-          reverseGeocodeError.locationReason = 'reverse-geocode';
-          throw reverseGeocodeError;
-        }
-        const data = await response.json();
+        if(response.ok){const data=await response.json();currentLocationName=String(data?.locationName||'').trim();}}
+        catch{/* Coordinates remain valid even when a search locality cannot be resolved. */}finally{clearTimeout(reverseTimer);}
         if(epoch!==conversationEpoch)return;
-        const locationName = String(data?.locationName || '').trim();
-        if (!locationName) {
-          const reverseGeocodeError = new Error('Reverse geocoding did not return a location name.');
-          reverseGeocodeError.locationReason = 'reverse-geocode';
-          throw reverseGeocodeError;
-        }
         clearLocationPermissionDenied();
-        currentLocationName = locationName;
-        currentLocationCoords = {
-          latitude: Number(position.coords.latitude),
-          longitude: Number(position.coords.longitude)
-        };
         saveConversation();
         status.remove();
-        if (selectRegionOnly) {
-          selectPluginRegion(locationName, true, false);
-          return;
-        }
         lastAIRequest = buildAIRequest(chatMessages);
         generateAnswer(lastAIRequest);
       } catch (error) {
@@ -2505,6 +2481,8 @@
       }
     }
     function routeQuestion(question) {
+      if(['지역·역 선택','지역·역 선택하기'].includes(question)){openPhase1Condition('location');return;}
+      if(['예산 변경','음식 종류 변경','다른 메뉴로','방문 시간 변경','인원 변경'].includes(question)){openPhase1Condition(/예산/.test(question)?'budget':/방문/.test(question)?'visit':/인원/.test(question)?'people':'food');return;}
       if (['지역 바꾸기', '음식 바꾸기', '메뉴 바꾸기', '조건 바꾸기'].includes(question)) { openSearchPicker(question === '지역 바꾸기' ? 'region' : question === '조건 바꾸기' ? null : 'food'); return; }
       if (question === '비교하기') {
         const cards = [...comparisonTray.values()].slice(0, 3);
@@ -2587,8 +2565,6 @@
       currentLocationName = region;
       if (!useCoordinates) currentLocationCoords = null;
       const state = pluginState();
-      state.slots = { ...state.slots, region, use_current_location: useCoordinates, menu: null, food_type: null };
-      Object.assign(state, { lastCards: [], shownPlaces: [], shownPlaceIds: [], focus: null, aCandidates: [], aProposed: [], menuCategory:null, regionFlexible:false, pendingQuestionSlot: 'menu_category', askedSlots:[], questionCount:0, consecutiveQuestions:0, noResults: false });
       ask(useCoordinates ? '내 주변에서 먹을 곳 찾아줘' : region + '에서 먹을 곳 찾아줘', { responseState: state, alreadyAdded: !label });
     }
     function selectPluginSituations(patch, message) {
@@ -2957,16 +2933,17 @@
     window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
     renderAuthNavigation();
     renderHistory();
+    try{const resume=sessionStorage.getItem('inchelin-resume-chat');if(resume){sessionStorage.removeItem('inchelin-resume-chat');openHistory(resume);}}catch{}
     renderPlugins();
     let searchPicker = null;
-    function openSearchPicker(axis) { if (searchPicker) searchPicker.open(axis); else showToast('선택기를 불러오는 중이에요. 잠시 후 다시 눌러주세요.'); }
+    function openSearchPicker(axis) { openPhase1Condition(axis==='food'?'food':'location'); }
     import('/assets/search-picker-v1.js?v=127').then(({ mountSearchPicker }) => {
       searchPicker = mountSearchPicker({ getSlots: () => pluginState().slots,
         send: message => { currentLocationCoords = null; ask(message); }, locate: message => requestCurrentLocation(message),
         isBusy: () => generating || locationRequestInFlight,
         onOpen: () => { closeOverlay('pluginOverlay'); taskMenu.classList.remove('open'); } });
     }).catch(() => showToast('음식·지역 선택기를 불러오지 못했어요. 새로고침해 주세요.'));
-    import('/assets/plugin-actions-v1.js?v=127').then(({ mountPluginActions }) => {
+    import('/assets/plugin-actions-v1.js?v=137').then(({ mountPluginActions }) => {
       let storage;
       try { storage = window.localStorage; } catch (_) { /* 브라우저 저장소가 막혀도 도구를 이용해요. */ }
       pluginActions = mountPluginActions({
