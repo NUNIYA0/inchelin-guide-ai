@@ -22,6 +22,7 @@ import { testRelatedContext } from './related-context-smoke.mjs';
 import { testV130 } from './v130-regression-smoke.mjs';
 import { testV132 } from './v132-regression-smoke.mjs';
 import { testV133 } from './v133-regression-smoke.mjs';
+import { testV134 } from './v134-regression-smoke.mjs';
 import {
   applyAnalysisToState,
   chooseModeACandidates,
@@ -1410,7 +1411,7 @@ function semanticAnalysis(overrides = {}) {
     assert.ok(!card.recommendationReason.includes(card.address));
   }
   const searchCalls = third.calls.filter(call => call.href.includes("/search/v1/local"));
-  assert.ok(searchCalls.length >= 1 && searchCalls.length <= 7, 'one main search plus at most six concurrent suggestion preflights');
+  assert.ok(searchCalls.length >= 1 && searchCalls.length <= 19, 'one main search plus at most three bounded batches of six suggestion preflights');
   assert.equal(new URL(searchCalls[0].href).searchParams.get("query"), "역삼 삼겹살");
   assert.equal(third.calls.filter(call => call.body?.text?.format?.name === "inchelin_response_mode_analysis").length, 0);
   const fourth = await runCase({
@@ -2147,6 +2148,7 @@ await testConversationUI(runCase);
 await testV130(runCase);
 await testV132(runCase);
 await testV133(runCase);
+await testV134(runCase);
 await testSearchAxes(runCase);
 await testAISearchPolicy(runCase);
 await testConversationCopyRegression(runCase);

@@ -20,8 +20,7 @@ export async function testRelatedQuestions(runCase) {
   const check=(body,name,min=0)=>{
     const questions=body.meta.relatedQuestions;
     assert.ok(questions.length>=min && questions.length<=3,name+': '+JSON.stringify(questions));
-    const primary=questions.filter(item=>!item.fallback);
-    assert.equal(new Set(primary.map(item=>item.axis)).size,primary.length);
+    assert.equal(new Set(questions.map(item=>item.axis)).size,questions.length);
     assert.equal(new Set(questions.map(item=>item.key)).size,questions.length);
     assert.equal(body.meta.answer_plan.includes('related_questions'),questions.length>0);
     for(const item of questions){assert.ok(item.text.length>=12 && item.text.length<=(['detail','compare'].includes(item.axis)?40:30));assert.doesNotMatch(item.text,SIDE_FOOD);assert.doesNotMatch(item.text,FORBIDDEN_COPY);assert.doesNotMatch(item.text,/영업|평점|가격|웨이팅|분위기|주차|인기/);assert.ok(item.intent);}
@@ -54,7 +53,7 @@ export async function testRelatedQuestions(runCase) {
   const timeout=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {generationStatus:504});check(timeout.body,'timeout fallback');assert.ok(timeout.body.meta.relatedQuestions.every(item=>item.source==='template'));
   const proposed=[{text:'성수에서도 국밥 먹을 곳 찾아줘'},{text:'국밥 말고 냉면 먹을 곳 찾아줘'},{text:'국밥집 영업시간도 함께 알려줘'},{text:'삼겹살 말고 소주 마실 곳 알려줘'}];
   const model=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:proposed}});
-  check(model.body,'model filtering');assert.equal(model.body.meta.relatedQuestions.filter(item=>item.source==='model').length,2,JSON.stringify(model.body.meta.relatedQuestions));
+  check(model.body,'model filtering');assert.equal(model.body.meta.relatedQuestions.filter(item=>item.source==='model').length,1,'pending question reserves one named-card axis and one validated model search axis');
   const unknown=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:[{text:'부산에서도 국밥 먹을 곳 찾아주세요'}]}});
   assert.ok(unknown.body.meta.relatedQuestions.every(item=>!item.text.includes('부산')));
   const malformed=await run('강남에서 국밥 먹을 곳 찾아줘',{}, {aiResponse:{message:'강남에서 국밥을 골라봤어요.',suggestions:[],selectedRestaurantIds:[],related_questions:{bad:true}}});check(malformed.body,'malformed-generation fallback');
@@ -63,7 +62,7 @@ export async function testRelatedQuestions(runCase) {
   const next=await run('회식이에요',state);check(next.body,'session');assert.ok(next.body.meta.relatedQuestions.every(item=>!state.shownSuggestions.some(old=>old.key===item.key||old.text===item.text)));
   for(const choice of first.body.meta.relatedQuestions){
     const result=await run(choice.text,state,{naverResponse:query=>({items:places.items.map(item=>({...item,title:query.includes('설렁탕')?'설렁탕집':item.title,roadAddress:'서울 강남구 역삼동 1',category:query.includes('설렁탕')?'한식>설렁탕':'한식>국밥'}))})});
-    assert.ok(['place_search','condition_change','followup','compare','service'].includes(result.body.meta.analysis.intent),choice.text+' actual routing');
+    assert.ok(['place_search','condition_change','followup','compare','service','specific_place'].includes(result.body.meta.analysis.intent),choice.text+' actual routing');
   }
   for(const dish of ['계란찜','공기밥','김치전','사이다','소주','아이스크림']){
     const result=await run(dish+' 먹고 싶어');assert.equal(result.body.meta.flow,'side_main');assert.match(result.body.message,/보통 어떤 메인과 같이 드세요/);assert.equal(result.calls.length,0);assert.equal(result.body.restaurants.length,0);assert.ok(result.body.suggestions.every(isMainDish));

@@ -18,7 +18,9 @@ export async function testWelcomeFirstSearch(runCase){
     assert.equal(body.restaurants.length,3);assert.equal(body.meta.analysis.intent,'place_search');
     for(const block of ['text','place_cards','source','question','chips','related_questions'])assert.ok(body.meta.answer_plan.includes(block),block);
     assert.equal(body.meta.turnPolicy.questionText,'누구와 가세요?');assert.equal(body.suggestions.length,5);
-    assert.ok(body.meta.relatedQuestions.length>=1);assert.ok(body.meta.relatedQuestions.every(item=>['region','food','companion','compare'].includes(item.axis)));
+    assert.equal(body.meta.relatedQuestions.length,2);assert.ok(body.meta.relatedQuestions.every(item=>['region','food','compare','detail'].includes(item.axis)));
+    assert.equal(body.meta.relatedQuestions.filter(item=>['compare','detail'].includes(item.axis)).length,1);
+    assert.equal(body.meta.relatedQuestions.filter(item=>['region','food'].includes(item.axis)).length,1);
     assert.doesNotMatch(body.message,FORBIDDEN_COPY);assert.doesNotMatch(body.message,/새로 말씀|다시|준비|처리|생성|분석/);
   };
   const nodes=node=>[node,...node.children.flatMap(nodes)];

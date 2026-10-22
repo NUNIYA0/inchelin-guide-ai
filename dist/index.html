@@ -1051,8 +1051,8 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-  <script src="assets/response-rules.js?rules=v133"></script>
-  <script src="assets/naver-map.js?rules=v133"></script>
+<script src="assets/response-rules.js?rules=v134"></script>
+<script src="assets/naver-map.js?rules=v134"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1295,6 +1295,7 @@
         regionLabel: String(restaurant.regionLabel || '').trim(),
         address,
         roadAddress: String(restaurant.roadAddress || '').trim(),
+        parcelAddress: String(restaurant.parcelAddress || '').trim(),
         phone: String(restaurant.phone || restaurant.telephone || '').trim(),
         telephone: String(restaurant.telephone || restaurant.phone || '').trim(),
         longitude: restaurant.longitude !== null && restaurant.longitude !== undefined && restaurant.longitude !== '' && Number.isFinite(Number(restaurant.longitude)) ? Number(restaurant.longitude) : null,
@@ -1481,6 +1482,9 @@
         name: restaurant.name,
         address: restaurant.address,
         category: restaurant.category,
+        rawCategory: restaurant.rawCategory,
+        parcelAddress: restaurant.parcelAddress,
+        roadAddress: restaurant.roadAddress,
         businessStatus: restaurant.businessStatus,
         openingHours: restaurant.openingHours,
         parking: restaurant.parking,

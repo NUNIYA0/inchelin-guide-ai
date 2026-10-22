@@ -123,7 +123,7 @@ export function validateRelated(textValue,{state,parentIntent,classify,history=[
 export function relatedTemplates(state,intent,context={}) {
   const food=isMainDish(state.slots.menu)?state.slots.menu:state.aCandidates.find(isMainDish)||'국밥';
   const region=state.slots.region||'강남',other=[...new Set([...(region==='홍대'?['성수','종로','여의도']:ADJACENT_REGIONS[region]||[]),...SEARCH_REGIONS])].filter(area=>area!==region && SEARCH_REGIONS.includes(area));
-  const similar=({국밥:['설렁탕','곰탕','냉면'],삼겹살:['갈비','불고기','국밥'],냉면:['메밀국수','칼국수','국밥']})[food]||['국밥','냉면','삼겹살'];
+  const similar=({국밥:['설렁탕','곰탕','냉면'],삼겹살:['갈비','불고기','국밥'],냉면:['메밀국수','칼국수','국밥'],파스타:['리소토','피자','스테이크'],초밥:['돈까스','라멘','우동']})[food]||['국밥','냉면','삼겹살'];
   // All variants retain the same grounded axis values; syntax is rotated after two rounds.
   const regions=other.flatMap(area=>[`${area}에서도 ${food} 먹을 곳 찾아줘`,`${region} 말고 ${area}에서 찾아줘`,`${area} 지역에서 ${food}도 찾아줘`]);
   const foods=similar.filter(name=>name!==food && isMainDish(name)).flatMap(name=>[`${food} 말고 ${name} 먹을 곳 찾아줘`,`${region}에서 ${withParticle(name,'은/는')} 어때?`,`${region}에서 ${withParticle(name,'으로/로')} 바꿔 찾아줘`]);
@@ -141,6 +141,23 @@ export function relatedTemplates(state,intent,context={}) {
   if(intent==='food_talk') return [`${food} 먹을 곳도 같이 찾아줘`,`${food} 먹는 법도 조금 더 알려줘`,...menu,...SERVICE_TEXTS];
   return [...search,...details,...comparisons];
 }
+// Place responses reserve a primary-axis question; grounded detail/compare never
+// substitute for a failed region/food lookup or repeat their axis to pad counts.
+export function selectRelatedAxes(candidates,{placeResponse=false,pending=false,limit=3}={}) {
+  const unique=[];
+  for(const candidate of candidates)if(!unique.some(old=>old.axis===candidate.axis))unique.push(candidate);
+  if(!placeResponse)return unique.slice(0,limit);
+  if(pending) {
+    const primary=unique.find(item=>['region','food'].includes(item.axis));
+    const grounded=unique.find(item=>['detail','compare'].includes(item.axis));
+    return [grounded,primary].filter(Boolean);
+  }
+  const primary=unique.find(item=>['region','food','companion'].includes(item.axis));
+  if(!primary)return unique.filter(item=>['detail','compare'].includes(item.axis)).slice(0,2);
+  const selected=unique.slice(0,limit);
+  if(!selected.includes(primary))selected[selected.length-1]=primary;
+  return selected;
+}
 export async function applyRelatedQuestions(response,payload,classify,preflight=async()=>false) {
   const meta={...(response.meta||{})};
   const state=normalizeResponseState(meta.responseModeState||payload.context?.responseModeState||{});
@@ -153,50 +170,56 @@ export async function applyRelatedQuestions(response,payload,classify,preflight=
   const raw=meta.relatedCandidates||meta.analysis?.related_questions||[];
   const proposed=Array.isArray(raw)?raw.slice(0,6):[];
   delete meta.relatedCandidates;if(meta.analysis) {meta.analysis={...meta.analysis};delete meta.analysis.related_questions;}
-  const selected=[];
+  let selected=[];
   if(relatedAllowed({...response,meta}) && state.shownSuggestions.length<1000) {
     const options={state,parentIntent,classify,history:(payload.messages||[]).filter(item=>item.role==='user').map(item=>item.content),pendingSlot:context.pending_question?.slot};
     const limit=meta.answer_plan?.includes('question')&&meta.turnPolicy?.questionText?2:3;
-    let searches=0;
-    const attempted=new Set(),axisAttempts=new Map();
+    const attempted=new Set();
     const chips=[...(response.suggestions||[]),...(meta.turnPolicy?.actionChips||[])].join(' ');
     const priorities=['region','food','companion','detail','compare'];
     const axisScore=axis=>(state.relatedAxisHistory.at(-1)?.includes(axis)?4:0)+(state.relatedAxisHistory.at(-2)?.includes(axis)?2:0)+priorities.indexOf(axis)/10;
     const candidates=[...proposed.map(item=>({text:typeof item==='string'?item:item?.text,source:'model'})),...relatedTemplates(state,parentIntent,context).map(text=>({text,source:'template'}))]
       .map(candidate=>({...candidate,validated:validateRelated(candidate.text,options)})).filter(candidate=>candidate.validated);
     if(['place_search','condition_change','followup'].includes(parentIntent))candidates.sort((a,b)=>axisScore(a.validated.axis)-axisScore(b.validated.axis));
-    const checks=[];
+    const placeResponse=['place_search','condition_change','followup'].includes(parentIntent);
+    const pending=limit===2;
+    const available=[];
+    const probeResults=new Map();
     for (const candidate of candidates) {
       const validated=candidate.validated;
-      if(checks.some(item=>item.validated.key===validated.key))continue;
+      if(available.some(item=>item.validated.key===validated.key))continue;
       if(validated.axis==='menu_batch' && /다른 메뉴/.test(chips) || validated.axis==='more' && /다른 곳/.test(chips))continue;
       if(['region','food','place','companion','more'].includes(validated.axis)) {
         if(!state.slots.region && !response.restaurants?.length)continue;
         const region=mentionedSearchRegion(validated.text)||state.slots.region;
         const food=foodIn(validated.text)||state.slots.menu||state.slots.food_type;
         const key=region+':'+food+':'+(/다른.{0,10}(?:곳|식당|집)/.test(validated.text)?'unseen':'any');
-        if(!SEARCH_REGIONS.includes(region)||!food||attempted.has(key)||searches>=6||(axisAttempts.get(validated.axis)||0)>=2)continue;
-        attempted.add(key);searches++;axisAttempts.set(validated.axis,(axisAttempts.get(validated.axis)||0)+1);
+        if(!SEARCH_REGIONS.includes(region)||!food)continue;
+        candidate.probeKey=key;
         candidate.check={region,food,text:validated.text,state,response};
       }
-      checks.push(candidate);
+      available.push(candidate);
     }
-    // Six bounded checks run concurrently; classification still happens before any lookup.
-    const confirmed=await Promise.all(checks.map(async candidate=>{
-      if(!candidate.check)return candidate;
-      let timer;try {return await Promise.race([Promise.resolve().then(()=>preflight(candidate.check)),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),850);})])?candidate:null;}
-      catch{return null;}finally{clearTimeout(timer);}
-    }));
-    for(const candidate of confirmed.filter(Boolean)){
-      if(selected.some(item=>item.axis===candidate.validated.axis))continue;
-      selected.push({...candidate.validated,source:candidate.source});if(selected.length>=limit)break;
-    }
-    // Fill shortages from already verified, named cards, never an unverified search or FAQ.
-    // Distinct axes have priority; separate real card details remain answerable fallback options.
-    for(const candidate of confirmed.filter(Boolean)) {
-      if(selected.length>=limit)break;
-      if(selected.some(item=>item.key===candidate.validated.key))continue;
-      selected.push({...candidate.validated,source:candidate.source,fallback:true});
+    const choose=()=>selectRelatedAxes(available.filter(candidate=>!candidate.check||probeResults.get(candidate.probeKey)===true)
+      .map(candidate=>({...candidate.validated,source:candidate.source})),{placeResponse,pending,limit});
+    // Failed first alternatives must not end fallback exploration. Up to three
+    // bounded parallel batches try different supported combinations, at most 18
+    // unique probes; ordinary successful first batches still return immediately.
+    for(let round=0;round<3;round++) {
+      const checks=[],axisAttempts=new Map();
+      for(const candidate of available) {
+        if(!candidate.check||attempted.has(candidate.probeKey)||checks.length>=6||(axisAttempts.get(candidate.validated.axis)||0)>=2)continue;
+        attempted.add(candidate.probeKey);checks.push(candidate);
+        axisAttempts.set(candidate.validated.axis,(axisAttempts.get(candidate.validated.axis)||0)+1);
+      }
+      await Promise.all(checks.map(async candidate=>{
+        let timer,found=false;
+        try {found=await Promise.race([Promise.resolve().then(()=>preflight(candidate.check)),new Promise(resolve=>{timer=setTimeout(()=>resolve(false),850);})])===true;}
+        catch { /* Failed or timed-out combinations never become suggestions. */ }
+        finally {clearTimeout(timer);probeResults.set(candidate.probeKey,found);}
+      }));
+      selected=choose();
+      if(selected.length>=limit||!checks.length)break;
     }
   }
   // Never fill an exhausted session with repeated or unanswerable questions.

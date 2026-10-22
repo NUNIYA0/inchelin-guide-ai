@@ -33,7 +33,7 @@ export async function testHistoryAlternatives(runCase) {
   for (const count of [0,1,2]) {
     const result = await run('강남에서 국밥 먹을 곳 찾아줘',{}, {items:Array.from({length:count},(_,i)=>item('강남국밥'+i,'강남구'))});
     assert.equal(result.body.restaurants.length,count);
-    assert.ok(local(result).length>=1 && local(result).length<=7,'main region search plus up to six distinct suggestion-only preflights');
+    assert.ok(local(result).length>=1 && local(result).length<=19,'main region search plus at most three bounded batches of six suggestion preflights');
     assert.equal(new URL(local(result)[0].href).searchParams.get('query'),'강남 국밥');
     assert.ok(result.body.restaurants.every(card=>card.address.includes('강남')),'preflight cannot broaden displayed cards');
     const choices=result.body.meta.turnPolicy.expansionChoices;
@@ -60,11 +60,11 @@ export async function testHistoryAlternatives(runCase) {
     assert.doesNotMatch(result.body.meta.turnPolicy.intro,/인기|많이 찾/);
     assert.ok(result.body.meta.turnPolicy.expansionChoices.some(choice=>choice.label==='홍대'));
     assert.equal(result.body.meta.responseModeState.regionFlexible,true);
-    assert.ok(local(result).length>=3 && local(result).length<=9,'two bounded neighbor queries plus at most six distinct suggestion-only preflights');
+    assert.ok(local(result).length>=3 && local(result).length<=21,'two bounded neighbor queries plus at most eighteen distinct suggestion-only preflights');
     assert.ok(local(result).slice(0,3).every(call=>new URL(call.href).searchParams.get('query').includes('국밥')), 'main and neighbor searches keep the food; suggestions may explore another food');
     const changed=await run('홍대에서 찾아줘',result.body.meta.responseModeState,{items:[item('홍대국밥','마포구 서교동')]});
     assert.equal(changed.body.meta.responseModeState.regionFlexible,false);
-    assert.ok(local(changed).length>=1 && local(changed).length<=7,'explicit area search plus bounded suggestion preflights');
+    assert.ok(local(changed).length>=1 && local(changed).length<=19,'explicit area search plus bounded suggestion preflights');
     assert.ok(changed.body.restaurants.every(card=>/홍대|서교동/.test(card.address)),'suggestions never broaden the selected area cards');
   }
   const noNeighbors=await run('아무데나',selected.body.meta.responseModeState,query=>({items:/역삼|논현/.test(query)?[]:[item('강남국밥','강남구')]}));

@@ -7,7 +7,7 @@ import {mentionedSearchRegion,normalizeFoodAxis} from '../worker/search-axes.js'
 
 export async function testV133(runCase){
   const rules=globalThis.InchelinResponseRules,now=Date.now();
-  assert.equal(rules.VERSION,'v133');assert.ok(rules.TTL_MS<=3600000);
+  assert.ok(/^v\d+$/.test(rules.VERSION));assert.ok(rules.TTL_MS<=3600000);
   assert.equal(rules.isCurrent({responseRulesVersion:'v132',generatedAt:now}),false);
   assert.equal(rules.isCurrent({responseRulesVersion:rules.VERSION,generatedAt:now-rules.TTL_MS}),false);
   const cache=new Map([['v132:query',{expires:now+1000}],[rules.cacheKey('query'),{expires:now+1000}],['v133:too-long',{expires:now+rules.TTL_MS+1}]]);
@@ -37,7 +37,8 @@ export async function testV133(runCase){
   for(const pending of [false,true]){
     const state=normalizeResponseState({slots:{region:'홍대',menu:'냉면'},lastCards:cards,pendingQuestionSlot:pending?'companion':null});
     const result=await applyRelatedQuestions({message:'골라봤어요.',restaurants:cards,meta:{intent:'place_search',answer_plan:pending?['text','place_cards','question']:['text','place_cards'],turnPolicy:pending?{questionText:'누구와 가세요?',next_question:{slot:'companion'}}:{},responseModeState:state}},{messages:[]},classify,async()=>false);
-    assert.equal(result.meta.relatedQuestions.length,pending?2:3,'grounded named-card fallback fills failed preflights');
+    assert.ok(result.meta.relatedQuestions.length<(pending?2:3),'v134 never duplicates detail axes to pad a failed search pool');
+    assert.equal(new Set(result.meta.relatedQuestions.map(q=>q.axis)).size,result.meta.relatedQuestions.length);
     assert.ok(result.meta.relatedQuestions.every(q=>['detail','compare'].includes(q.axis)));
   }
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');

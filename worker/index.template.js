@@ -681,9 +681,12 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
   const state = normalizeResponseState(stateValue);
   const latest = [...messages].reverse().find(message => message.role === "user")?.content || "";
   const hasPrev = state.lastCards.length > 0;
-  const useCurrentLocation = /현재\s*위치|내\s*주변/.test(latest);
-  const region = useCurrentLocation ? "" : locationMatches(latest).at(-1) || (state.pendingQuestionSlot === "region" ? bareRegionReply(latest) : "");
-  let food = (latest.match(FOOD_SEARCH_PATTERN)?.[0] || '').replace(/^고깃집$/, '고기');
+  // Known proper names are references, not a fresh region/menu declaration.
+  // E.g. a name ending in 냉면 must not become an unsupported '~면' region.
+  const axisText=[...state.lastCards].sort((a,b)=>b.name.length-a.name.length).reduce((text,card)=>card.name?text.split(card.name).join(' '):text,latest);
+  const useCurrentLocation = /현재\s*위치|내\s*주변/.test(axisText);
+  const region = useCurrentLocation ? "" : locationMatches(axisText).at(-1) || (state.pendingQuestionSlot === "region" ? bareRegionReply(axisText) : "");
+  let food = (axisText.match(FOOD_SEARCH_PATTERN)?.[0] || '').replace(/^고깃집$/, '고기');
   if (food === '회' && !/(?<![가-힣])회(?=\s|를|가|먹|$)/.test(latest)) food = '';
   const slotFood = food === "국물" ? "" : food;
   const service = /인슐랭|너\s*누구|AI\s*야|인공지능|뭐\s*할\s*수|누가\s*만들|사용법|대화.{0,8}삭제|채팅.{0,8}삭제|공유\s*링크|지난\s*대화|새\s*대화|로그인|로그아웃|어떻게\s*(?:써|사용|삭제|공유|로그인|로그아웃)|무료|요금|위치\s*정보|기록\s*저장|모바일|추천.{0,8}기준|어떤\s*원칙|원칙으로.{0,12}골라|데이터\s*출처|등록\s*(?:안\s*된|되지\s*않은|된)\s*식당|등록\s*식당\s*(?:기준|범위)|카드.{0,5}왜|와인/i.test(latest);
@@ -733,7 +736,7 @@ function fallbackResponseModeAnalysis(messages, stateValue) {
     use_current_location: useCurrentLocation,
     food_type: /^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면|술집|국밥·찌개)$/.test(slotFood) ? slotFood : null,
     menu: slotFood && !/^(?:한식|중식|일식|양식|분식|카페|디저트|고기|면|술집|국밥·찌개)$/.test(slotFood) ? slotFood : null,
-    companion: [...new Set([...latest.matchAll(/가족\s*모임|접대[·\s]*비즈니스|\d+\s*[~〜-]?\s*\d*\s*명|혼밥|혼자|연인|데이트|가족|부모님|친구|동료|회사\s*사람|팀|회식|모임/g)].map(match => match[0] === "혼자" ? "혼밥" : match[0]))].join(" · ") || null,
+    companion: [...new Set([...axisText.matchAll(/가족\s*모임|접대[·\s]*비즈니스|\d+\s*[~〜-]?\s*\d*\s*명|혼밥|혼자|연인|데이트|가족|부모님|친구|동료|회사\s*사람|팀|회식|모임/g)].map(match => match[0] === "혼자" ? "혼밥" : match[0]))].join(" · ") || null,
     meal_time: latest.match(/아침|점심|저녁|야식/)?.[0] || null,
     parking: /주차\s*(?:가|는|되는|가능|필요)/.test(latest) ? true : null,
     other: [...latest.matchAll(/든든|해장|국물|따뜻|가볍|산뜻|매운|매콤|시원|비\s*오는|조용한?|단체석/g)].map(match => match[0]),
@@ -781,6 +784,18 @@ const RESPONSE_MODE_SCHEMA = {
 function prioritizeSearchAxes(value, messages, state) {
   const analysis = normalizeAnalysis(value);
   const firstText=[...messages].reverse().find(message=>message.role==='user')?.content||'';
+  // Optional answers are refinements even when an analyzer uses another search label.
+  // Do not let a companion-only answer reset or replace either primary search axis.
+  if(state.lastCards.length && !['service','compare','specific_place','food_talk','out_of_scope'].includes(analysis.intent)
+    && !normalizeFoodAxis(firstText) && !mentionedSearchRegion(firstText)
+    && !/다른|처음부터|초기화|아까|첫\s*번째|두\s*번째|세\s*번째/.test(firstText)) {
+    const optional=fallbackResponseModeAnalysis(messages,state);
+    if(optional.slots.companion || optional.slots.parking!==null || optional.slots.other.length) {
+      analysis.intent='condition_change';analysis.sub_intent='add';analysis.change={slot:'preferences',action:'add'};
+      analysis.slots={...optional.slots,region:null,food_type:null,menu:null};analysis.flags.new_topic='none';
+      return normalizeAnalysis(analysis);
+    }
+  }
   if (!state.lastCards.length && !state.shownPlaceIds.length && normalizeFoodAxis(firstText)
     && mentionedSearchRegion(firstText) && !['service','compare','specific_place','food_talk','out_of_scope'].includes(analysis.intent)) {
     analysis.intent='place_search'; analysis.sub_intent='axis_search'; analysis.change=null;
@@ -2172,6 +2187,7 @@ function restaurantCard(place, source, userText = "", locationName = "") {
     privateRoom: factValue(place, 'private_room') === true ? true : null,
     address,
     roadAddress: safeText(registered.roadAddress || registered.road_address, 300) || null,
+    parcelAddress: safeText(registered.address,300) || null,
     phone: safeText(firstPresent(factValue(place, "phone"), registered.phone), 80),
     telephone: safeText(firstPresent(factValue(place, "phone"), registered.telephone, registered.phone), 80) || null,
     longitude: Number.isFinite(registered.longitude) ? registered.longitude : null,
@@ -2193,6 +2209,19 @@ function restaurantCard(place, source, userText = "", locationName = "") {
     isRegisteredInInchelin: source === "inchelin",
     dataSource: source,
   };
+}
+
+// Lossless validation view: road and parcel addresses are separate evidence.
+// A rendered card is not itself a provider place (registered_data/facts differ).
+function restoreCardPlace(card) {
+  return {id:card.id,name:card.name,address:card.address,provider:card.dataSource,
+    business_status:card.businessStatus||'unknown',distance_meters:card.distanceMeters,
+    registered_data:{rawCategory:card.rawCategory||card.category,address:card.parcelAddress,roadAddress:card.roadAddress,
+      longitude:card.longitude,latitude:card.latitude,naverPlaceId:card.naverPlaceId,naverPlaceUrl:card.naverPlaceUrl,
+      representativeMenus:card.representativeMenus||[]},
+    facts:Object.fromEntries([['private_room',card.privateRoom],['parking',card.parking],['phone',card.phone],['opening_hours',card.openingHours]]
+      .filter(([,value])=>value!==null&&value!==undefined&&value!=='')
+      .map(([key,value])=>[key,{value,resolution_status:'confirmed',origin:card.dataSource}])),retainedCard:card};
 }
 
 function sanitizeRecentRestaurants(value) {
@@ -2505,16 +2534,10 @@ async function handleChat(request, env, execution = {}) {
   const preferenceRefinement=analysis.intent==='condition_change'
     && globalThis.InchelinResponseRules.isCurrent(priorCandidateState)
     && priorCandidateState.slots.region===responseState.slots.region
-    && priorCandidateState.slots.menu===responseState.slots.menu
-    && priorCandidateState.slots.food_type===responseState.slots.food_type
+    && (priorCandidateState.slots.menu||priorCandidateState.slots.food_type)===(responseState.slots.menu||responseState.slots.food_type)
     && analysis.change?.action!=='exclude_previous' && !/다른\s*(?:곳|식당)/.test(latestUserMessage);
-  const retainedPlaces=preferenceRefinement?priorCandidateState.lastCards.map(card=>({
-    id:card.id,name:card.name,address:card.address,business_status:card.businessStatus||'unknown',distance_meters:card.distanceMeters,
-    registered_data:{rawCategory:card.rawCategory||card.category,roadAddress:card.roadAddress,longitude:card.longitude,latitude:card.latitude,naverPlaceId:card.naverPlaceId,naverPlaceUrl:card.naverPlaceUrl},
-    facts:Object.fromEntries([['private_room',card.privateRoom],['parking',card.parking],['phone',card.phone],['opening_hours',card.openingHours]]
-      .filter(([,value])=>value!==null&&value!==undefined&&value!=='')
-      .map(([key,value])=>[key,{value,resolution_status:'confirmed',origin:card.dataSource||dataSource}])),retainedCard:card,
-  })).filter(place=>validateRestaurantCandidate(place,{messages,intentAnalysis,source:dataSource,locationName:signals.locationName})):[];
+  const retainedPlaces=preferenceRefinement?priorCandidateState.lastCards.filter(card=>card.dataSource===dataSource).map(restoreCardPlace)
+    .filter(place=>validateRestaurantCandidate(place,{messages,intentAnalysis,source:dataSource,locationName:signals.locationName})):[];
   const preferenceScore=place=>Number(Boolean(place.retainedCard.privateRoom && /회식/.test(responseState.slots.companion||'')))+Number(responseState.slots.parking===true&&place.retainedCard.parking===true);
   retainedPlaces.sort((a,b)=>preferenceScore(b)-preferenceScore(a));
 
@@ -2805,7 +2828,7 @@ export default {
           const intentAnalysis={location:region,foodCategory:food,foodPreference:'',otherConditions:[],needsRestaurantSearch:true};
           const valid=place=>validateRestaurantCandidate(place,{messages,intentAnalysis,source:provider.source,locationName:region});
           const excluded=/다른.{0,10}(?:곳|식당|집)/.test(text)?new Set(state.shownPlaceIds):new Set();
-          if((planned.restaurants||[]).some(place=>!excluded.has(place.id)&&valid(place)))return true;
+          if((planned.restaurants||[]).map(restoreCardPlace).some(place=>!excluded.has(place.id)&&valid(place)))return true;
           // Existing validated results can answer the current combination without another lookup.
           return confirmedCombination(provider.source+':'+region+':'+food+':'+[...excluded].sort().join(','),async()=>{
             const result=await provider.searchRestaurants({messages,locationName:region,intentAnalysis,suggestionCheck:true});
