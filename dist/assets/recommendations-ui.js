@@ -1,15 +1,15 @@
 // Contains no recommendation records. The server supplies exact authored pairs.
 (() => {
   const active=()=>globalThis.InchelinRecommendationFlags?.enabled===true&&globalThis.InchelinRecommendationFlags?.connected===true;
-  function normalize(bundle){
-    if(!active()||!bundle||!['matched','unmatched','ambiguous'].includes(bundle.status))return null;
+  function normalize(bundle,{demo=false}={}){
+    if((!active()&&!demo)||!bundle||!['matched','unmatched','ambiguous'].includes(bundle.status))return null;
     const clean=r=>r&&typeof r.id==='string'?{id:r.id,recommenderName:typeof r.recommenderName==='string'?r.recommenderName:null,reason:typeof r.reason==='string'?r.reason:null,writtenAt:r.writtenAt||null}:null;
     const representative=clean(bundle.representative),additional=Array.isArray(bundle.additional)?bundle.additional.map(clean).filter(Boolean):[];
     const records=[...new Map([representative,...additional].filter(Boolean).map(r=>[r.id,r])).values()];
     return {status:bundle.status,representative:records[0]||null,additional:records.slice(1),totalCount:records.length};
   }
-  function render(raw){
-    const bundle=normalize(raw);if(!bundle)return null;
+  function render(raw,{demo=false}={}){
+    const bundle=normalize(raw,{demo});if(!bundle)return null;
     const section=document.createElement('section');section.className='registered-recommendations';section.setAttribute('aria-label','등록된 추천');
     const pair=record=>{
       const item=document.createElement('div');item.className='registered-recommendation';

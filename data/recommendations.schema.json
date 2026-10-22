@@ -9,6 +9,7 @@
       "category":{"type":"string"},"latitude":{"type":"number","minimum":-90,"maximum":90},"longitude":{"type":"number","minimum":-180,"maximum":180},"imageUrl":{"type":["string","null"],"format":"uri"},
       "menus":{"type":"array","items":{"type":"object","required":["name"],"properties":{"name":{"type":"string","minLength":1},"priceKRW":{"type":["number","null"],"minimum":0},"mainDish":{"type":"boolean"}}}},
       "soloEvidence":{"type":["object","null"],"required":["confirmed","source"],"properties":{"confirmed":{"type":"boolean"},"source":{"type":"string","minLength":1}}},
+      "openingSchedule":{"type":["object","null"],"required":["source","timeZone","validFrom","validUntil","hours"],"properties":{"source":{"type":"string","minLength":1},"timeZone":{"const":"Asia/Seoul"},"validFrom":{"type":"string","format":"date-time"},"validUntil":{"type":"string","format":"date-time"},"hours":{"type":"array","items":{"type":"object","required":["startMinute","endMinute"],"properties":{"startMinute":{"type":"integer","minimum":0,"maximum":1439},"endMinute":{"type":"integer","minimum":1,"maximum":1440}}}}}},
       "recommendations":{"type":"array","items":{"type":"object","required":["id"],"properties":{
         "id":{"type":"string","minLength":1},"recommenderName":{"type":["string","null"]},"reason":{"type":["string","null"]},
         "writtenAt":{"type":["string","null"],"format":"date-time"},"tags":{"type":"array","items":{"type":"string"}}

@@ -11,7 +11,7 @@ export function mountPhase1Sheets({send,locate,isBusy,getConditions=()=>({})}){
     const finish=message=>{sheet.dialog.close();send(message);};
     if(key==='location'){
       const current=button('현재 위치로 찾기',()=>{sheet.dialog.close();locate('지금 내 주변에서 찾아줘');});current.className='primary-action';sheet.body.append(current);
-      sheet.body.append(make('p','동네·역 이름을 직접 입력할 수 있어요. 아래는 현재 좌표가 연결된 바로가기예요. 지원하지 않는 지역은 임의 위치로 바꾸지 않아요.','meal-muted'));
+      sheet.body.append(make('p','동네·역 이름을 직접 입력하거나 바로 선택할 수 있는 지역에서 골라주세요. 지금은 아래 7개 역과 현재 위치를 기준으로 찾을 수 있어요. 지원하지 않는 장소는 임의로 바꾸지 않아요.','meal-muted'));
     }
     const chips=make('div','','meal-chips');
     const options=key==='location'?api.centers.map(c=>[c.label,c.label+'에서 추천해줘']):key==='radiusMeters'?[['500m 이내','500m 이내로 찾아줘'],['1km 이내','1km 이내로 찾아줘'],['2km 이내','2km 이내로 찾아줘']]:key==='food'?['한식','중식','일식','양식','파스타','냉면','삼겹살','국밥','카페'].map(food=>[food,food+' 먹을 곳 찾아줘']):key==='budget'?[['1만 원 이하','1만 원 이하로 찾아줘'],['2만 원 이하','2만 원 이하로 찾아줘'],['제한 없음','예산 제한 없애줘']]:key==='companion'?[['혼밥','혼자 먹을 거야'],['동료','동료와 먹을 거야'],['가족','가족과 먹을 거야'],['해제','동행 조건 해제해줘']]:key==='purpose'?[['회식','회식할 거야'],['데이트','데이트할 거야'],['접대','접대할 거야']]:[];

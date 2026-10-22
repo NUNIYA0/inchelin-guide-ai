@@ -5,14 +5,15 @@ import {testPhase1Client} from './phase1-client-smoke.mjs';
 import {normalizeKoreanParticles} from '../worker/korean.js';
 import {testRecommendations} from './recommendations-smoke.mjs';
 import {testPhase3} from './phase3-smoke.mjs';
+import {testPhase4} from './phase4-smoke.mjs';
 const api=globalThis.InchelinPhase1;
 const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
-const dataset=query=>{const center=api.centers.find(c=>query.startsWith(c.label))||api.centers[0];return {items:[100,400,800,1000.2,2000].map((m,i)=>item(center,m,i))};};
-export async function requestCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200,workerOverride=worker}={}){
+const dataset=query=>{const center=api.centers.find(c=>query.startsWith(c.label))||api.centers[0];return {items:[100,400,800,1000.2,2000].map((m,i)=>item(center,m,i,/한식/.test(query)?{category:'음식점>한식'}:{}))};};
+export async function requestCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200,workerOverride=worker,demoMode=false,currentLocalDatetime='2026-10-22T12:00:00+09:00'}={}){
   const original=globalThis.fetch,calls=[];
   globalThis.fetch=async url=>{calls.push(String(url));assert.match(String(url),/naverapihub\.apigw\.ntruss\.com\/search\/v1\/local/,'AI/image/other live calls forbidden');return Response.json(typeof data==='function'?data(new URL(url).searchParams.get('query')):data,{status});};
-  try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName}})});const response=await workerOverride.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
+  try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName,demoMode,currentLocalDatetime}})});const response=await workerOverride.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
 }
 // Legacy v137/v138 card assertions now explicitly exercise the consent continuation.
 // New v139 tests and the consent client scenario call requestCase directly.
@@ -67,9 +68,10 @@ const faq=await runCase('추천은 어떤 기준으로 하나요?');assert.equal
 assert.deepEqual(noLocation.body.meta.conditionChips,[]);assert.deepEqual(foodOnly.body.meta.conditionChips,[]);
 assert.ok(bulk.body.meta.notice.split(/[.!?]/).filter(x=>x.trim()).length<=2);
 assert.ok(!/주차|분위기|시간|좌석/.test(bulk.body.meta.notice),'only applicable conditions');
-assert.ok(!/영업 여부|방문 시간/.test(remove.body.meta.notice),'do not repeat a retained visit notice');
+assert.ok(remove.body.restaurants.every(card=>card.conditionVerification.checks.find(check=>check.key==='visit')?.blocking===false),'meal context does not require opening evidence');
 const v138Samples=await testRecommendations(runCase);
 const v139Samples=await testPhase3(requestCase);
-await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples},requestCase);
+const v140Samples=await testPhase4(requestCase);
+await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},requestCase);
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
-console.log('v139 policy smoke passed: registered-first source fixture; no silent Naver substitution; per-condition evidence; explicit unknown consent + invalidation; over-budget exclusion; exact authored recommendations; v137/v138 continuation regression. All upstream calls mocked; no keys or AI calls.');
+console.log('v140 policy smoke passed: meal context vs mandatory opening; per-type session consent; broad category vs menu evidence; opt-in fictional catalogue isolation; representative ranking; budget filtering; v137–139 regressions. All upstream calls mocked; no keys or AI calls.');

@@ -16,7 +16,7 @@
   function distance(a,b){if(!coords(a)||!coords(b))return null;const rad=n=>n*Math.PI/180,dlat=rad(b.latitude-a.latitude),dlng=rad(b.longitude-a.longitude),v=Math.sin(dlat/2)**2+Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(dlng/2)**2;return 6371008.8*2*Math.atan2(Math.sqrt(v),Math.sqrt(Math.max(0,1-v)));}
   function findCenters(text){const matches=centers.flatMap(c=>c.aliases.flatMap(alias=>[...text.matchAll(new RegExp(alias+'(?=$|[\\s,.!?]|에서|으로|로|이나|이랑|랑|과|와|하고|또는|말고|역(?![가-힣])|쪽|근처|주변|맛집|음식|추천|냉면|삼겹살|파스타)','g'))].map(m=>({center:c,index:m.index,length:alias.length}))));return matches.sort((a,b)=>a.index-b.index||a.length-b.length);}
   function parse(text,previous={},context={}){
-    text=clean(text);const c={location:null,radiusMeters:1000,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,vibe:null,parking:null,...JSON.parse(JSON.stringify(previous||{}))};
+    text=clean(text);const c={location:null,radiusMeters:1000,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,requireOpen:false,visitAt:null,vibe:null,parking:null,...JSON.parse(JSON.stringify(previous||{}))};
     if(c.location&&!coords(c.location))c.location=null;
     c.radiusMeters=Number.isFinite(Number(c.radiusMeters))&&Number(c.radiusMeters)>0?Number(c.radiusMeters):1000;
     const matches=findCenters(text),unique=[...new Set(matches.map(m=>m.center.label))];
@@ -38,13 +38,24 @@
     else if(/가족|회식|동료|친구|데이트|접대/.test(text))c.companion=text.match(/가족|회식|동료|친구|데이트|접대/)[0];
     const people=text.match(/(\d+(?:\s*[~〜-]\s*\d+)?)\s*명/);if(people)c.people=people[1]+'명';
     const purpose=text.match(/회식|데이트|가족\s*모임|접대|비즈니스/);if(purpose)c.purpose=purpose[0];
-    const visit=text.match(/(?:(?:오늘|내일|모레|이번\s*주말|다음\s*주|\d{1,2}월\s*\d{1,2}일)\s*)?(?:오전\s*\d{1,2}시|오후\s*\d{1,2}시|\d{1,2}시|아침|점심|오후|저녁|야식|늦은\s*밤)/);
+    const visit=text.match(/(?:(?:오늘|내일|모레|이번\s*주말|다음\s*주|\d{1,2}월\s*\d{1,2}일)\s*)?(?:(?:오전|오후|아침|점심|저녁|야식|늦은\s*밤)(?:\s*\d{1,2}시(?:\s*\d{1,2}분)?)?|\d{1,2}시(?:\s*\d{1,2}분)?)/);
+    if(/(?:영업\s*중|영업하는|문\s*연|열려\s*있는).*(?:곳|식당|가게).*만|영업.*(?:필수|조건)|영업하는\s*곳만/.test(text))c.requireOpen=true;
     const visitExplicitThisTurn=Boolean(visit||/내일|모레|오늘/.test(text)&&/갈|방문|먹/.test(text));
     if(visit)c.visit=visit[0];else if(/내일|모레|오늘/.test(text)&&/갈|방문|먹/.test(text))c.visit=text.match(/내일|모레|오늘/)[0];
+    if(c.requireOpen&&/지금|현재|영업\s*중/.test(text)&&!visit)c.visit='지금';
+    if(visit||c.requireOpen&&/지금|현재|영업\s*중/.test(text)){
+      const now=new Date(context.currentLocalDatetime||Date.now()),clock=Number.isFinite(now.getTime())?now:new Date();
+      const local=new Date(clock.getTime()+9*3600000),hour=c.visit?.match(/(\d{1,2})시(?:\s*(\d{1,2})분)?/);
+      if(c.visit==='지금')c.visitAt=clock.toISOString();
+      else if(hour){let h=Number(hour[1]);if(/오후|저녁|야식|밤/.test(c.visit)&&h<12)h+=12;if(/오전|아침/.test(c.visit)&&h===12)h=0;const day=/모레/.test(c.visit)?2:/내일/.test(c.visit)?1:0,date=c.visit.match(/(\d{1,2})월\s*(\d{1,2})일/);c.visitAt=h<24&&Number(hour[2]||0)<60&&!/주말|다음\s*주/.test(c.visit)?new Date(Date.UTC(local.getUTCFullYear(),date?Number(date[1])-1:local.getUTCMonth(),date?Number(date[2]):local.getUTCDate()+day,h-9,Number(hour[2]||0))).toISOString():null;}
+      else c.visitAt=null;
+    }
     if(/조용|대화|아늑/.test(text))c.vibe=text.match(/조용|대화|아늑/)[0];
     if(/주차/.test(text))c.parking=true;
     const remove=[[/음식|메뉴/,'food'],[/예산|가격/,'budget'],[/인원/,'people'],[/혼밥|동행/,'companion'],[/방문|시간/,'visit'],[/목적/,'purpose'],[/분위기/,'vibe'],[/주차/,'parking']];
     if(/해제|제한\s*없|상관\s*없|빼줘|지워줘/.test(text))for(const [pattern,key] of remove)if(pattern.test(text)){c[key]=null;if(key==='companion'&&c.people===1)c.people=null;}
+    if(/영업.*(?:해제|상관\s*없|빼줘|제한\s*없)/.test(text))c.requireOpen=false;
+    if(!c.visit)c.visitAt=null;
     if(/위치.*(?:삭제|해제|빼줘)|지역.*(?:삭제|해제|빼줘)/.test(text))c.location=null;
     const unknownStation=!matches.length&&!/현재\s*위치|내\s*주변/.test(text)&&(text.match(/([가-힣]{2,15}역)(?:에서|으로|로|\s|$)/)?.[1]||text.match(/([가-힣]{2,12})(?:에서)/)?.[1]);
     if(unknownStation)c.location=null;

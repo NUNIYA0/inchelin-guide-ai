@@ -46,6 +46,7 @@ const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8
 const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');
 const recommendations=await readFile(join(root,'worker','recommendations.js'),'utf8');
 const conditionEvidence=await readFile(join(root,'worker','condition-evidence.js'),'utf8');
+const demoRecommendations=await readFile(join(root,'worker','demo-recommendations.js'),'utf8');
 const recommendationConfig=JSON.parse(await readFile(join(root,'data','recommendation-source.json'),'utf8'));
 const recommendationData=await loadRecommendationSource(root,recommendationConfig);
 await writeFile(join(root,'dist','assets','recommendation-flags.js'),'globalThis.InchelinRecommendationFlags='+JSON.stringify({enabled:recommendationData.enabled,connected:recommendationData.connected})+';');
@@ -85,6 +86,8 @@ await Promise.all([
   writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(outputRoot, 'dist', 'server', 'recommendations.js'), recommendations),
   writeFile(join(outputRoot, 'dist', 'server', 'condition-evidence.js'), conditionEvidence),
+  writeFile(join(outputRoot, 'dist', 'server', 'demo-recommendations.js'), demoRecommendations),
+  writeFile(join(hostingOutputRoot, 'server', 'demo-recommendations.js'), demoRecommendations),
   writeFile(join(hostingOutputRoot, 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'recommendations.js'), recommendations),
   writeFile(join(hostingOutputRoot, 'server', 'answer-plan.js'), answerPlan),

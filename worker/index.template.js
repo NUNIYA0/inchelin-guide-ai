@@ -23,9 +23,10 @@ import { createChatTiming } from './request-timing.js';
 import './response-rules.js';
 import './phase1-core.js';
 import {createRecommendationCatalog, dedupeRestaurants} from './recommendations.js';
-import {evaluateConditions,conditionSignature} from './condition-evidence.js';
+import {evaluateConditions,unknownScopes,consentKeys} from './condition-evidence.js';
+import {demoRecommendationSource} from './demo-recommendations.js';
 const recommendationData = __RECOMMENDATION_DATA__;
-const recommendationCatalog = createRecommendationCatalog(recommendationData);
+const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2319,26 +2320,28 @@ function restaurantResultsMessage(state, count, hasCoordinates) {
 }
 
 async function phase1ChatResponse(latest,context,env,execution){
-  const api=globalThis.InchelinPhase1,previous=context.responseModeState||{},prior=previous.phase1||{};
+  const demoMode=context.demoMode===true,rawPrevious=context.responseModeState||{};
+  const api=globalThis.InchelinPhase1,previous=Boolean(rawPrevious.phase1?.demoMode)===demoMode?rawPrevious:{},prior=previous.phase1||{};
   const migratedLocation=previous.slots?.use_current_location?api.parse('지금 내 주변에서 찾아줘',{},context).conditions.location:api.centers.find(c=>c.aliases.includes(previous.slots?.region)||c.label===previous.slots?.region)||null;
   // v136 meal_time could be inferred from the clock, so it is not a provided
   // optional condition. Only explicitly parsed v137 visit values are retained.
   const old=prior.conditions||{location:migratedLocation,food:previous.slots?.menu||previous.slots?.food_type||null,budget:previous.preferences?.budget||null,companion:previous.slots?.companion||null,vibe:previous.preferences?.vibe||null,parking:previous.slots?.parking??null,visit:null};
   const parsed=api.parse(latest,old,context),c=parsed.conditions;
+  const recommendationCatalog=demoMode?createRecommendationCatalog(demoRecommendationSource(c.location)):registeredRecommendationCatalog;
   const registeredOnly=/네이버.*(?:검색|찾)/.test(latest)?false:/등록.*(?:추천|식당)|추천인.*(?:있는|맛집)/.test(latest)||prior.registeredOnly===true;
-  const consentSignature=/미확인.*(?:후보|조건).*(?:보여|볼게|동의)|미확인 후보 보기/.test(latest)?conditionSignature(c):prior.consentSignature===conditionSignature(c)?prior.consentSignature:null;
-  const state={...emptyResponseState(),slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{conditions:c,focusCardId:prior.focusCardId||null,consentSignature},lastCards:previous.lastCards||[]};
+  const acceptedUnknowns=consentKeys(prior,c,latest),scopes=unknownScopes(c),pendingScopes=scopes.filter(item=>!acceptedUnknowns.includes(item.key));
+  const state={...emptyResponseState(),slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{conditions:c,focusCardId:prior.focusCardId||null,acceptedUnknowns,pendingUnknowns:[],demoMode},lastCards:previous.lastCards||[]};
   const cards=state.lastCards.slice(0,3),catalog=[...new Map([...(previous.shownPlaces||[]),...cards].filter(card=>card?.id).map(card=>[card.id,card])).values()].slice(-50);
   state.phase1.registeredOnly=registeredOnly;
   state.shownPlaces=catalog;
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
   const plan=(message,restaurants=[],{question='',choices=[],notice='',intent='place_search',error=false}={})=>{
-    restaurants=recommendationCatalog.enrich(restaurants,c).map(card=>({...card,conditionVerification:evaluateConditions(card,c)}));
+    restaurants=recommendationCatalog.enrich(restaurants,c).map(card=>({...card,isDemo:demoMode,...(demoMode?{naverPlaceUrl:'',naverLink:''}:{}),conditionVerification:evaluateConditions(card,c)}));
     state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
-    answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
+    answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,demoMode,dataConnectionStatus:demoMode?'fictional_demo':recommendationCatalog.active?'connected_snapshot':'not_connected',conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
     turnPolicy:{intro:message,questionText:question,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   if(!c.location||parsed.ambiguous||parsed.unknownStation){
@@ -2347,34 +2350,41 @@ async function phase1ChatResponse(latest,context,env,execution){
     return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
   }
   if(parsed.invalidRadius)return plan('거리를 임의로 바꾸지 않고 기다릴게요.',[],{question:'0보다 큰 직선거리를 m나 km로 알려주시겠어요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'2km 이내',message:'2km 이내로 찾아줘'}]});
-  if(registeredOnly&&!recommendationCatalog.active)return plan('아직 기존 앱의 식당·추천 원본이 연결되지 않았어요. 추천인·추천 이유가 있는 등록 맛집을 지금 확인해드릴 수는 없어요.',[],{choices:[{label:'네이버 검색으로 찾기',message:'네이버 검색으로 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
+  if(registeredOnly&&!recommendationCatalog.active)return plan('등록된 추천 정보를 현재 불러올 수 없어요. 추천인·추천 이유가 있는 등록 맛집 대신 외부 검색을 사용하려면 아래에서 선택해 주세요.',[],{choices:[{label:'네이버 검색으로 찾기',message:'네이버 검색으로 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
   const targets=[];
   for(const [i,pattern] of [[0,/첫\s*번째|처음|1\s*번째/],[1,/두\s*번째|2\s*번째/],[2,/세\s*번째|3\s*번째/]])if(pattern.test(latest)&&cards[i])targets.push(cards[i]);
   for(const card of catalog)if(latest.includes(card.name)&&!targets.includes(card))targets.push(card);
   const explicit=api.parse(latest,{},context).conditions;
-  const primarySearch=explicit.location||explicit.food||explicit.budget||/추천|찾아|먹을\s*곳|필요|가능한\s*곳|되는\s*곳/.test(latest);
+  const primarySearch=explicit.location||explicit.food||explicit.budget||explicit.requireOpen||parsed.visitExplicitThisTurn||/추천|찾아|먹을\s*곳|필요|가능한\s*곳|되는\s*곳/.test(latest);
   const detailed=parsed.intents.some(i=>['compare','map'].includes(i)) || parsed.intents.includes('detail')&&(targets.length>0||!primarySearch);
   if(detailed && !targets.length){const focused=catalog.find(card=>card.id===prior.focusCardId);if(focused)targets.push(focused);else if(cards.length===1)targets.push(cards[0]);}
   if(detailed){
     if(!targets.length || parsed.intents.includes('compare')&&targets.length<2)return plan('어느 식당을 말씀하시는지 골라주세요.',[],{question:parsed.intents.includes('compare')?'비교할 식당 두 곳은 어디인가요?':'어느 식당이 궁금하세요?',choices:cards.slice(0,3).map(card=>({label:card.name,message:card.name+' 자세히 알려줘'})),intent:'specific_place'});
     state.phase1.focusCardId=targets[0].id;
-    for(const card of targets)card.naverPlaceUrl=api.mapUrl(card.roadAddress||card.address||card.parcelAddress);
+    for(const card of targets)card.naverPlaceUrl=demoMode?'':api.mapUrl(card.roadAddress||card.address||card.parcelAddress);
     const info=targets.map(card=>`${card.name}: ${card.category||'음식 종류는 확인되지 않았어요'}, ${card.address||'주소 정보가 없어요'}${Number.isFinite(card.distanceMeters)?`, ${card.originLabel||c.location.label}에서 직선 ${Math.round(card.distanceMeters)}m`:''}`).join('\n');
-    const unknown=/메뉴|가격|영업|전화|주차|좌석/.test(latest)?'메뉴·가격·영업시간·전화·주차·좌석은 지금 확인된 정보가 없어요. 방문 전 식당에 확인해 주세요.':'';
-    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&'주소로 네이버지도를 열 수 있어요. 건물이나 위치 검색 결과가 나올 수 있어요.',unknown].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1?[{label:'네이버지도 보기',message:targets[0].name+' 네이버지도 보기',url:targets[0].naverPlaceUrl||'',disabled:!targets[0].address}]:[]});
+    const details=targets.map(card=>{
+      const menus=card.registeredFacts?.menus||[],parts=[],missing=[];
+      if(/메뉴|가격/.test(latest)){if(menus.length)parts.push(menus.map(m=>m.name+' '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(', '));else missing.push('메뉴·가격');}
+      if(/영업|전화|주차|좌석/.test(latest)){if(/영업/.test(latest))missing.push('영업시간');if(/전화/.test(latest))missing.push('전화번호');if(/주차/.test(latest))missing.push('주차');if(/좌석/.test(latest))missing.push('좌석');}
+      if(missing.length)parts.push(missing.join('·')+'는 지금 확인된 정보가 없어요. 방문 전 식당에 확인해 주세요.');
+      return parts.length?card.name+': '+parts.join(' '):'';
+    }).filter(Boolean).join('\n');
+    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&(demoMode?'가상 데이터에는 실제 주소가 없어 지도를 제공하지 않아요.':'주소로 네이버지도를 열 수 있어요. 건물이나 위치 검색 결과가 나올 수 있어요.'),details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1&&!demoMode?[{label:'네이버지도 보기',message:targets[0].name+' 네이버지도 보기',url:targets[0].naverPlaceUrl||'',disabled:!targets[0].address}]:[]});
   }
   const editing=/^(?:음식\s*종류\s*변경|다른\s*메뉴로|예산\s*변경|방문\s*시간\s*변경|인원\s*변경)$/;
   if(editing.test(latest))return plan('바꾸고 싶은 조건을 골라주세요.',[],{question:/예산/.test(latest)?'예산을 어떻게 바꿀까요?':'어떤 음식으로 바꿀까요?',choices:/예산/.test(latest)?[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'예산 해제',message:'예산 제한 없애줘'}]:['한식','파스타','냉면'].map(label=>({label,message:label+'로 찾아줘'}))});
-  const unsupported=[c.food&&'메뉴 판매 여부',c.budget&&'가격',(c.companion||c.people||c.purpose)&&'인원·좌석',c.vibe&&'분위기',c.parking&&'주차',c.visit&&'방문 시간의 영업 여부'].filter(Boolean);
-  if(!recommendationCatalog.active&&!consentSignature&&unsupported.length){
+  const unsupported=pendingScopes.map(item=>item.label);
+  if(!recommendationCatalog.active&&unsupported.length){
     state.noResults=false;
-    return plan(`${unsupported.join('·')} 정보를 확인할 원본이 아직 연결되지 않았어요. 조건을 충족한다고 보장할 수 없어 검색 전에 먼저 여쭤볼게요.`,[],{question:'미확인 항목을 표시하고 지역·음식으로 검색해볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
+    state.phase1.pendingUnknowns=pendingScopes.map(item=>item.key);
+    return plan(`${unsupported.join('·')} 정보는 현재 확인할 수 없어요. 이 항목이 미확인인 식당도 볼지 선택해 주세요.`,[],{question:'미확인 항목을 표시하고 지역·음식으로 검색해볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
   }
   let places=[],error=false;
   const registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label,naverPlaceUrl:api.mapUrl(card.roadAddress||card.parcelAddress||card.address)})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
-  const deferredExternal=!registeredOnly&&!consentSignature&&unsupported.length>0&&registered.length<3;
+  const deferredExternal=!registeredOnly&&unsupported.length>0&&registered.length<3;
   try{
-    if(registered.length<3&&!registeredOnly&&!deferredExternal){
+    if(registered.length<3&&!registeredOnly&&!deferredExternal&&!demoMode){
     const provider=new NaverRestaurantProvider(env),result=await execution.measure('search',()=>provider.searchRestaurants({messages:[{role:'user',content:latest}],locationName:c.location.query||c.location.label,intentAnalysis:{phase1:true,location:c.location.query||c.location.label,foodCategory:c.food||'',needsRestaurantSearch:true}}));
     if(!result.configured||result.errorCode)throw new Error('search_unavailable');
     const measured=result.places.map(place=>({place,meters:api.distance(c.location,place.registered_data)}));
@@ -2387,15 +2397,19 @@ async function phase1ChatResponse(latest,context,env,execution){
     return {...card,...api.phase2Fields(),imageUrl:null,recommendationReason:'',recommendedBy:'',address,naverPlaceUrl:api.mapUrl(address),naverLink:api.mapUrl(address),distanceMeters:Math.round(meters),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label};
   })]),c).map(card=>({...card,conditionVerification:evaluateConditions(card,c)})).filter(card=>card.conditionVerification.status!=='failed');
   const confirmed=candidates.filter(card=>['confirmed','experience'].includes(card.conditionVerification.status)),unconfirmed=candidates.filter(card=>card.conditionVerification.status==='unconfirmed');
-  const selected=[...confirmed,...(consentSignature?unconfirmed:[])].slice(0,3);
+  const accepted=unconfirmed.filter(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown'&&check.blocking!==false).every(check=>acceptedUnknowns.includes(check.key)));
+  const withheld=unconfirmed.filter(card=>!accepted.includes(card));
+  const selected=[...confirmed,...accepted].slice(0,3);
   if(registered.length)error=false;
   state.lastCards=error?cards:selected;state.shownPlaces=[...new Map([...catalog,...selected].map(card=>[card.id,card])).values()].slice(-50);state.shownPlaceIds=state.shownPlaces.map(card=>card.id);state.noResults=!selected.length;
-  if(!error&&(unconfirmed.length||deferredExternal)&&!consentSignature){
+  if(!error&&(withheld.length||deferredExternal)){
     state.noResults=false;
-    const missing=[...new Set(unconfirmed.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown').map(check=>check.label)))];if(!missing.length)missing.push(...unsupported);
+    const newChecks=withheld.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown'&&check.blocking!==false&&!acceptedUnknowns.includes(check.key)));
+    const missing=[...new Set(newChecks.map(check=>check.label))];if(!missing.length)missing.push(...unsupported);
+    state.phase1.pendingUnknowns=[...new Set([...newChecks.map(check=>check.key),...(deferredExternal?pendingScopes.map(item=>item.key):[])])];
     return plan(selected.length?`조건을 확인한 ${selected.length}곳을 먼저 보여드려요. 다른 식당의 ${missing.join('·')} 확인은 필요해요.`:`${missing.join('·')} 조건을 충족하는 식당은 아직 확인되지 않았어요. 조건은 바꾸지 않았어요.`,selected,{question:'미확인 항목을 표시하고 다른 식당도 찾아볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
   }
-  const unknownLabels=[...new Set(selected.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown'&&(check.key!=='visit'||parsed.visitExplicitThisTurn)).map(check=>check.key==='budget'?'가격':check.label)))];
+  const unknownLabels=[...new Set(selected.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown').map(check=>check.key==='budget'?'가격':check.label)))];
   const notice=unknownLabels.length?unknownLabels.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'';
   const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.${selected.some(card=>card.conditionVerification.status==='unconfirmed')?' 아직 확인되지 않은 조건은 카드에 따로 적었어요.':''}`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
   return plan(message,selected,{choices:api.followups(c,{empty:!selected.length}),notice:selected.length?notice:'',error});
