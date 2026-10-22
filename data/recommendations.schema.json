@@ -1,0 +1,15 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "title":"Inchelin authored recommendations v1",
+  "type":"object","required":["schemaVersion","restaurants"],
+  "properties":{
+    "schemaVersion":{"const":1},
+    "restaurants":{"type":"array","items":{"type":"object","required":["recommendations"],"anyOf":[{"required":["roadAddress"]},{"required":["parcelAddress"]}],"properties":{
+      "name":{"type":"string"},"roadAddress":{"type":"string","minLength":1},"parcelAddress":{"type":"string"},
+      "recommendations":{"type":"array","items":{"type":"object","required":["id"],"properties":{
+        "id":{"type":"string","minLength":1},"recommenderName":{"type":["string","null"]},"reason":{"type":["string","null"]},
+        "writtenAt":{"type":["string","null"],"format":"date-time"},"tags":{"type":"array","items":{"type":"string"}}
+      }}}
+    }}}
+  }
+}

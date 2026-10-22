@@ -22,6 +22,9 @@ import './naver-map.js';
 import { createChatTiming } from './request-timing.js';
 import './response-rules.js';
 import './phase1-core.js';
+import {createRecommendationCatalog, dedupeRestaurants} from './recommendations.js';
+const recommendationData = __RECOMMENDATION_DATA__;
+const recommendationCatalog = createRecommendationCatalog(recommendationData);
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2326,9 +2329,14 @@ async function phase1ChatResponse(latest,context,env,execution){
   state.shownPlaces=catalog;
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
-  const plan=(message,restaurants=[],{question='',choices=[],notice='',intent='place_search',error=false}={})=>chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
+  const plan=(message,restaurants=[],{question='',choices=[],notice='',intent='place_search',error=false}={})=>{
+    restaurants=recommendationCatalog.enrich(restaurants,c);
+    state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
+    state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
+    return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
     answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
     turnPolicy:{intro:message,questionText:question,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
+  };
   if(!c.location||parsed.ambiguous||parsed.unknownStation){
     state.lastCards=[];
     const question=parsed.ambiguous?'어느 역을 기준으로 찾을까요?':parsed.unknownStation?'어느 지역의 역인지 알려주시겠어요? 지금 선택 가능한 역도 아래에서 골라주세요.':'어디에서 드실 예정이세요? 동네나 역 이름을 직접 입력해 주셔도 돼요.';
@@ -2360,12 +2368,12 @@ async function phase1ChatResponse(latest,context,env,execution){
     places=measured.filter(item=>item.meters!==null&&item.meters<=c.radiusMeters).sort((a,b)=>a.meters-b.meters);
     if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'phase1_search',origin:c.location.label,query:result.query,radiusMeters:c.radiusMeters,providerCount:result.places.length,missingCoordinates:measured.filter(p=>p.meters===null).length,withinRadius:places.length,nearestMeters:measured.filter(p=>p.meters!==null).sort((a,b)=>a.meters-b.meters)[0]?.meters??null}));
   }catch{error=true;}
-  const selected=places.slice(0,3).map(({place,meters})=>{
+  const selected=dedupeRestaurants(places.map(({place,meters})=>{
     const card=restaurantCard(place,'naver','',c.location.label),address=card.roadAddress||card.parcelAddress||card.address||'';
     return {...card,...api.phase2Fields(),imageUrl:null,recommendationReason:'',recommendedBy:'',address,naverPlaceUrl:api.mapUrl(address),naverLink:api.mapUrl(address),distanceMeters:Math.round(meters),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label};
-  });
+  })).slice(0,3);
   state.lastCards=error?cards:selected;state.shownPlaces=[...new Map([...catalog,...selected].map(card=>[card.id,card])).values()].slice(-50);state.shownPlaceIds=state.shownPlaces.map(card=>card.id);state.noResults=!selected.length;
-  const notice=[c.food&&'음식 조건은 검색어에 반영했어요. 개별 메뉴 판매 여부는 방문 전 확인해 주세요.',c.budget&&'가격은 확인되지 않아 예산 충족 여부를 보장할 수 없어요.',(c.companion||c.people||c.purpose||c.vibe||c.parking)&&'인원·좌석·분위기·주차 조건은 매장 확인이 필요해요.',c.visit&&'방문 예정 시간은 기억해둘게요. 해당 시간의 영업 여부는 확인되지 않았어요.'].filter(Boolean).join(' ');
+  const notice=api.conditionNotice(c,parsed.visitExplicitThisTurn);
   const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
   return plan(message,selected,{choices:api.followups(c,{empty:!selected.length}),notice:selected.length?notice:'',error});
 }

@@ -1,0 +1,12 @@
+{
+  "schemaVersion":1,
+  "restaurants":[
+    {"name":"테스트 식당 0","roadAddress":"서울특별시 성동구 연무장길 0","recommendations":[
+      {"id":"fixture-a","recommenderName":"테스트 전용 작성자 하나","reason":"혼자 먹기 편하다는 테스트 원문입니다.\n원문 유지 <표시> & 확인함.","writtenAt":"2026-01-01T00:00:00Z","tags":["혼밥"]},
+      {"id":"fixture-b","recommenderName":"테스트 전용 작성자 둘","reason":"회식 관련 테스트 원문이에요.","writtenAt":"2026-02-01T00:00:00Z","tags":["회식"]},
+      {"id":"fixture-c","recommenderName":"테스트 전용 작성자 둘","reason":"같은 작성자의 별도 추천 테스트예요.","writtenAt":"2026-02-01T00:00:00Z","tags":[]}
+    ]},
+    {"name":"테스트 식당 1","roadAddress":"서울특별시 성동구 연무장길 1","recommendations":[{"id":"fixture-d","recommenderName":null,"reason":null,"writtenAt":null,"tags":[]}]},
+    {"name":"테스트 식당 2","roadAddress":"서울특별시 성동구 연무장길 2","recommendations":[]}
+  ]
+}

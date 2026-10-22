@@ -3,14 +3,15 @@ import {readFile} from 'node:fs/promises';
 import worker from '../build/dist/server/index.js';
 import {testPhase1Client} from './phase1-client-smoke.mjs';
 import {normalizeKoreanParticles} from '../worker/korean.js';
+import {testRecommendations} from './recommendations-smoke.mjs';
 const api=globalThis.InchelinPhase1;
 const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
 const dataset=query=>{const center=api.centers.find(c=>query.startsWith(c.label))||api.centers[0];return {items:[100,400,800,1000.2,2000].map((m,i)=>item(center,m,i))};};
-export async function runCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200}={}){
+export async function runCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200,workerOverride=worker}={}){
   const original=globalThis.fetch,calls=[];
   globalThis.fetch=async url=>{calls.push(String(url));assert.match(String(url),/naverapihub\.apigw\.ntruss\.com\/search\/v1\/local/,'AI/image/other live calls forbidden');return Response.json(typeof data==='function'?data(new URL(url).searchParams.get('query')):data,{status});};
-  try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName}})});const response=await worker.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
+  try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName}})});const response=await workerOverride.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
 }
 const c=r=>r.body.meta.responseModeState.phase1.conditions,s=r=>r.body.meta.responseModeState;
 for(const [h,m,p] of [[9,59,'morning'],[10,0,'lunch'],[13,59,'lunch'],[14,0,'afternoon'],[16,59,'afternoon'],[17,0,'evening'],[20,59,'evening'],[21,0,'lateNight'],[23,59,'lateNight'],[0,0,'lateNight'],[4,59,'lateNight'],[5,0,'morning']]){
@@ -53,6 +54,11 @@ const focusedState=s(bulk);focusedState.phase1.focusCardId=bulk.body.restaurants
 for(const r of [bulk,seongsu,noAddress])for(const card of r.body.restaurants){for(const key of ['imageUrl','menus','prices','recommenderName','otherRecommendations','openingHours'])assert.equal(card[key],null);assert.equal(card.recommendedBy,'');assert.equal(card.recommendationReason,'');}
 assert.equal(normalizeKoreanParticles('홍대은 냉면를 골라봐요.',['홍대','냉면']),'홍대는 냉면을 골라봐요.');
 const faq=await runCase('추천은 어떤 기준으로 하나요?');assert.equal(faq.calls.length,0);assert.equal(faq.body.restaurants.length,0);assert.match(faq.body.message,/직선거리 1km/);
-await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress});
+assert.deepEqual(noLocation.body.meta.conditionChips,[]);assert.deepEqual(foodOnly.body.meta.conditionChips,[]);
+assert.ok(bulk.body.meta.notice.split(/[.!?]/).filter(x=>x.trim()).length<=2);
+assert.ok(!/주차|분위기|시간|좌석/.test(bulk.body.meta.notice),'only applicable conditions');
+assert.ok(!/영업 여부|방문 시간/.test(remove.body.meta.notice),'do not repeat a retained visit notice');
+const v138Samples=await testRecommendations(runCase);
+await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples});
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
-console.log('v137 policy smoke passed: time boundaries/fallback 3; location-only; bulk and one-axis changes; Haversine 1km; Seongsu Italian fixtures; current/ambiguous station; no widening; address/null maps; compound intent/ordinals; phase-2 fields; actual client request/render and condition sheets. All upstream calls mocked.');
+console.log('v138 policy smoke passed: authored source/CSV/identity/representative ranking/exact text/count/flag off; enabled real Worker fixture and actual client toggle/render; concise notices/no early chips; all v137 time/location/distance/conditions/map/recovery cases. All upstream calls mocked; no keys or AI calls.');

@@ -39,6 +39,7 @@
     const people=text.match(/(\d+(?:\s*[~〜-]\s*\d+)?)\s*명/);if(people)c.people=people[1]+'명';
     const purpose=text.match(/회식|데이트|가족\s*모임|접대|비즈니스/);if(purpose)c.purpose=purpose[0];
     const visit=text.match(/(?:(?:오늘|내일|모레|이번\s*주말|다음\s*주|\d{1,2}월\s*\d{1,2}일)\s*)?(?:오전\s*\d{1,2}시|오후\s*\d{1,2}시|\d{1,2}시|아침|점심|오후|저녁|야식|늦은\s*밤)/);
+    const visitExplicitThisTurn=Boolean(visit||/내일|모레|오늘/.test(text)&&/갈|방문|먹/.test(text));
     if(visit)c.visit=visit[0];else if(/내일|모레|오늘/.test(text)&&/갈|방문|먹/.test(text))c.visit=text.match(/내일|모레|오늘/)[0];
     if(/조용|대화|아늑/.test(text))c.vibe=text.match(/조용|대화|아늑/)[0];
     if(/주차/.test(text))c.parking=true;
@@ -47,10 +48,14 @@
     if(/위치.*(?:삭제|해제|빼줘)|지역.*(?:삭제|해제|빼줘)/.test(text))c.location=null;
     const unknownStation=!matches.length&&!/현재\s*위치|내\s*주변/.test(text)&&(text.match(/([가-힣]{2,15}역)(?:에서|으로|로|\s|$)/)?.[1]||text.match(/([가-힣]{2,12})(?:에서)/)?.[1]);
     if(unknownStation)c.location=null;
-    return {conditions:c,ambiguous,unknownStation,invalidRadius,intents:[/비교|어디가\s*나아/.test(text)&&'compare',/지도/.test(text)&&'map',/영업|전화|메뉴\s*알려|가격|주차|주소|자세|상세/.test(text)&&'detail',/다시\s*추천|다른\s*곳/.test(text)&&'retry'].filter(Boolean)};
+    return {conditions:c,ambiguous,unknownStation,invalidRadius,visitExplicitThisTurn,intents:[/비교|어디가\s*나아/.test(text)&&'compare',/지도/.test(text)&&'map',/영업|전화|메뉴\s*알려|가격|주차|주소|자세|상세/.test(text)&&'detail',/다시\s*추천|다른\s*곳/.test(text)&&'retry'].filter(Boolean)};
   }
   const mapUrl=address=>{const full=String(address||'').replace(/<[^>]*>/g,'').trim();return full?'https://map.naver.com/p/search/'+encodeURIComponent(full):'';};
-  function conditionChips(c){return [c.location&&{key:'location',label:c.location.label}, {key:'radiusMeters',label:c.radiusMeters<1000?c.radiusMeters+'m 이내':c.radiusMeters/1000+'km 이내'},...['visit','food','budget','companion','people','purpose','vibe','parking'].filter(k=>c[k]!=null&&!(k==='people'&&c[k]===1)).map(key=>({key,label:key==='parking'?'주차 필요':String(c[key]),removable:true}))].filter(Boolean);}
+  function conditionChips(c){if(!c.location)return [];return [{key:'location',label:c.location.label}, {key:'radiusMeters',label:c.radiusMeters<1000?c.radiusMeters+'m 이내':c.radiusMeters/1000+'km 이내'},...['visit','food','budget','companion','people','purpose','vibe','parking'].filter(k=>c[k]!=null&&!(k==='people'&&c[k]===1)).map(key=>({key,label:key==='parking'?'주차 필요':String(c[key]),removable:true}))].filter(Boolean);}
+  function conditionNotice(c,visitExplicitThisTurn=false){
+    const missing=[c.food&&'메뉴 판매 여부',c.budget&&'가격',(c.companion||c.people||c.purpose)&&'좌석',c.vibe&&'분위기',c.parking&&'주차'].filter(Boolean);
+    return [missing.length?missing.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'',c.visit&&visitExplicitThisTurn?'말씀하신 시간의 영업 여부는 확인되지 않았어요.':''].filter(Boolean).join(' ');
+  }
   function followups(c,{empty=false,detail=false}={}){
     if(detail)return[{label:'네이버지도 보기',message:'네이버지도 보기'}];
     if(empty)return[{label:'2km로 확대',message:'2km 이내로 찾아줘'},...(c.food?[{label:'음식 변경',message:'음식 종류 변경'}]:[]),...(c.budget?[{label:'예산 변경',message:'예산 변경'}]:[]),{label:'지역·역 선택',message:'지역·역 선택'}].filter(x=>!(c.radiusMeters>=2000&&x.label==='2km로 확대')).slice(0,3);
@@ -62,5 +67,5 @@
   const period=hour=>hour>=5&&hour<10?'morning':hour>=10&&hour<14?'lunch':hour>=14&&hour<17?'afternoon':hour>=17&&hour<21?'evening':'lateNight';
   function welcome(hour,generated=[]){const p=period(hour);return [...new Set([...(Array.isArray(generated)?generated:[]).filter(s=>typeof s==='string'&&s.length>8&&!/영업|디저트|강남|홍대|역삼|성수|종로|여의도/.test(s)),...defaults[p]])].slice(0,3).map(prompt=>({label:prompt,prompt}));}
   const phase2Fields=()=>({imageUrl:null,menus:null,prices:null,recommenderName:null,recommendationReason:null,otherRecommendations:null,openingHours:null});
-  globalThis.InchelinPhase1=Object.freeze({centers,dishes,coords,distance,parse,mapUrl,conditionChips,followups,period,welcome,phase2Fields});
+  globalThis.InchelinPhase1=Object.freeze({centers,dishes,coords,distance,parse,mapUrl,conditionChips,conditionNotice,followups,period,welcome,phase2Fields});
 })();

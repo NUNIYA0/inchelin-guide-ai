@@ -906,6 +906,16 @@
     .restaurant-detail-area .restaurant-map-link {font-size:14px;min-height:44px;white-space:nowrap;}
     .disclaimer {font-size:13px;line-height:1.5;}
     @media(max-width:767px){.restaurant-card{height:auto;max-height:none;min-height:0;}.restaurant-address{padding-right:0;}.restaurant-detail-area{position:static;right:auto;bottom:auto;}}
+    /* Authored recommendations are distinct from AI copy and never truncated. */
+    .registered-recommendations {border-top:1px solid #e5e5e5;margin-top:12px;padding-top:12px;min-width:0;font:400 14px/1.6 system-ui,sans-serif;}
+    .registered-recommendation p {margin:0 0 8px;white-space:pre-wrap;overflow-wrap:anywhere;color:#333;}
+    .registered-recommendation .recommender-name {font-weight:600;}
+    .recommendations-toggle {min-height:44px;max-width:100%;padding:8px 12px;border:1px solid #ddd;border-radius:22px;background:#fff;font:400 14px/1.5 system-ui,sans-serif;cursor:pointer;white-space:normal;}
+    .recommendations-toggle:focus-visible {outline:2px solid #111;outline-offset:3px;}
+    .additional-recommendations[hidden] {display:none!important;}
+    .recommendations-separator {font-size:13px;color:#555;margin:12px 0;}
+    .recommendations-empty {font-size:14px;color:#555;margin:0;}
+    .restaurant-card.has-registered-recommendations {height:auto;max-height:none;}
   </style>
 </head>
 <body>
@@ -1083,9 +1093,11 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v137"></script>
-<script src="assets/naver-map.js?rules=v137"></script>
-<script src="assets/phase1-core.js?rules=v137"></script>
+<script src="assets/response-rules.js?rules=v138"></script>
+<script src="assets/naver-map.js?rules=v138"></script>
+<script src="assets/phase1-core.js?rules=v138"></script>
+<script src="assets/recommendation-flags.js?rules=v138"></script>
+<script src="assets/recommendations-ui.js?rules=v138"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1334,6 +1346,7 @@
         distanceMeters: restaurant.distanceMeters !== null && restaurant.distanceMeters !== undefined && Number.isFinite(Number(restaurant.distanceMeters)) ? Math.max(0, Math.round(Number(restaurant.distanceMeters))) : null,
         distanceKind:restaurant.distanceKind||'straight',originLabel:String(restaurant.originLabel||restaurant.regionLabel||''),
         recommendationReason: String(restaurant.recommendationReason || '').trim(),
+        recommendationBundle: globalThis.InchelinRecommendationsUI?.normalize(restaurant.recommendationBundle)||null,
         openingHours: String(restaurant.openingHours || '').trim(),
         representativeMenus: Array.isArray(restaurant.representativeMenus) ? restaurant.representativeMenus.map(item => String(item).trim()).filter(Boolean).slice(0, 8) : [],
         menuPrice: restaurant.menuPrice ?? null,
@@ -1873,6 +1886,8 @@
           image.addEventListener('error', () => media.remove(), { once: true }); media.appendChild(image); content.appendChild(media);
         }
         card.appendChild(content);
+        const authored=globalThis.InchelinRecommendationsUI?.render(restaurant.recommendationBundle);
+        if(authored){card.classList.add('has-registered-recommendations');card.appendChild(authored);}
         const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-compare restaurant-map-link';
         compare.restaurantName=restaurant.name;
         if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());

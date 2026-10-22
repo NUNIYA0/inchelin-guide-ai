@@ -1,0 +1,1 @@
+globalThis.InchelinRecommendationFlags={"enabled":false,"connected":false};

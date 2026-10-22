@@ -71,7 +71,7 @@ export function stripAnalysisFields(value, inAnalysis = false, path = []) {
   return Object.fromEntries(Object.entries(value).filter(([key]) =>
     !/^_|reasoning|notes?|rationale|explanation|^turn_text$|^summary$|^reason$/i.test(key)
       // Card/menu reasons are public, evidence-bound display fields, not analysis.
-      || (!path.includes('analysis') && path.includes('menuCards') && key === 'reason')
+      || (!path.includes('analysis') && (path.includes('menuCards') || path.includes('recommendationBundle')) && key === 'reason')
   ).filter(([key]) => !inAnalysis || allowedAnalysis.has(key)).map(([key, item]) => [key,
     // Only the root analysis object is allowlisted. Its typed routing children
     // keep their fields, while private-key stripping still recurses everywhere.

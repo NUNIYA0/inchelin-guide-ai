@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
+import '../dist/assets/recommendation-flags.js';
+import '../dist/assets/recommendations-ui.js';
 
 export async function testPhase1Client(runCase,samples){
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
@@ -53,9 +55,28 @@ export async function testPhase1Client(runCase,samples){
       const a=app({skew});a.api.type(prompt);await a.api.done();assert.equal(a.api.messages.length,2,prompt);assert.equal(a.requests.length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);
       assert.ok(a.elements.chatView.classList.contains('active'));assert.equal(a.elements.welcome.style.display,'none');assert.equal(a.api.busy,false);
       const hasLocation=/홍대|성수|강남역/.test(prompt);assert.equal(cls(a.elements.messages,'restaurant-card').length,hasLocation?3:0,prompt);assert.equal(cls(a.elements.messages,'turn-question').length,hasLocation?0:1);assert.ok(!/새 버전/.test(a.elements.messages.textContent));
+      if(!hasLocation)assert.equal(cls(a.elements.messages,'phase1-conditions').length,0,'no chips until location is resolved');
     }
     for(let index=0;index<3;index++){const a=app();a.api.clickRow(index);await a.api.done();assert.equal(a.api.messages.length,2);assert.equal(cls(a.elements.messages,'turn-question').length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);}
     const a=app();a.api.type('강남역에서 한식, 만 원 이하로');await a.api.done();
+    assert.equal(cls(a.elements.messages,'registered-recommendations').length,0,'production flag off');
+    const oldFlags=globalThis.InchelinRecommendationFlags;
+    try{
+      const off=app();off.api.render({role:'assistant',content:samples.enabled.body.message,restaurants:samples.enabled.body.restaurants,meta:samples.enabled.body.meta});assert.equal(cls(off.elements.messages,'registered-recommendations').length,0,'off ignores incoming authored records too');
+      globalThis.InchelinRecommendationFlags={enabled:true,connected:true};
+      const rec=app();rec.api.render({role:'assistant',content:samples.solo.body.message,restaurants:samples.solo.body.restaurants,meta:samples.solo.body.meta});
+      const sections=cls(rec.elements.messages,'registered-recommendations');assert.equal(sections.length,3);
+      assert.match(sections[0].textContent,/테스트 전용 작성자 하나/);assert.ok(sections[0].textContent.includes(samples.fixture.restaurants[0].recommendations[0].reason));
+      assert.match(sections[1].textContent,/추천인 정보 없음/);assert.match(sections[1].textContent,/추천 이유 없음/);assert.equal(cls(sections[1],'recommendations-toggle').length,0);
+      assert.match(sections[2].textContent,/등록된 추천이 없어요/);assert.equal(cls(sections[2],'recommendations-toggle').length,0);
+      const toggle=cls(sections[0],'recommendations-toggle')[0],extra=cls(sections[0],'additional-recommendations')[0];
+      assert.equal(toggle.textContent,'다른 추천 2개 보기');assert.equal(extra.hidden,true);
+      const beforeRequests=rec.requests.length,beforeConditions=JSON.stringify(rec.api.messages),links=cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href);
+      toggle.click();assert.equal(extra.hidden,false);assert.equal(toggle.attributes['aria-expanded'],'true');assert.equal(toggle.textContent,'다른 추천 접기');assert.match(extra.textContent,/── 다른 추천 2개 ──/);
+      assert.equal(cls(sections[0],'registered-recommendation').length,3);
+      toggle.click();assert.equal(extra.hidden,true);assert.equal(rec.requests.length,beforeRequests);assert.equal(JSON.stringify(rec.api.messages),beforeConditions);assert.deepEqual(cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href),links);
+      rec.api.render({role:'assistant',content:samples.solo.body.message,restaurants:samples.solo.body.restaurants,meta:samples.solo.body.meta});toggle.click();assert.equal(extra.hidden,false);assert.equal(cls(rec.elements.messages,'additional-recommendations').at(-1).hidden,true,'only the clicked card expands, including historical cards');
+    }finally{globalThis.InchelinRecommendationFlags=oldFlags;globalThis.document=a.document;}
     assert.ok(cls(a.elements.messages,'phase1-condition').length>=4);assert.match(a.elements.messages.textContent,/강남역에서 직선 100m/);
     const before=JSON.stringify(a.api.messages);const link=cls(a.elements.messages,'restaurant-map-link').find(n=>n.tagName==='A');assert.ok(link.href.includes(encodeURIComponent('서울특별시')));link.click();assert.equal(a.api.messages.length,2);assert.equal(a.api.request().context.responseModeState.phase1.focusCardId,a.api.messages[1].restaurants[0].id);assert.ok(before.includes('강남역'));
     await a.api.edit('radiusMeters');const dialog=a.document.body.children.at(-1);assert.equal(dialog.open,true);const five=flatten(dialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='500m 이내');five.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);assert.equal(a.api.request().context.responseModeState.phase1.conditions.food,'한식');
@@ -80,6 +101,6 @@ export async function testPhase1Client(runCase,samples){
     }
     const script=html.match(/<script>\s*([^]*?)<\/script>/g).at(-1)?.replace(/^<script>|<\/script>$/g,'');if(script)new Function(script);
     assert.match(html,/white-space:nowrap/);assert.match(html,/flex-wrap:wrap/);assert.match(html,/45000/);assert.match(html,/20000/);assert.match(html,/pointer: fine/);assert.match(html,/prefers-reduced-motion/);
-    console.log('v137 actual client smoke: missing-location/ready render + clock skew; conditions edit/remove; station sheet; full-address map + return state/focus; no-address disabled; network/JSON/zero/version retry; stop; mobile DOM/CSS contracts passed (no pixel/browser QA).');
+    console.log('v138 actual client smoke: authored exact pairs/missing fields/0-1-many counts/local expand-collapse/history/flag off; no early conditions; v137 missing-location/ready render, condition sheets, maps, retry/stop and mobile DOM/CSS contracts passed (no pixel/browser QA).');
   }finally{globalThis.document=originalDocument;globalThis.sessionStorage=originalStorage;}
 }
