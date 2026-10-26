@@ -6,6 +6,7 @@ import {normalizeKoreanParticles} from '../worker/korean.js';
 import {testRecommendations} from './recommendations-smoke.mjs';
 import {testPhase3} from './phase3-smoke.mjs';
 import {testPhase4} from './phase4-smoke.mjs';
+import {testConversationScroll} from './scroll-smoke.mjs';
 const api=globalThis.InchelinPhase1;
 const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
@@ -74,6 +75,7 @@ const v139Samples=await testPhase3(requestCase);
 const v140Samples=await testPhase4(requestCase);
 await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},requestCase);
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
+testConversationScroll(html);
 assert.ok(!/id="guide(?:Rail|Side)"/.test(html),'usage-guide navigation removed from both sidebar states');
 for(const id of ['aboutRail','aboutSide'])assert.match(html.match(new RegExp('<button[^>]+id="'+id+'"[^]*?</button>'))?.[0]||'',/src="assets\/guide-icon\.png"/,'introduction reuses the historic open-book asset');
 assert.ok(!/\['guideRail', 'guideSide'\]/.test(html),'removed controls have no click binding');
