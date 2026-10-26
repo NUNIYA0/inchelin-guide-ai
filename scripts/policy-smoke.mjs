@@ -77,4 +77,4 @@ const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
 assert.ok(!/id="guide(?:Rail|Side)"/.test(html),'usage-guide navigation removed from both sidebar states');
 assert.ok(!/\['guideRail', 'guideSide'\]/.test(html),'removed controls have no click binding');
 for(const id of ['newChatRail','newChatSide'])assert.match(html.match(new RegExp('<button[^>]+id="'+id+'"[^]*?</button>'))?.[0]||'',/<svg[^]*?<use href="#i-new-chat"\/>/,'new-chat icon remains in both sidebar states');
-console.log('v140 policy smoke passed: meal context vs mandatory opening; per-type session consent; broad category vs menu evidence; opt-in fictional catalogue isolation; representative ranking; budget filtering; v137–139 regressions. All upstream calls mocked; no keys or AI calls.');
+console.log('v142 policy smoke passed: demo catalogue and entry removed; retired demo flags ignored; consent/category/evidence/map/sidebar regressions. All upstream calls mocked; no keys or AI calls.');

@@ -20,7 +20,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
   }
   const originalDocument=globalThis.document,originalStorage=globalThis.sessionStorage;
   try{
-    function app({kind='',skew=0,clock=false,demo=false}={}){
+    function app({kind='',skew=0,clock=false}={}){
       const ids=['welcome','chatView','main','guidePanel','messages','welcomeInput','chatInput','chatSend','conversationBottom','comparisonTray','suggestions','welcomeForm'];const elements=Object.fromEntries(ids.map(id=>[id,new Node()]));
       const document={body:new Node('body'),createElement:tag=>new Node(tag),createElementNS:(ns,tag)=>new Node(tag),getElementById:id=>elements[id]||null};globalThis.document=document;
       const memory=new Map();globalThis.sessionStorage={setItem:(k,v)=>memory.set(k,v),getItem:k=>memory.get(k),removeItem:k=>memory.delete(k)};
@@ -34,7 +34,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
         result.body.meta.generatedAt+=skew;if(kind==='version')result.body.meta.responseRulesVersion='v136';return Response.json(result.body);
       };
       const source=`
-        const DEMO_MODE=${JSON.stringify(demo)},scopedKey=key=>DEMO_MODE?'inchelin-demo:'+key:key;
+        const scopedKey=key=>key;
         let currentId='old',chatMessages=[],currentLocationName='',currentLocationCoords=null,generating=false,autoFollowConversation=true,lastAIRequest=null,activeRequestController=null,generationTimers=[],conversationEpoch=0,locationRequestInFlight=false,regeneratingAnswer=false,pending;
         const answerRequests=new WeakMap(),AI_API_ENDPOINT='/api/chat',activeSuggestions=globalThis.InchelinPhase1.welcome(12);
         const $=s=>document.getElementById(s.slice(1)),qsa=()=>[],saveConversation=()=>{},updateShareVisibility=()=>{},leaveSharedConversation=()=>{},setSidebar=()=>{},showToast=()=>{},followConversation=()=>{},isNearConversationBottom=()=>true;
@@ -61,13 +61,6 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
     }
     for(let index=0;index<3;index++){const a=app();a.api.clickRow(index);await a.api.done();assert.equal(a.api.messages.length,2);assert.equal(cls(a.elements.messages,'turn-question').length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);}
     const gated=app({kind:'consent'});gated.api.type('강남역에서 한식, 만 원 이하로 혼자 먹을 거야');await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,0);assert.match(gated.elements.messages.textContent,/연결되지|미확인/);const consent=cls(gated.elements.messages,'quick-reply').find(n=>n.textContent==='미확인 후보 보기');assert.ok(consent);consent.click();await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,3);assert.ok(cls(gated.elements.messages,'condition-evidence').length);assert.match(gated.elements.messages.textContent,/미확인/);assert.equal(gated.api.request().context.responseModeState.phase1.conditions.budget,'1만 원 이하');
-    const demo=app({demo:true,kind:'consent'});demo.api.type('강남역에서 한식');await demo.api.done();
-    assert.equal(cls(demo.elements.messages,'registered-recommendations').length,3,'explicit demo works without enabling real source');
-    assert.ok(cls(demo.elements.messages,'restaurant-map-link').every(node=>node.tagName!=='A'),'fictional addresses cannot open maps');
-    const demoMore=cls(demo.elements.messages,'recommendations-toggle')[0],demoExtra=cls(demo.elements.messages,'additional-recommendations')[0];
-    const requestCount=demo.requests.length;demoMore.click();assert.equal(demoExtra.hidden,false);demoMore.click();assert.equal(demoExtra.hidden,true);assert.equal(demo.requests.length,requestCount);
-    const demoStatus=cls(demo.elements.messages,'verification-toggle')[0],demoEvidence=cls(demo.elements.messages,'condition-evidence')[0];
-    assert.equal(demoEvidence.hidden,true);demoStatus.click();assert.equal(demoEvidence.hidden,false);demoStatus.click();assert.equal(demoEvidence.hidden,true);assert.equal(demo.requests.length,requestCount);
     const a=app();a.api.type('강남역에서 한식, 만 원 이하로');await a.api.done();
     assert.equal(cls(a.elements.messages,'registered-recommendations').length,0,'production flag off');
     const oldFlags=globalThis.InchelinRecommendationFlags;
@@ -112,6 +105,6 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
     const script=html.match(/<script>\s*([^]*?)<\/script>/g).at(-1)?.replace(/^<script>|<\/script>$/g,'');if(script)new Function(script);
     assert.match(html,/white-space:nowrap/);assert.match(html,/flex-wrap:wrap/);assert.match(html,/45000/);assert.match(html,/20000/);assert.match(html,/pointer: fine/);assert.match(html,/prefers-reduced-motion/);
     assert.match(html,/\.restaurant-title-link::after\s*\{content:none;/,'no stretched link intercepting authored toggles');assert.match(html,/inchelin-active-chat/);assert.match(html,/aria-label="새 대화"/);
-    console.log('v140 client DOM smoke passed: opt-in demo + disabled fictional maps; local recommendation/evidence toggles; consent; chips; maps/state; geolocation mocks; retry/stop. Browser and physical-device QA are reported separately.');
+    console.log('v142 client DOM smoke passed: local recommendation/evidence toggles; consent; chips; maps/state; geolocation mocks; retry/stop.');
   }finally{globalThis.document=originalDocument;globalThis.sessionStorage=originalStorage;}
 }

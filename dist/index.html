@@ -939,20 +939,12 @@
     .location-manual-fallback {display:block;margin-top:12px;min-height:44px;}
     @media(max-width:767px){.restaurant-title-link h3{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}.registered-recommendations{margin-top:12px;}.restaurant-card{padding:16px;}.restaurant-address{white-space:normal;-webkit-line-clamp:2;display:-webkit-box;}.chat-input{scroll-margin-bottom:150px;}}
     @media(prefers-reduced-motion:reduce){.suggestion{transition:none;}}
-    .demo-banner {position:fixed;top:0;left:0;right:0;z-index:1100;height:64px;padding:8px 12px;background:#fff1bd;color:#302700;text-align:center;font:600 13px/20px system-ui,sans-serif;}
-    .demo-banner[hidden] {display:none;}
-    .demo-banner a {display:inline-block;margin-left:8px;min-height:32px;color:#111;text-decoration:underline;}
-    body.demo-mode {padding-top:64px;}
-    .demo-mode .mobile-header {top:64px;}
-    .demo-entry {display:inline-flex;align-items:center;min-height:44px;font:400 14px/1.5 system-ui,sans-serif;color:#555;text-decoration:underline;margin-top:16px;}
-    .demo-entry[hidden] {display:none;}
     .verification-summary {font:500 13px/1.6 system-ui,sans-serif;color:#444;margin:8px 0;overflow-wrap:anywhere;}
     .verification-toggle {min-height:44px;max-width:100%;border:1px solid #ddd;border-radius:22px;padding:8px 12px;background:white;font:400 14px/1.5 system-ui,sans-serif;}
     .condition-evidence[hidden] {display:none!important;}
   </style>
 </head>
 <body>
-  <div id="demoBanner" class="demo-banner" hidden>가상 데이터 체험 · 실제 식당·추천 정보가 아니에요. <a id="demoExit" href="/">실제 검색으로</a></div>
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
     <symbol id="i-arrow-down" viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></symbol>
     <symbol id="i-arrow-right" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
@@ -1030,7 +1022,6 @@
             </div>
           </form>
           <div class="suggestions" id="suggestions" aria-label="추천 질문"></div>
-          <a class="demo-entry" href="?demo=1">가상 데이터로 추천 기능 체험</a>
         </div>
 
         <div class="chat-view" id="chatView">
@@ -1126,11 +1117,11 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v141"></script>
-<script src="assets/naver-map.js?rules=v141"></script>
-<script src="assets/phase1-core.js?rules=v141"></script>
-<script src="assets/recommendation-flags.js?rules=v141"></script>
-<script src="assets/recommendations-ui.js?rules=v141"></script>
+<script src="assets/response-rules.js?rules=v142"></script>
+<script src="assets/naver-map.js?rules=v142"></script>
+<script src="assets/phase1-core.js?rules=v142"></script>
+<script src="assets/recommendation-flags.js?rules=v142"></script>
+<script src="assets/recommendations-ui.js?rules=v142"></script>
   <script>
   (($, qsa) => {
     // 콘텐츠와 기능 데이터는 이 객체에서 교체할 수 있습니다.
@@ -1160,9 +1151,7 @@
       ['요금제·사용량', '현재 데모에는 결제나 사용량 제한이 연결되어 있지 않습니다.']
     ];
 
-    const DEMO_MODE=new URLSearchParams(location.search).get('demo')==='1';
-    const scopedKey=key=>DEMO_MODE?'inchelin-demo:'+key:key;
-    if(DEMO_MODE){$('#demoBanner').hidden=false;document.body.classList.add('demo-mode');$('#demoExit').href=location.pathname;$('.demo-entry').hidden=true;}
+    const scopedKey=key=>key;
     const welcome = $('#welcome');
     const chatView = $('#chatView');
     const guidePanel = $('#guidePanel');
@@ -1344,7 +1333,7 @@
     }
     function normalizeRestaurant(restaurant) {
       if (!restaurant) return null;
-      if(Boolean(restaurant.isDemo)!==DEMO_MODE)return null;
+      if(restaurant.isDemo===true)return null; // Ignore retired demonstration cards in old shared/history payloads.
       const dataSource = restaurant.dataSource === 'inchelin' ? 'inchelin' : restaurant.dataSource === 'naver' ? 'naver' : '';
       if (!dataSource || (dataSource === 'inchelin' && restaurant.isRegisteredInInchelin !== true)) return null;
       if (dataSource === 'naver' && Number(restaurant.validationVersion || 0) < 2) return null;
@@ -1383,8 +1372,7 @@
         distanceMeters: restaurant.distanceMeters !== null && restaurant.distanceMeters !== undefined && Number.isFinite(Number(restaurant.distanceMeters)) ? Math.max(0, Math.round(Number(restaurant.distanceMeters))) : null,
         distanceKind:restaurant.distanceKind||'straight',originLabel:String(restaurant.originLabel||restaurant.regionLabel||''),
         recommendationReason: String(restaurant.recommendationReason || '').trim(),
-        isDemo:restaurant.isDemo===true,
-        recommendationBundle: globalThis.InchelinRecommendationsUI?.normalize(restaurant.recommendationBundle,{demo:DEMO_MODE})||null,
+        recommendationBundle: globalThis.InchelinRecommendationsUI?.normalize(restaurant.recommendationBundle)||null,
         registeredFacts: restaurant.registeredFacts||null,
         conditionVerification: restaurant.conditionVerification||null,
         openingHours: String(restaurant.openingHours || '').trim(),
@@ -1393,8 +1381,8 @@
         parking: restaurant.parking ?? null,
         privateRoom: typeof restaurant.privateRoom === 'boolean' ? restaurant.privateRoom : null,
         naverPlaceId: naverPlace.placeId,
-        naverPlaceUrl: restaurant.isDemo?'':globalThis.InchelinPhase1.mapUrl(restaurant.roadAddress||restaurant.address||restaurant.parcelAddress),
-        naverLink: DEMO_MODE?'':globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
+        naverPlaceUrl: globalThis.InchelinPhase1.mapUrl(restaurant.roadAddress||restaurant.address||restaurant.parcelAddress),
+        naverLink: globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
         isRegisteredInInchelin: dataSource === 'inchelin',
         dataSource
       };
@@ -1472,7 +1460,7 @@
       return `${location.origin}${location.pathname}#share=${encoded}`;
     }
     function updateShareVisibility() {
-      const visible = !DEMO_MODE&&!isSharedConversation && chatView.classList.contains('active') && chatMessages.some(message => message.role === 'user');
+      const visible = !isSharedConversation && chatView.classList.contains('active') && chatMessages.some(message => message.role === 'user');
       $('#shareButton').hidden = !visible;
       $('#mobileShareButton').hidden = !visible;
     }
@@ -1578,7 +1566,6 @@
         conversationId: currentId,
         messages: nextMessages,
         context: {
-          demoMode:DEMO_MODE,
           responseRulesVersion:globalThis.InchelinResponseRules.VERSION,
           currentLocalDatetime: state.localDateTime,
           timezone: state.timeZone,
@@ -1926,8 +1913,8 @@
         const menus=restaurant.registeredFacts?.menus||[];
         const menu=document.createElement('p');menu.className='registered-menu';menu.textContent=menus.length?menus.slice(0,2).map(m=>m.name+' · '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(' / '):'메뉴·가격 정보 없음';body.appendChild(menu);
         if(Number.isFinite(restaurant.distanceMeters)&&restaurant.originLabel){const distance=document.createElement('p');distance.className='restaurant-distance';distance.textContent=restaurant.originLabel+'에서 직선 '+restaurant.distanceMeters+'m';body.appendChild(distance);}
-        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.isDemo?'가상 위치 · 실제 주소 없음':restaurant.roadAddress || restaurant.address || '주소 정보 없음'; address.setAttribute('title',address.textContent);
-        const source=document.createElement('p');source.className='card-source';source.textContent=restaurant.isDemo?'가상 데이터 · 실제 식당 아님':restaurant.dataSource==='inchelin'?'인슐랭 앱 등록 식당':restaurant.recommendationBundle?.status==='matched'?'네이버 검색 · 앱 등록 추천 정보':'네이버 검색 · 앱 등록 추천 아님';
+        const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address || '주소 정보 없음'; address.setAttribute('title',address.textContent);
+        const source=document.createElement('p');source.className='card-source';source.textContent=restaurant.dataSource==='inchelin'?'인슐랭 앱 등록 식당':restaurant.recommendationBundle?.status==='matched'?'네이버 검색 · 앱 등록 추천 정보':'네이버 검색 · 앱 등록 추천 아님';
         let evidence=null;
         if(verification?.checks?.some(check=>check.key!=='distance')){evidence=document.createElement('div');evidence.className='condition-evidence';evidence.hidden=true;for(const check of verification.checks.filter(check=>check.key!=='distance')){const line=document.createElement('p');line.textContent=check.label+': '+(check.status==='confirmed'?'확인':check.status==='experience'?'추천인 경험':check.status==='failed'?'불충족':'미확인')+' — '+check.basis;evidence.appendChild(line);}}
         if (restaurant.imageUrl) {
@@ -1938,7 +1925,7 @@
         }else{const noPhoto=document.createElement('p');noPhoto.className='photo-missing';noPhoto.textContent='사진 정보 없음';content.appendChild(noPhoto);}
         content.appendChild(body);
         card.appendChild(content);
-        const authored=globalThis.InchelinRecommendationsUI?.render(restaurant.recommendationBundle,{demo:restaurant.isDemo});
+        const authored=globalThis.InchelinRecommendationsUI?.render(restaurant.recommendationBundle);
         if(authored){card.classList.add('has-registered-recommendations');card.appendChild(authored);}
         card.append(source,address);
         if(verification){const summary=document.createElement('p');summary.className='verification-summary';const unknown=verification.checks.filter(check=>check.status==='unknown').map(check=>check.label),known=verification.checks.filter(check=>check.status==='confirmed'&&check.key!=='distance').map(check=>check.label),failed=verification.checks.filter(check=>check.status==='failed').map(check=>check.label);summary.textContent=[known.length?known.join('·')+' 확인':'직선거리 확인',unknown.length?'미확인: '+unknown.join('·'):null,failed.length?'조건 불충족: '+failed.join('·'):null,verification.status==='experience'?'추천인의 경험 참고':null].filter(Boolean).join(' / ');card.appendChild(summary);}
@@ -1954,7 +1941,7 @@
           else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
           renderComparisonTray();
         });
-        const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link';map.textContent=restaurant.isDemo?'가상 데이터 · 지도 미제공':restaurant.naverPlaceUrl?'네이버지도 보기':'주소 정보 없음';
+        const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link';map.textContent=restaurant.naverPlaceUrl?'네이버지도 보기':'주소 정보 없음';
         if(restaurant.naverPlaceUrl){map.href=restaurant.naverPlaceUrl;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
         actions.append(map,compare); card.appendChild(actions); list.appendChild(card);
       });

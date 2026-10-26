@@ -24,7 +24,6 @@ import './response-rules.js';
 import './phase1-core.js';
 import {createRecommendationCatalog, dedupeRestaurants} from './recommendations.js';
 import {evaluateConditions,unknownScopes,consentKeys} from './condition-evidence.js';
-import {demoRecommendationSource} from './demo-recommendations.js';
 const recommendationData = __RECOMMENDATION_DATA__;
 const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
 
@@ -2320,28 +2319,28 @@ function restaurantResultsMessage(state, count, hasCoordinates) {
 }
 
 async function phase1ChatResponse(latest,context,env,execution){
-  const demoMode=context.demoMode===true,rawPrevious=context.responseModeState||{};
-  const api=globalThis.InchelinPhase1,previous=Boolean(rawPrevious.phase1?.demoMode)===demoMode?rawPrevious:{},prior=previous.phase1||{};
+  const rawPrevious=context.responseModeState||{};
+  const api=globalThis.InchelinPhase1,previous=rawPrevious.phase1?.demoMode===true?{}:rawPrevious,prior=previous.phase1||{};
   const migratedLocation=previous.slots?.use_current_location?api.parse('지금 내 주변에서 찾아줘',{},context).conditions.location:api.centers.find(c=>c.aliases.includes(previous.slots?.region)||c.label===previous.slots?.region)||null;
   // v136 meal_time could be inferred from the clock, so it is not a provided
   // optional condition. Only explicitly parsed v137 visit values are retained.
   const old=prior.conditions||{location:migratedLocation,food:previous.slots?.menu||previous.slots?.food_type||null,budget:previous.preferences?.budget||null,companion:previous.slots?.companion||null,vibe:previous.preferences?.vibe||null,parking:previous.slots?.parking??null,visit:null};
   const parsed=api.parse(latest,old,context),c=parsed.conditions;
-  const recommendationCatalog=demoMode?createRecommendationCatalog(demoRecommendationSource(c.location)):registeredRecommendationCatalog;
+  const recommendationCatalog=registeredRecommendationCatalog;
   const registeredOnly=/네이버.*(?:검색|찾)/.test(latest)?false:/등록.*(?:추천|식당)|추천인.*(?:있는|맛집)/.test(latest)||prior.registeredOnly===true;
   const acceptedUnknowns=consentKeys(prior,c,latest),scopes=unknownScopes(c),pendingScopes=scopes.filter(item=>!acceptedUnknowns.includes(item.key));
-  const state={...emptyResponseState(),slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{conditions:c,focusCardId:prior.focusCardId||null,acceptedUnknowns,pendingUnknowns:[],demoMode},lastCards:previous.lastCards||[]};
-  const cards=state.lastCards.slice(0,3),catalog=[...new Map([...(previous.shownPlaces||[]),...cards].filter(card=>card?.id).map(card=>[card.id,card])).values()].slice(-50);
+  const state={...emptyResponseState(),slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{conditions:c,focusCardId:prior.focusCardId||null,acceptedUnknowns,pendingUnknowns:[]},lastCards:(previous.lastCards||[]).filter(card=>!card.isDemo)};
+  const cards=state.lastCards.slice(0,3),catalog=[...new Map([...(previous.shownPlaces||[]),...cards].filter(card=>card?.id&&!card.isDemo).map(card=>[card.id,card])).values()].slice(-50);
   state.phase1.registeredOnly=registeredOnly;
   state.shownPlaces=catalog;
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
   const plan=(message,restaurants=[],{question='',choices=[],notice='',intent='place_search',error=false}={})=>{
-    restaurants=recommendationCatalog.enrich(restaurants,c).map(card=>({...card,isDemo:demoMode,...(demoMode?{naverPlaceUrl:'',naverLink:''}:{}),conditionVerification:evaluateConditions(card,c)}));
+    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...card,conditionVerification:evaluateConditions(card,c)}));
     state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
-    answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,demoMode,dataConnectionStatus:demoMode?'fictional_demo':recommendationCatalog.active?'connected_snapshot':'not_connected',conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
+    answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
     turnPolicy:{intro:message,questionText:question,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   if(!c.location||parsed.ambiguous||parsed.unknownStation){
@@ -2361,7 +2360,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   if(detailed){
     if(!targets.length || parsed.intents.includes('compare')&&targets.length<2)return plan('어느 식당을 말씀하시는지 골라주세요.',[],{question:parsed.intents.includes('compare')?'비교할 식당 두 곳은 어디인가요?':'어느 식당이 궁금하세요?',choices:cards.slice(0,3).map(card=>({label:card.name,message:card.name+' 자세히 알려줘'})),intent:'specific_place'});
     state.phase1.focusCardId=targets[0].id;
-    for(const card of targets)card.naverPlaceUrl=demoMode?'':api.mapUrl(card.roadAddress||card.address||card.parcelAddress);
+    for(const card of targets)card.naverPlaceUrl=api.mapUrl(card.roadAddress||card.address||card.parcelAddress);
     const info=targets.map(card=>`${card.name}: ${card.category||'음식 종류는 확인되지 않았어요'}, ${card.address||'주소 정보가 없어요'}${Number.isFinite(card.distanceMeters)?`, ${card.originLabel||c.location.label}에서 직선 ${Math.round(card.distanceMeters)}m`:''}`).join('\n');
     const details=targets.map(card=>{
       const menus=card.registeredFacts?.menus||[],parts=[],missing=[];
@@ -2370,7 +2369,7 @@ async function phase1ChatResponse(latest,context,env,execution){
       if(missing.length)parts.push(missing.join('·')+'는 지금 확인된 정보가 없어요. 방문 전 식당에 확인해 주세요.');
       return parts.length?card.name+': '+parts.join(' '):'';
     }).filter(Boolean).join('\n');
-    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&(demoMode?'가상 데이터에는 실제 주소가 없어 지도를 제공하지 않아요.':'주소로 네이버지도를 열 수 있어요. 건물이나 위치 검색 결과가 나올 수 있어요.'),details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1&&!demoMode?[{label:'네이버지도 보기',message:targets[0].name+' 네이버지도 보기',url:targets[0].naverPlaceUrl||'',disabled:!targets[0].address}]:[]});
+    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&'주소로 네이버지도를 열 수 있어요. 건물이나 위치 검색 결과가 나올 수 있어요.',details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1?[{label:'네이버지도 보기',message:targets[0].name+' 네이버지도 보기',url:targets[0].naverPlaceUrl||'',disabled:!targets[0].address}]:[]});
   }
   const editing=/^(?:음식\s*종류\s*변경|다른\s*메뉴로|예산\s*변경|방문\s*시간\s*변경|인원\s*변경)$/;
   if(editing.test(latest))return plan('바꾸고 싶은 조건을 골라주세요.',[],{question:/예산/.test(latest)?'예산을 어떻게 바꿀까요?':'어떤 음식으로 바꿀까요?',choices:/예산/.test(latest)?[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'예산 해제',message:'예산 제한 없애줘'}]:['한식','파스타','냉면'].map(label=>({label,message:label+'로 찾아줘'}))});
@@ -2384,7 +2383,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label,naverPlaceUrl:api.mapUrl(card.roadAddress||card.parcelAddress||card.address)})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
   const deferredExternal=!registeredOnly&&unsupported.length>0&&registered.length<3;
   try{
-    if(registered.length<3&&!registeredOnly&&!deferredExternal&&!demoMode){
+    if(registered.length<3&&!registeredOnly&&!deferredExternal){
     const provider=new NaverRestaurantProvider(env),result=await execution.measure('search',()=>provider.searchRestaurants({messages:[{role:'user',content:latest}],locationName:c.location.query||c.location.label,intentAnalysis:{phase1:true,location:c.location.query||c.location.label,foodCategory:c.food||'',needsRestaurantSearch:true}}));
     if(!result.configured||result.errorCode)throw new Error('search_unavailable');
     const measured=result.places.map(place=>({place,meters:api.distance(c.location,place.registered_data)}));
