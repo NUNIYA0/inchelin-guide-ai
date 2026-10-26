@@ -37,12 +37,12 @@ export async function testRecommendations(runCase){
   await assert.rejects(loadRecommendationSource(fileURLToPath(loaderRoot),{enabled:true,connected:true,source:'data/missing.json',format:'json'}),/ENOENT/);
   assert.equal((await loadRecommendationSource(root,{enabled:false,connected:false,source:'missing'})).restaurants.length,0);
   await assert.rejects(loadRecommendationSource(root,{enabled:true,connected:true,source:'../secret',format:'json'}),/inside data/);
-  const config=JSON.parse(await readFile(new URL('../data/recommendation-source.json',import.meta.url),'utf8'));assert.equal(config.enabled,false);assert.equal(config.connected,false);
+  const config=JSON.parse(await readFile(new URL('../data/recommendation-source.json',import.meta.url),'utf8'));assert.equal(config.enabled,true);assert.equal(config.connected,true);
   const workerText=await readFile(new URL('../build/dist/server/index.js',import.meta.url),'utf8');
   async function checkAssets(directory){for(const item of await readdir(directory,{withFileTypes:true})){const path=new URL(item.name+(item.isDirectory()?'/':''),directory);if(item.isDirectory())await checkAssets(path);else if(/\.(?:js|html|json)$/.test(item.name))assert.ok(!(await readFile(path,'utf8')).includes('테스트 전용 작성자'),'no fictional author in deployable assets: '+item.name);}}
   await checkAssets(new URL('../dist/',import.meta.url));
   assert.ok(!workerText.includes('테스트 전용 작성자'),'fixtures never embedded');
-  assert.match(workerText,/const recommendationData = \{"schemaVersion":1,"enabled":false,"connected":false,"restaurants":\[\]\};/);
+  assert.match(workerText,/"exclusive":true/);
   // A test-only copy of the real built Worker, never placed in deployable dist/.
   const testPath=new URL('../build/dist/server/index.recommendations-test.js',import.meta.url);
   const injected=workerText.replace(/const recommendationData = [^\n]+;/,'const recommendationData = '+JSON.stringify({...fixture,enabled:true,connected:true})+';');

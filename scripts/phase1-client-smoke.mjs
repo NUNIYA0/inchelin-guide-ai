@@ -4,6 +4,8 @@ import '../dist/assets/recommendation-flags.js';
 import '../dist/assets/recommendations-ui.js';
 
 export async function testPhase1Client(runCase,samples,requestCase=runCase){
+  const deploymentFlags=globalThis.InchelinRecommendationFlags;
+  globalThis.InchelinRecommendationFlags={enabled:false,connected:false};
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
   const fn=name=>{const value=html.match(new RegExp('    (?:async )?function '+name+'\\([^]*?\\n    \\}'))?.[0];assert.ok(value,name);return value;};
   const flatten=n=>[n,...n.children.flatMap(flatten)],cls=(root,name)=>flatten(root).filter(n=>n.className.split(' ').includes(name));
@@ -106,5 +108,5 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
     assert.match(html,/white-space:nowrap/);assert.match(html,/flex-wrap:wrap/);assert.match(html,/45000/);assert.match(html,/20000/);assert.match(html,/pointer: fine/);assert.match(html,/prefers-reduced-motion/);
     assert.match(html,/\.restaurant-title-link::after\s*\{content:none;/,'no stretched link intercepting authored toggles');assert.match(html,/inchelin-active-chat/);assert.match(html,/aria-label="새 대화"/);
     console.log('v142 client DOM smoke passed: local recommendation/evidence toggles; consent; chips; maps/state; geolocation mocks; retry/stop.');
-  }finally{globalThis.document=originalDocument;globalThis.sessionStorage=originalStorage;}
+  }finally{globalThis.document=originalDocument;globalThis.sessionStorage=originalStorage;globalThis.InchelinRecommendationFlags=deploymentFlags;}
 }

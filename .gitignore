@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 /build/
+/data/private/
 /dist/server/
 /dist/.openai/
 /dist/assets/search-axes-data-v1.js

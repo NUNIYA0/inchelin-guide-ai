@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
-  "enabled": false,
-  "connected": false,
-  "source": null,
+  "enabled": true,
+  "connected": true,
+  "source": "data/private/restaurants-261026.json",
   "format": "json"
 }

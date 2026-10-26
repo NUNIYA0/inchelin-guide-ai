@@ -26,6 +26,7 @@ import {createRecommendationCatalog, dedupeRestaurants} from './recommendations.
 import {evaluateConditions,unknownScopes,consentKeys} from './condition-evidence.js';
 const recommendationData = __RECOMMENDATION_DATA__;
 const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
+import {resolveRegisteredCards} from './registered-search.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -918,7 +919,7 @@ function faqSimilarity(left, right) {
 function serviceFaqAnswer(text, subIntent, source) {
   const normalizedQuestion = value => String(value || "").replace(/[^0-9a-z가-힣]/gi, "").toLowerCase();
   const exact = SERVICE_FAQ.items.find(item => item.examples.some(example => normalizedQuestion(example) === normalizedQuestion(text)));
-  if (exact) return exact.answer?.[source] || exact.answer?.default || SERVICE_FAQ.fallback_answer;
+  if (exact) return (registeredRecommendationCatalog.exclusive&&exact.answer?.registered)||exact.answer?.[source] || exact.answer?.default || SERVICE_FAQ.fallback_answer;
   if (subIntent === "wine") return SERVICE_FAQ.items.find(item => item.id === "wine.preparing")?.answer?.default || SERVICE_FAQ.fallback_answer;
   const candidates = SERVICE_FAQ.items.filter(item => item.sub_intent === subIntent);
   const inputTokens = new Set(faqTokens(text));
@@ -932,7 +933,7 @@ function serviceFaqAnswer(text, subIntent, source) {
   })).sort((a, b) => b.score - a.score);
   const matched = ranked[0]?.score >= 0.45 ? ranked[0].item : null;
   if (!matched?.answer) return SERVICE_FAQ.fallback_answer;
-  return matched.answer[source] || matched.answer.default || SERVICE_FAQ.fallback_answer;
+  return (registeredRecommendationCatalog.exclusive&&matched.answer.registered)||matched.answer[source] || matched.answer.default || SERVICE_FAQ.fallback_answer;
 }
 
 async function modeAResponse(analysis, state, env, messages = []) {
@@ -1861,11 +1862,11 @@ class NaverRestaurantProvider {
     this.source = "naver";
   }
 
-  async searchRestaurants({ messages, locationName, intentAnalysis, suggestionCheck = false }) {
+  async searchRestaurants({ messages, locationName, intentAnalysis, suggestionCheck = false, exactQuery = '' }) {
     const endpoint = trustedEndpoint(this.env.NAVER_LOCAL_SEARCH_API_URL || "https://naverapihub.apigw.ntruss.com/search/v1/local");
     const clientId = safeText(this.env.NAVER_API_HUB_CLIENT_ID, 300);
     const clientSecret = safeText(this.env.NAVER_API_HUB_CLIENT_SECRET, 300);
-    const queries = naverRestaurantSearchQueries(messages, locationName, intentAnalysis);
+    const queries = exactQuery?[exactQuery]:naverRestaurantSearchQueries(messages, locationName, intentAnalysis);
     const query = queries[0] || "맛집";
     if (!endpoint || !clientId || !clientSecret) {
       providerDebugLog(this.env, "search_skipped", {
@@ -2327,7 +2328,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const old=prior.conditions||{location:migratedLocation,food:previous.slots?.menu||previous.slots?.food_type||null,budget:previous.preferences?.budget||null,companion:previous.slots?.companion||null,vibe:previous.preferences?.vibe||null,parking:previous.slots?.parking??null,visit:null};
   const parsed=api.parse(latest,old,context),c=parsed.conditions;
   const recommendationCatalog=registeredRecommendationCatalog;
-  const registeredOnly=/네이버.*(?:검색|찾)/.test(latest)?false:/등록.*(?:추천|식당)|추천인.*(?:있는|맛집)/.test(latest)||prior.registeredOnly===true;
+  const registeredOnly=recommendationCatalog.exclusive||(/네이버.*(?:검색|찾)/.test(latest)?false:/등록.*(?:추천|식당)|추천인.*(?:있는|맛집)/.test(latest)||prior.registeredOnly===true);
   const acceptedUnknowns=consentKeys(prior,c,latest),scopes=unknownScopes(c),pendingScopes=scopes.filter(item=>!acceptedUnknowns.includes(item.key));
   const state={...emptyResponseState(),slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{conditions:c,focusCardId:prior.focusCardId||null,acceptedUnknowns,pendingUnknowns:[]},lastCards:(previous.lastCards||[]).filter(card=>!card.isDemo)};
   const cards=state.lastCards.slice(0,3),catalog=[...new Map([...(previous.shownPlaces||[]),...cards].filter(card=>card?.id&&!card.isDemo).map(card=>[card.id,card])).values()].slice(-50);
@@ -2340,7 +2341,7 @@ async function phase1ChatResponse(latest,context,env,execution){
     state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
-    answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
+    answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',...(recommendationCatalog.exclusive?{registeredData:{count:recommendationCatalog.entries().length,sourceDate:recommendationData.sourceDate,sourceHash:recommendationData.sourceHash,exclusive:true}}:{}),conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
     turnPolicy:{intro:message,questionText:question,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   if(!c.location||parsed.ambiguous||parsed.unknownStation){
@@ -2365,7 +2366,9 @@ async function phase1ChatResponse(latest,context,env,execution){
     const details=targets.map(card=>{
       const menus=card.registeredFacts?.menus||[],parts=[],missing=[];
       if(/메뉴|가격/.test(latest)){if(menus.length)parts.push(menus.map(m=>m.name+' '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(', '));else missing.push('메뉴·가격');}
-      if(/영업|전화|주차|좌석/.test(latest)){if(/영업/.test(latest))missing.push('영업시간');if(/전화/.test(latest))missing.push('전화번호');if(/주차/.test(latest))missing.push('주차');if(/좌석/.test(latest))missing.push('좌석');}
+      if(/영업/.test(latest)){if(card.registeredFacts?.openingHoursText)parts.push('엑셀에 수집된 영업시간: '+card.registeredFacts.openingHoursText+' (방문 전 재확인해 주세요)');else missing.push('영업시간');}
+      if(/전화/.test(latest)){if(card.registeredFacts?.phone)parts.push('연락처: '+card.registeredFacts.phone);else missing.push('전화번호');}
+      if(/주차/.test(latest))missing.push('주차');if(/좌석/.test(latest))missing.push('좌석');
       if(missing.length)parts.push(missing.join('·')+'는 지금 확인된 정보가 없어요. 방문 전 식당에 확인해 주세요.');
       return parts.length?card.name+': '+parts.join(' '):'';
     }).filter(Boolean).join('\n');
@@ -2380,7 +2383,16 @@ async function phase1ChatResponse(latest,context,env,execution){
     return plan(`${unsupported.join('·')} 정보는 현재 확인할 수 없어요. 이 항목이 미확인인 식당도 볼지 선택해 주세요.`,[],{question:'미확인 항목을 표시하고 지역·음식으로 검색해볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
   }
   let places=[],error=false;
-  const registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label,naverPlaceUrl:api.mapUrl(card.roadAddress||card.parcelAddress||card.address)})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
+  let registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label,naverPlaceUrl:api.mapUrl(card.roadAddress||card.parcelAddress||card.address)})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
+  if(recommendationCatalog.exclusive){
+    const provider=new NaverRestaurantProvider(env);
+    const resolved=await execution.measure('registered_coordinates',()=>resolveRegisteredCards(recommendationCatalog,c,api,async row=>{
+      const area=String(row.roadAddress||'').split(/\s+/).slice(0,2).join(' ');
+      const result=await provider.searchRestaurants({messages:[{role:'user',content:row.name}],locationName:area,intentAnalysis:{phase1:true,location:area,foodCategory:'',needsRestaurantSearch:true},exactQuery:row.name+' '+area});
+      if(!result.configured||result.errorCode)throw new Error('registered_lookup_failed');return result.places;
+    }));
+    registered=resolved.cards;if(resolved.attempted>0&&resolved.failures===resolved.attempted)error=true;
+  }
   const deferredExternal=!registeredOnly&&unsupported.length>0&&registered.length<3;
   try{
     if(registered.length<3&&!registeredOnly&&!deferredExternal){

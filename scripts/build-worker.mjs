@@ -45,6 +45,7 @@ const requestTiming=await readFile(join(root,'worker','request-timing.js'),'utf8
 const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8');
 const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');
 const recommendations=await readFile(join(root,'worker','recommendations.js'),'utf8');
+const registeredSearch=await readFile(join(root,'worker','registered-search.js'),'utf8');
 const conditionEvidence=await readFile(join(root,'worker','condition-evidence.js'),'utf8');
 const recommendationConfig=JSON.parse(await readFile(join(root,'data','recommendation-source.json'),'utf8'));
 const recommendationData=await loadRecommendationSource(root,recommendationConfig);
@@ -70,6 +71,8 @@ const turnPolicy = await readFile(join(root, "worker", "turn-policy.js"), "utf8"
 const conversationCopy = await readFile(join(root, "worker", "conversation-copy.js"), "utf8");
 const answerPlan = await readFile(join(root, 'worker', 'answer-plan.js'), 'utf8');
 const serviceFaq = JSON.parse(await readFile(join(root, "data", "service-faq.json"), "utf8"));
+const registeredFaq=JSON.parse(await readFile(join(root,'data','registered-faq.json'),'utf8'));
+for(const item of serviceFaq.items)if(registeredFaq[item.id])item.answer.registered=registeredFaq[item.id];
 const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
   .replace("__ASSETS__", JSON.stringify(assets))
@@ -84,6 +87,8 @@ await Promise.all([
   }),
   writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(outputRoot, 'dist', 'server', 'recommendations.js'), recommendations),
+  writeFile(join(outputRoot, 'dist', 'server', 'registered-search.js'), registeredSearch),
+  writeFile(join(hostingOutputRoot, 'server', 'registered-search.js'), registeredSearch),
   writeFile(join(outputRoot, 'dist', 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'recommendations.js'), recommendations),
