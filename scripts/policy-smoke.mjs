@@ -75,6 +75,7 @@ const v140Samples=await testPhase4(requestCase);
 await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},requestCase);
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
 assert.ok(!/id="guide(?:Rail|Side)"/.test(html),'usage-guide navigation removed from both sidebar states');
+for(const id of ['aboutRail','aboutSide'])assert.match(html.match(new RegExp('<button[^>]+id="'+id+'"[^]*?</button>'))?.[0]||'',/src="assets\/guide-icon\.png"/,'introduction reuses the historic open-book asset');
 assert.ok(!/\['guideRail', 'guideSide'\]/.test(html),'removed controls have no click binding');
 for(const id of ['newChatRail','newChatSide'])assert.match(html.match(new RegExp('<button[^>]+id="'+id+'"[^]*?</button>'))?.[0]||'',/<svg[^]*?<use href="#i-new-chat"\/>/,'new-chat icon remains in both sidebar states');
 console.log('v142 policy smoke passed: demo catalogue and entry removed; retired demo flags ignored; consent/category/evidence/map/sidebar regressions. All upstream calls mocked; no keys or AI calls.');
