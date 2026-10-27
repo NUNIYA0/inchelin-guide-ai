@@ -26,5 +26,8 @@
 .radius-answer .quick-reply {border:1px solid #d0d5dc;background:#fff;}
 .radius-answer .quick-reply.history-selected {border:1px solid #252a32;background:#f1f2f5;font-weight:600!important;}
 .radius-answer .quick-reply.history-selected .quick-reply-title {font-weight:600!important;}
+/* Answer controls stay pill-shaped in every question layout, including full rows. */
+.answer-chips .quick-reply.quick-reply-chip {border-radius:999px;white-space:nowrap;}
+.answer-question .answer-chips .quick-reply.quick-reply-chip {border-radius:999px;}
 @media(max-width:767px){.restaurant-group .restaurant-list{grid-auto-columns:88%;}.restaurant-group .restaurant-list[data-single=true]{max-width:100%;}.restaurant-card .restaurant-card-body{padding:14px 14px 0;}.restaurant-card .registered-recommendations{margin-inline:14px;}.restaurant-card .restaurant-detail-area{padding:14px;}.restaurant-carousel-header{margin-top:14px;}}
 @media(prefers-reduced-motion:reduce){.restaurant-list{scroll-behavior:auto;}}
