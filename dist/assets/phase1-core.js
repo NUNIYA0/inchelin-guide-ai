@@ -10,6 +10,11 @@
     {label:'여의도역',latitude:37.52162,longitude:126.92424,aliases:['여의도역','여의도']},
   ];
   // Representative station points, not exits or walking-route origins. WGS84.
+  function locationOptions(){return centers.flatMap(center=>{
+    const area=center.aliases.at(-1);
+    return [{id:'station:'+center.label,label:center.label,type:'station',centerLabel:center.label,latitude:center.latitude,longitude:center.longitude,detail:area+' · 등록된 역 기준점'},
+      {id:'region:'+area,label:area,type:'region',centerLabel:center.label,latitude:center.latitude,longitude:center.longitude,detail:center.label+'을 기준으로 검색'}];
+  });}
   const dishes=['삼겹살','제육볶음','순두부찌개','김치찌개','설렁탕','국밥','곰탕','냉면','칼국수','쌀국수','라멘','우동','초밥','스시','돈까스','파스타','스파게티','피자','스테이크','리소토','마라탕','짜장면','짬뽕','떡볶이','김밥','비빔밥','치킨','갈비','불고기','샐러드','한식','중식','일식','양식','분식','카페','고기'];
   const clean=s=>String(s||'').replace(/<[^>]*>/g,'').trim().slice(0,200);
   const coords=p=>p&&p.latitude!=null&&p.longitude!=null&&p.latitude!==''&&p.longitude!==''&&Number.isFinite(Number(p.latitude))&&Number.isFinite(Number(p.longitude))&&Math.abs(Number(p.latitude))<=90&&Math.abs(Number(p.longitude))<=180&&!(Number(p.latitude)===0&&Number(p.longitude)===0)?{latitude:Number(p.latitude),longitude:Number(p.longitude)}:null;
@@ -22,6 +27,8 @@
     const matches=findCenters(text),unique=[...new Set(matches.map(m=>m.center.label))];
     let ambiguous=/이나|또는|어디(?:로|가)/.test(text)&&unique.length>1;
     if(matches.length&&!ambiguous)c.location={...matches.at(-1).center,kind:'station'};
+    const picked=locationOptions().find(option=>option.id===context.locationSelection?.id);
+    if(picked&&picked.label===context.locationSelection.label&&picked.latitude===context.locationSelection.latitude&&picked.longitude===context.locationSelection.longitude){const center=centers.find(row=>row.label===picked.centerLabel);c.location={...center,kind:'station',id:picked.id,selectionLabel:picked.label};ambiguous=false;}
     if(/현재\s*위치|내\s*주변|지금\s*내\s*주변/.test(text)){
       const current=coords(context.currentLocation);
       c.location=current?{...current,label:'현재 위치',kind:'current',query:context.currentLocationName&&context.currentLocationName!=='현재 위치'?clean(context.currentLocationName):centers.slice().sort((a,b)=>distance(a,current)-distance(b,current))[0].label}:null;
@@ -78,5 +85,5 @@
   const period=hour=>hour>=5&&hour<10?'morning':hour>=10&&hour<14?'lunch':hour>=14&&hour<17?'afternoon':hour>=17&&hour<21?'evening':'lateNight';
   function welcome(hour,generated=[]){const p=period(hour);return [...new Set([...(Array.isArray(generated)?generated:[]).filter(s=>typeof s==='string'&&s.length>8&&!/영업|디저트|강남|홍대|역삼|성수|종로|여의도/.test(s)),...defaults[p]])].slice(0,3).map(prompt=>({label:prompt,prompt}));}
   const phase2Fields=()=>({imageUrl:null,menus:null,prices:null,recommenderName:null,recommendationReason:null,otherRecommendations:null,openingHours:null});
-  globalThis.InchelinPhase1=Object.freeze({centers,dishes,coords,distance,parse,mapUrl,conditionChips,conditionNotice,followups,period,welcome,phase2Fields});
+  globalThis.InchelinPhase1=Object.freeze({centers,locationOptions,dishes,coords,distance,parse,mapUrl,conditionChips,conditionNotice,followups,period,welcome,phase2Fields});
 })();

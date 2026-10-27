@@ -32,7 +32,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
         if(kind==='network')throw new Error('network');
         if(kind==='hang')return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('stopped'),{name:'AbortError'}))));
         if(kind==='json')return new Response('{');
-        const result=await(kind==='consent'?requestCase:runCase)(request.messages.at(-1).content,{state:request.context.responseModeState,demoMode:request.context.demoMode,...(kind==='zero'?{data:{items:[]}}:{})});
+        const result=await(kind==='consent'?requestCase:runCase)(request.messages.at(-1).content,{state:request.context.responseModeState,locationSelection:request.context.locationSelection,demoMode:request.context.demoMode,...(kind==='zero'?{data:{items:[]}}:{})});
         result.body.meta.generatedAt+=skew;if(kind==='version')result.body.meta.responseRulesVersion='v136';return Response.json(result.body);
       };
       const source=`
@@ -105,7 +105,41 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
     const before=JSON.stringify(a.api.messages);const link=cls(a.elements.messages,'restaurant-map-link').find(n=>n.tagName==='A');assert.ok(link.href.includes(encodeURIComponent('서울특별시')));link.click();assert.equal(a.api.messages.length,2);assert.equal(a.api.request().context.responseModeState.phase1.focusCardId,a.api.messages[1].restaurants[0].id);assert.ok(before.includes('강남역'));
     await a.api.edit('radiusMeters');const dialog=a.document.body.children.at(-1);assert.equal(dialog.open,true);assert.equal(flatten(dialog).find(n=>n.textContent==='1km 이내').attributes['aria-pressed'],'true');assert.ok(flatten(dialog).some(n=>n.placeholder==='예: 800m, 1.5km'));const five=flatten(dialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='500m 이내');five.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);assert.equal(a.api.request().context.responseModeState.phase1.conditions.food,'한식');
     const latestConditions=cls(a.elements.messages,'phase1-conditions').at(-1);const remove=flatten(latestConditions).find(n=>n.attributes['aria-label']==='1만 원 이하 해제');remove.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.budget,null);assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
-    await a.api.edit('location');const regionDialog=a.document.body.children.at(-1);flatten(regionDialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='역삼역').click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.location.label,'역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
+    await a.api.edit('location');const regionDialog=a.document.body.children.at(-1);flatten(regionDialog).find(n=>n.attributes['aria-label']==='역삼역 지하철역').click();
+    assert.equal(cls(regionDialog,'location-apply')[0].disabled,false);cls(regionDialog,'location-apply')[0].click();await a.api.done();
+    assert.equal(a.requests.at(-1).context.locationSelection.id,'station:역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.location.id,'station:역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.location.label,'역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
+    {
+      const {createLocationPicker}=await import('../dist/assets/location-picker.js'),catalog=globalThis.InchelinPhase1.locationOptions(),p=app(),sent=[];
+      const flush=async()=>{await Promise.resolve();await Promise.resolve();};
+      const picker=createLocationPicker({send:(...args)=>sent.push(args)});picker.open();await flush();const dialog=picker.dialog;
+      const find=name=>cls(dialog,name)[0],filter=value=>cls(dialog,'location-filter').find(n=>n.dataset.filter===value);
+      assert.equal(find('location-apply').disabled,true);assert.equal(find('location-search').querySelectorAll('.location-clear').length,1);
+      assert.equal(cls(dialog,'location-result').length,catalog.length);assert.equal(find('location-search').children.find(n=>n.tagName==='INPUT').value,'');
+      filter('station').click();await flush();assert.equal(cls(dialog,'location-result').length,7);
+      const input=flatten(dialog).find(n=>n.tagName==='INPUT');input.value='홍대';input.events.input();await flush();assert.equal(cls(dialog,'location-result').length,1);
+      filter('region').click();await flush();assert.equal(cls(dialog,'location-result').length,1);
+      const row=cls(dialog,'location-result')[0];row.click();assert.equal(row.attributes['aria-checked'],'true');assert.equal(find('location-apply').disabled,false);
+      find('location-apply').click();assert.equal(dialog.open,false);assert.equal(sent[0][0],'홍대에서 추천해줘');assert.equal(sent[0][1].locationSelection.id,'region:홍대');
+      const selected=sent[0][1].locationSelection,parsed=globalThis.InchelinPhase1.parse(sent[0][0],{radiusMeters:500,food:'냉면'},{locationSelection:selected}).conditions;
+      assert.equal(parsed.location.latitude,selected.latitude);assert.equal(parsed.location.longitude,selected.longitude);assert.equal(parsed.radiusMeters,500);assert.equal(parsed.food,'냉면');
+      picker.open();await flush();assert.equal(input.value,'홍대','previous input node is detached');const freshInput=flatten(dialog).find(n=>n.tagName==='INPUT');assert.equal(freshInput.value,'');assert.equal(find('location-apply').disabled,true);
+      freshInput.value='광화문';freshInput.events.input();await flush();assert.equal(cls(dialog,'location-result').length,0,'unsupported mockup place is not fabricated');assert.match(find('location-status').textContent,/결과가 없어요/);
+      find('location-clear').click();await flush();assert.equal(cls(dialog,'location-result').length,catalog.length);
+      cls(dialog,'location-result')[1].click();assert.equal(cls(dialog,'location-result').filter(n=>n.attributes['aria-checked']==='true').length,1);
+      find('location-cancel').click();assert.equal(sent.length,1,'cancel leaves applied location unchanged');
+      picker.open();await flush();dialog.events.cancel({preventDefault(){}});assert.equal(dialog.open,false);assert.equal(sent.length,1,'Esc does not apply');
+      let resolveSearch;const delayed=createLocationPicker({send:()=>{},search:()=>new Promise(resolve=>resolveSearch=resolve)});delayed.open();assert.match(cls(delayed.dialog,'location-status')[0].textContent,/검색 중/);resolveSearch([]);await flush();assert.match(cls(delayed.dialog,'location-status')[0].textContent,/결과가 없어요/);delayed.dialog.close();
+      const failed=createLocationPicker({send:()=>{},search:async()=>{throw new Error('test');}});failed.open();await flush();assert.match(cls(failed.dialog,'location-status')[0].textContent,/불러오지 못/);assert.equal(cls(failed.dialog,'location-retry').length,1);failed.dialog.close();
+      const oldWidth=globalThis.innerWidth,oldHeight=globalThis.innerHeight,oldViewport=globalThis.visualViewport;
+      try{
+        globalThis.innerWidth=1280;globalThis.innerHeight=900;globalThis.visualViewport=undefined;
+        const pc=createLocationPicker({send:()=>{}});pc.open();assert.equal(pc.dialog.style.height,'680px');assert.equal(pc.dialog.style.top,'110px');pc.dialog.close();
+        globalThis.innerWidth=390;globalThis.visualViewport={height:400,offsetTop:20,addEventListener(){},removeEventListener(){}};
+        const keyboard=createLocationPicker({send:()=>{}});keyboard.open();assert.equal(keyboard.dialog.style.height,'392px');assert.equal(keyboard.dialog.style.top,'28px');assert.ok(keyboard.dialog.classList.contains('location-compact'));keyboard.dialog.close();
+      }finally{globalThis.innerWidth=oldWidth;globalThis.innerHeight=oldHeight;globalThis.visualViewport=oldViewport;}
+      const forged=globalThis.InchelinPhase1.parse('강남역',{}, {locationSelection:{...catalog[0],latitude:0}}).conditions;
+      assert.equal(forged.location.latitude,catalog[0].latitude,'request cannot replace authoritative coordinates');
+    }
     for(const withCards of [true,false]){
       const noticeApp=app(),notice='인원·방문 목적·해당 시간 영업 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.';
       noticeApp.api.render({role:'assistant',content:'말씀하신 조건으로 찾아봤어요.',restaurants:withCards?samples.solo.body.restaurants:[],meta:{...samples.solo.body.meta,answer_plan:['text','place_cards','source','notice'],notice}});

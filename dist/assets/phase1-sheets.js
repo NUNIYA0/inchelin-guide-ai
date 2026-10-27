@@ -1,11 +1,14 @@
 import {createBottomSheet} from './bottom-sheet-v1.js?v=127';
+import {createLocationPicker} from './location-picker.js';
 const api=globalThis.InchelinPhase1;
 export function mountPhase1Sheets({send,locate,isBusy,getConditions=()=>({})}){
   const sheet=createBottomSheet({titleId:'phase1ConditionTitle'});
+  let locationPicker;
   const make=(tag,text='',cls='')=>{const node=document.createElement(tag);node.textContent=text;node.className=cls;return node;};
   const button=(text,action)=>{const b=make('button',text,'meal-chip');b.type='button';b.addEventListener('click',action);return b;};
   function open(key='location'){
     if(isBusy())return;
+    if(key==='location'){if(!locationPicker)locationPicker=createLocationPicker({send,isBusy});locationPicker.open();return;}
     const titles={location:'지역·역 선택',radiusMeters:'직선거리 변경',food:'음식 종류 변경',budget:'예산 변경',companion:'동행 변경',people:'인원 변경',visit:'방문 날짜·시간',purpose:'방문 목적',vibe:'분위기 선호',parking:'주차 선호'};
     sheet.open(titles[key]||'조건 변경');
     const finish=message=>{sheet.dialog.close();send(message);};

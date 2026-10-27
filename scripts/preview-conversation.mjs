@@ -14,7 +14,7 @@ createServer(async(req,res)=>{
   try{
     if(req.method==='GET'&&!req.url.startsWith('/api/')){
       const path=resolve(root,'.'+new URL(req.url,'http://localhost').pathname.replace(/\/$/,'/index.html'));if(!path.startsWith(root))throw new Error('path');
-      let body=await readFile(path);const type={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'}[extname(path)]||'application/octet-stream';
+      let body=await readFile(path);const type={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.png':'image/png','.svg':'image/svg+xml','.woff2':'font/woff2'}[extname(path)]||'application/octet-stream';
       if(extname(path)==='.html')body=Buffer.from(body.toString().replace('<body>','<body><div style="position:relative;z-index:50;background:#fff5d6;text-align:center;font:12px/24px sans-serif">로컬 화면 검증 · 실제 등록 정보 / 거리만 테스트 좌표</div>'));
       res.writeHead(200,{'content-type':type,'cache-control':'no-store'});res.end(body);return;
     }

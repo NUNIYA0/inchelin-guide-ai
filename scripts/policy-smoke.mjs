@@ -19,10 +19,10 @@ const api=globalThis.InchelinPhase1;
 const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
 const dataset=query=>{const center=api.centers.find(c=>query.startsWith(c.label))||api.centers[0];return {items:[100,400,800,1000.2,2000].map((m,i)=>item(center,m,i,/한식/.test(query)?{category:'음식점>한식'}:{}))};};
-export async function requestCase(message,{state=null,currentLocation=null,currentLocationName='',data=dataset,status=200,workerOverride=worker,demoMode=false,currentLocalDatetime='2026-10-22T12:00:00+09:00'}={}){
+export async function requestCase(message,{state=null,currentLocation=null,currentLocationName='',locationSelection=null,data=dataset,status=200,workerOverride=worker,demoMode=false,currentLocalDatetime='2026-10-22T12:00:00+09:00'}={}){
   const original=globalThis.fetch,calls=[];
   globalThis.fetch=async url=>{calls.push(String(url));assert.match(String(url),/naverapihub\.apigw\.ntruss\.com\/search\/v1\/local/,'AI/image/other live calls forbidden');return Response.json(typeof data==='function'?data(new URL(url).searchParams.get('query')):data,{status});};
-  try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName,demoMode,currentLocalDatetime}})});const response=await workerOverride.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
+  try{const request=new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json','X-Response-Rules-Version':globalThis.InchelinResponseRules.VERSION},body:JSON.stringify({messages:[{role:'user',content:message}],context:{responseModeState:state,currentLocation,currentLocationName,locationSelection,demoMode,currentLocalDatetime}})});const response=await workerOverride.fetch(request,env,{});assert.equal(response.status,200,message);return {body:await response.json(),calls};}finally{globalThis.fetch=original;}
 }
 // Legacy v137/v138 card assertions now explicitly exercise the consent continuation.
 // New v139 tests and the consent client scenario call requestCase directly.
@@ -85,6 +85,8 @@ await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
 testConversationScroll(html);
 await testRegisteredData(requestCase,productionWorker);
+const pickerCSS=await productionWorker.fetch(new Request('https://example.test/assets/location-picker.css?v=152'),env,{});
+assert.equal(pickerCSS.status,200);assert.match(pickerCSS.headers.get('content-type'),/text\/css/,'picker styles must not be served as binary');assert.match(await pickerCSS.text(),/\.bottom-sheet\.location-picker/);
 assert.ok(!/id="guide(?:Rail|Side)"/.test(html),'usage-guide navigation removed from both sidebar states');
 for(const id of ['aboutRail','aboutSide'])assert.match(html.match(new RegExp('<button[^>]+id="'+id+'"[^]*?</button>'))?.[0]||'',/src="assets\/guide-icon\.png"/,'introduction reuses the historic open-book asset');
 assert.ok(!/\['guideRail', 'guideSide'\]/.test(html),'removed controls have no click binding');

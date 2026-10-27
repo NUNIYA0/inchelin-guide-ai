@@ -10,6 +10,7 @@ if (!outputRoot.startsWith(`${root}${sep}`)) throw new Error("Invalid build dire
 if (!hostingOutputRoot.startsWith(`${root}${sep}`)) throw new Error("Invalid hosting build directory");
 
 const mimeTypes = {
+  ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
   ".png": "image/png",
   ".ttf": "font/ttf",
