@@ -91,7 +91,9 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
       assert.equal(details.hidden,true);assert.equal(cls(details,'registered-recommendations').length,0,'authored pair is never hidden in details');
       assert.equal(cls(details,'restaurant-address').length,1);assert.equal(cls(cards[0],'photo-missing').length,0);
       assert.equal(cls(cards[0],'restaurant-media').length,1,'no image keeps an equal-size placeholder');assert.match(cls(cards[0],'restaurant-photo-empty')[0].textContent,/등록된 사진이 없어요/);
-      const mapButton=cls(cards[0],'restaurant-map-button')[0];assert.equal(mapButton.textContent,'지도 보기');assert.equal(mapButton.children.length,0,'map action is text only');
+      const mapButton=cls(cards[0],'restaurant-map-button')[0];assert.equal(mapButton.textContent,'네이버지도에서 검색');assert.equal(mapButton.children.length,0,'map action is text only');
+      const checkedCard={...samples.solo.body.restaurants[0],naverPlaceUrl:'https://map.naver.com/p/entry/place/123456',naverPlaceId:'123456',naverPlaceVerification:{status:'verified',name:samples.solo.body.restaurants[0].name,address:samples.solo.body.restaurants[0].roadAddress||samples.solo.body.restaurants[0].address,source:'test-only-place-check',checkedAt:'2026-10-27'}};
+      const checked=app();checked.api.render({role:'assistant',content:'테스트 전용 상세 연결',restaurants:[checkedCard],meta:samples.solo.body.meta});const checkedMap=cls(checked.elements.messages,'restaurant-map-button')[0];assert.equal(checkedMap.textContent,'지도 보기');assert.equal(checkedMap.href,checkedCard.naverPlaceUrl);globalThis.document=rec.document;
       detailToggle.click();assert.equal(details.hidden,false);assert.equal(detailToggle.attributes['aria-expanded'],'true');assert.equal(cls(cards[1],'restaurant-extra')[0].hidden,true);
       assert.equal(cls(details,'restaurant-compare').length,0,'compare collection removed from details');
       assert.ok(!html.includes('id="comparisonTray"'),'no comparison tray in composer');

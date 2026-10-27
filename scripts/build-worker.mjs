@@ -41,7 +41,8 @@ const searchAxes = await readFile(join(root, "worker", "search-axes.js"), "utf8"
 const korean = await readFile(join(root, "worker", "korean.js"), "utf8");
 const mainDishes = await readFile(join(root,'worker','main-dishes.js'),'utf8');
 const relatedQuestions = await readFile(join(root,'worker','related-questions.js'),'utf8');
-const naverMap = await readFile(join(root,'dist','assets','naver-map.js'),'utf8');
+const naverMap = await readFile(join(root,'worker','naver-map.js'),'utf8');
+await writeFile(join(root,'dist','assets','naver-map.js'),naverMap);
 const requestTiming=await readFile(join(root,'worker','request-timing.js'),'utf8');
 const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8');
 const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');

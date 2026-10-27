@@ -1638,19 +1638,9 @@ function naverWgs84Coordinate(value, type) {
 }
 
 function naverPlaceDetails(value, fallbackPlaceId = "") {
-  const rawUrl = safeUrl(value);
-  let placeId = safeText(fallbackPlaceId, 80).replace(/[^0-9]/g, "");
-  if (rawUrl) {
-    try {
-      const url = new URL(rawUrl);
-      const host = url.hostname.toLowerCase();
-      if (host === "map.naver.com" || host === "m.map.naver.com" || host === "place.naver.com" || host === "m.place.naver.com") {
-        const match = url.pathname.match(/\/(?:entry\/place|restaurant|place)\/(\d+)/);
-        if (match) placeId = match[1];
-      }
-    } catch {}
-  }
-  return placeId ? { placeId, url: `https://map.naver.com/p/entry/place/${placeId}` } : { placeId: "", url: "" };
+  // Local-search `link` can be a business homepage. Neither arbitrary IDs nor
+  // search queries count as a Place destination; keep them out of the ID path.
+  const {placeId,url}=globalThis.InchelinMapLinks.parsePlaceUrl(value);return {placeId,url};
 }
 
 function exactRestaurantNameMatch(expected, actual) {
@@ -2340,9 +2330,10 @@ async function phase1ChatResponse(latest,context,env,execution){
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
   const plan=(message,restaurants=[],{question='',questionHelp='',choices=[],notice='',intent='place_search',error=false}={})=>{
-    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...card,photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
-    state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
-    state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
+    const currentLinks=({naverPlaceCandidateUrl,...card})=>({...card,...globalThis.InchelinMapLinks.linkFields(card)});
+    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...currentLinks(card),photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
+    state.lastCards=recommendationCatalog.enrich(state.lastCards,c).map(currentLinks);
+    state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c).map(currentLinks);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
     answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',...(recommendationCatalog.exclusive?{registeredData:{count:recommendationCatalog.entries().length,sourceDate:recommendationData.sourceDate,sourceHash:recommendationData.sourceHash,exclusive:true}}:{}),conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
     turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':!c.radiusConfirmed?'radiusMeters':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
@@ -2368,7 +2359,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   if(detailed){
     if(!targets.length || parsed.intents.includes('compare')&&targets.length<2)return plan('어느 식당을 말씀하시는지 골라주세요.',[],{question:parsed.intents.includes('compare')?'비교할 식당 두 곳은 어디인가요?':'어느 식당이 궁금하세요?',choices:cards.slice(0,3).map(card=>({label:card.name,message:card.name+' 자세히 알려줘'})),intent:'specific_place'});
     state.phase1.focusCardId=targets[0].id;
-    for(const card of targets)card.naverPlaceUrl=api.mapUrl(card.roadAddress||card.address||card.parcelAddress);
+    for(const card of targets){Object.assign(card,recommendationCatalog.enrich([card],c)[0]);Object.assign(card,globalThis.InchelinMapLinks.linkFields(card));}
     const info=targets.map(card=>`${card.name}: ${card.category||'음식 종류는 확인되지 않았어요'}, ${card.address||'주소 정보가 없어요'}${Number.isFinite(card.distanceMeters)?`, ${card.originLabel||c.location.label}에서 직선 ${Math.round(card.distanceMeters)}m`:''}`).join('\n');
     const details=targets.map(card=>{
       const menus=card.registeredFacts?.menus||[],parts=[],missing=[];
@@ -2379,7 +2370,7 @@ async function phase1ChatResponse(latest,context,env,execution){
       if(missing.length)parts.push(missing.join('·')+'는 지금 확인된 정보가 없어요. 방문 전 식당에 확인해 주세요.');
       return parts.length?card.name+': '+parts.join(' '):'';
     }).filter(Boolean).join('\n');
-    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&'주소로 네이버지도를 열 수 있어요. 건물이나 위치 검색 결과가 나올 수 있어요.',details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1?[{label:'네이버지도 보기',message:targets[0].name+' 네이버지도 보기',url:targets[0].naverPlaceUrl||'',disabled:!targets[0].address}]:[]});
+    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&(targets.every(card=>card.mapLinkKind==='detail')?'지도 보기에서 해당 매장 상세 정보를 열 수 있어요.':'상세 링크가 없는 매장은 이름과 주소로 네이버지도에서 검색할 수 있어요.'),details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1?[{label:targets[0].mapLinkLabel,message:targets[0].name+' 네이버지도 보기',url:targets[0].mapUrl||'',disabled:!targets[0].mapUrl}]:[]});
   }
   const editing=/^(?:음식\s*종류\s*변경|다른\s*메뉴로|예산\s*변경|방문\s*시간\s*변경|인원\s*변경)$/;
   if(editing.test(latest))return plan('바꾸고 싶은 조건을 골라주세요.',[],{question:/예산/.test(latest)?'예산을 어떻게 바꿀까요?':'어떤 음식으로 바꿀까요?',choices:/예산/.test(latest)?[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'예산 해제',message:'예산 제한 없애줘'}]:['한식','파스타','냉면'].map(label=>({label,message:label+'로 찾아줘'}))});
@@ -2390,7 +2381,7 @@ async function phase1ChatResponse(latest,context,env,execution){
     return plan(`${unsupported.join('·')} 정보는 현재 확인할 수 없어요. 이 항목이 미확인인 식당도 볼지 선택해 주세요.`,[],{question:'미확인 항목을 표시하고 지역·음식으로 검색해볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
   }
   let places=[],error=false;
-  let registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label,naverPlaceUrl:api.mapUrl(card.roadAddress||card.parcelAddress||card.address)})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
+  let registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
   if(recommendationCatalog.exclusive){
     const provider=new NaverRestaurantProvider(env);
     const resolved=await execution.measure('registered_coordinates',()=>resolveRegisteredCards(recommendationCatalog,c,api,async row=>{
@@ -2412,7 +2403,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   }catch{error=true;}
   const candidates=recommendationCatalog.enrich(dedupeRestaurants([...registered,...places.map(({place,meters})=>{
     const card=restaurantCard(place,'naver','',c.location.label),address=card.roadAddress||card.parcelAddress||card.address||'';
-    return {...card,...api.phase2Fields(),imageUrl:null,recommendationReason:'',recommendedBy:'',address,naverPlaceUrl:api.mapUrl(address),naverLink:api.mapUrl(address),distanceMeters:Math.round(meters),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label};
+    return {...card,...api.phase2Fields(),imageUrl:null,recommendationReason:'',recommendedBy:'',address,distanceMeters:Math.round(meters),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label};
   })]),c).map(card=>({...card,conditionVerification:evaluateConditions(card,c)})).filter(card=>card.conditionVerification.status!=='failed');
   const confirmed=candidates.filter(card=>['confirmed','experience'].includes(card.conditionVerification.status)),unconfirmed=candidates.filter(card=>card.conditionVerification.status==='unconfirmed');
   const accepted=unconfirmed.filter(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown'&&check.blocking!==false).every(check=>acceptedUnknowns.includes(check.key)));
@@ -2981,6 +2972,12 @@ export default {
       }
     }
 
+    if(url.pathname==='/api/restaurant-place-link'){
+      if(request.method!=='GET')return json({error:'method_not_allowed'},405);
+      const row=registeredRecommendationCatalog.entries().find(r=>r.sourceId===url.searchParams.get('id'));
+      if(!row)return json({status:'not_found'},404);
+      return json({name:row.name,roadAddress:row.roadAddress,naverPlaceUrl:row.naverPlaceUrl,naverPlaceId:row.naverPlaceId,naverPlaceVerification:row.naverPlaceVerification});
+    }
     if(url.pathname==='/api/restaurant-photo'){
       if(request.method!=='GET')return json({error:'Method not allowed'},405);
       const id=String(url.searchParams.get('id')||'').slice(0,120),row=registeredRecommendationCatalog.entries().find(r=>r.sourceId===id);

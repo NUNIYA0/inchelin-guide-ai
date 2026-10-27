@@ -23,6 +23,10 @@ createServer(async(req,res)=>{
     if(req.url==='/api/chat'&&String(req.headers.referer||'').includes('qa=photos')){
       const data=await response.json();data.restaurants?.forEach((card,index)=>{card.photos=index===0?[{url:'/assets/guide-icon.png',source:'registered'},{url:'/assets/favicon-inchelin-v2.png',source:'registered',isPrimary:true}]:index===1?[{url:'/assets/test-only-missing-photo.png',source:'registered'}]:[];if(index===0&&card.recommendationBundle?.representative){card.recommendationBundle.representative={...card.recommendationBundle.representative,recommenderName:'테스트 작성자(실사용자 아님)',reason:'장문 표시를 확인하는 테스트 문장으로 실제 추천 내용이 아니에요. '.repeat(8)};}});res.writeHead(response.status,{'content-type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));return;
     }
+    if(req.url==='/api/chat'&&String(req.headers.referer||'').includes('qa=map-fallback')){
+      const data=await response.json();if(data.restaurants?.[0])Object.assign(data.restaurants[0],{naverPlaceUrl:null,naverPlaceId:null,naverPlaceVerification:null,registeredSourceId:null});
+      res.writeHead(response.status,{'content-type':'application/json; charset=utf-8'});res.end(JSON.stringify(data));return;
+    }
     res.writeHead(response.status,Object.fromEntries(response.headers));res.end(Buffer.from(await response.arrayBuffer()));
   }catch{res.writeHead(500);res.end('Local UI preview failed');}
 }).listen(43146,'127.0.0.1',()=>console.log('UI preview http://127.0.0.1:43146'));

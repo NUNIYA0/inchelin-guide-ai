@@ -10,6 +10,8 @@ export async function testRegisteredData(request,workerOverride){
   assert.equal(source.restaurants.length,1099);assert.equal(source.exclusive,true);
   assert.equal(source.sourceHash,'81699ec6bfd876d9ae1a9b2a5b6a805c5a4cd4e8642eaf01a41184696135f696');
   assert.equal(new Set(source.restaurants.map(r=>r.sourceId)).size,1099);
+  assert.ok(source.restaurants.every(r=>r.naverPlaceUrl&&r.naverPlaceId&&r.naverPlaceVerification?.status==='verified'),'all source links retain their workbook identity-match evidence');
+  assert.equal(new Set(source.restaurants.map(r=>r.naverPlaceId)).size,1099);
   assert.ok(source.restaurants.every(r=>!r.latitude&&!r.longitude&&r.imageUrl===null));
   assert.ok(source.restaurants.every(r=>r.recommendations.every(rec=>rec.reason===null&&rec.writtenAt===null)),'collection date is not authorship date');
   const api=globalThis.InchelinPhase1,c=api.parse('강남역',{},{}).conditions;
@@ -26,9 +28,13 @@ export async function testRegisteredData(request,workerOverride){
     assert.equal(card.recommendationBundle.representative.reason,null);
     assert.deepEqual(card.registeredFacts.menus,row.menus);assert.equal(card.phone,row.phone);
     assert.equal(card.registeredFacts.openingHoursText,row.openingHoursText);
-    assert.ok(card.distanceMeters<=1000);assert.equal(card.naverPlaceUrl,api.mapUrl(row.roadAddress));
+    assert.ok(card.distanceMeters<=1000);assert.equal(card.naverPlaceUrl,row.naverPlaceUrl);assert.equal(card.mapLinkKind,'detail');assert.equal(card.naverPlaceVerification.source,'registered-workbook');
   }
   const state=result.body.meta.responseModeState;
+  const linkResponse=await workerOverride.fetch(new Request('https://example.test/api/restaurant-place-link?id='+encodeURIComponent(result.body.restaurants[0].registeredSourceId)),{},{});
+  const savedLink=await linkResponse.json();assert.equal(savedLink.naverPlaceUrl,result.body.restaurants[0].naverPlaceUrl);
+  const legacyState=structuredClone(state);for(const card of legacyState.lastCards){card.naverPlaceUrl=api.mapUrl(card.address);delete card.naverPlaceVerification;delete card.naverPlaceId;}
+  const mapAnswer=await request('첫 번째 집 네이버지도 보여줘',{workerOverride,state:legacyState,data});assert.equal(mapAnswer.body.restaurants[0].naverPlaceUrl,savedLink.naverPlaceUrl);assert.equal(mapAnswer.body.meta.turnPolicy.answerChoices[0].label,'지도 보기');
   const change=await request('500m 안으로',{workerOverride,state,data});assert.equal(change.calls.length,0,'coordinate cache reused');assert.equal(change.body.restaurants.length,3);
   const detail=await request('첫 번째 집 영업시간이랑 전화번호 알려줘',{workerOverride,state,data});
   assert.match(detail.body.message,/엑셀에 수집된 영업시간/);assert.match(detail.body.message,/연락처:/);

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import './history-more-smoke.mjs';
 import './history-manager-smoke.mjs';
 import './composer-smoke.mjs';
+import './place-links-smoke.mjs';
 import {readFile,writeFile,rm} from 'node:fs/promises';
 import productionWorker from '../build/dist/server/index.js';
 // Legacy external-search regressions run with a disconnected source copy.
@@ -73,7 +74,7 @@ const retry=await runCase('다시 추천해줘',{state:s(move)});assert.equal(c(
 for(const message of ['강남역이나 역삼역에서 추천해줘','건대입구역에서 찾아줘']){const r=await runCase(message);assert.equal(r.calls.length,0);assert.ok(r.body.meta.turnPolicy.questionText);}
 const otherGangnam=await runCase('강남구청역에서 찾아줘');assert.equal(otherGangnam.calls.length,0,'unsupported station must not alias 강남역');
 for(const address of ['서울특별시 강남구 강남대로78길 25 지상1층','서울특별시 마포구 서교동 123-4','부산광역시 중구 광복로 1'])assert.equal(api.mapUrl(address),'https://map.naver.com/p/search/'+encodeURIComponent(address));assert.equal(api.mapUrl(''),'');
-const noAddress=await runCase('강남역에서 추천해줘',{data:{items:[item(api.centers[0],100,1,{roadAddress:'',address:''})]}});assert.equal(noAddress.body.restaurants.length,1);assert.equal(noAddress.body.restaurants[0].naverPlaceUrl,'');
+const noAddress=await runCase('강남역에서 추천해줘',{data:{items:[item(api.centers[0],100,1,{roadAddress:'',address:''})]}});assert.equal(noAddress.body.restaurants.length,1);assert.equal(noAddress.body.restaurants[0].naverPlaceUrl,null);assert.equal(noAddress.body.restaurants[0].mapUrl,'');
 const compare=await runCase('첫 번째랑 두 번째 식당 비교하고 지도도 보여줘',{state:s(bulk)});assert.equal(compare.calls.length,0);assert.equal(compare.body.restaurants.length,2);assert.match(compare.body.message,/테스트 식당 0/);assert.match(compare.body.message,/테스트 식당 1/);assert.match(compare.body.message,/주소/);
 assert.ok(compare.body.meta.phase1Intents.includes('compare'));assert.ok(compare.body.meta.phase1Intents.includes('map'));assert.ok((move.initial||move).body.meta.phase1Intents.includes('condition_change'));
 const detail=await runCase('두 번째 집 영업시간이랑 전화번호 알려줘',{state:s(bulk)});assert.equal(detail.calls.length,0);assert.match(detail.body.message,/영업시간.*전화/);assert.equal(detail.body.restaurants[0].id,bulk.body.restaurants[1].id);

@@ -34,7 +34,7 @@ export async function resolveRegisteredCards(catalog,c,api,lookup){
       category:info.category||'음식점',rawCategory:info.rawCategory||info.category||'음식점',
       latitude:info.latitude,longitude:info.longitude,dataSource:'inchelin',isRegisteredInInchelin:true,
       distanceMeters:Math.round(meters),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label,
-      naverPlaceId:info.naverPlaceId||null,naverPlaceUrl:api.mapUrl(row.roadAddress||row.parcelAddress),validationVersion:2};
+      naverPlaceId:row.naverPlaceId||null,naverPlaceUrl:row.naverPlaceUrl||null,naverPlaceVerification:row.naverPlaceVerification||null,validationVersion:2};
   }));
   return {cards:catalog.enrich(resolved.filter(Boolean).sort((a,b)=>a.distanceMeters-b.distanceMeters),c),attempted:shortlist.length,failures};
 }

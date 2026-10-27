@@ -1223,7 +1223,7 @@
   <div class="toast" id="toast" role="status"></div>
 
 <script src="assets/response-rules.js?rules=v155"></script>
-<script src="assets/naver-map.js?rules=v145"></script>
+<script src="assets/naver-map.js?rules=v161"></script>
 <script src="assets/phase1-core.js?rules=v155"></script>
 <script src="assets/restaurant-ui.js?v=155"></script>
 <script src="assets/history-manager.js?v=160"></script>
@@ -1428,17 +1428,7 @@
       }
     }
     function normalizeNaverPlaceDetails(value, fallbackPlaceId = '') {
-      let placeId = String(fallbackPlaceId || '').replace(/[^0-9]/g, '');
-      const candidate = safeHttpUrl(value, true);
-      if (candidate) {
-        try {
-          const match = new URL(candidate).pathname.match(/\/(?:entry\/place|restaurant|place)\/(\d+)/);
-          if (match) placeId = match[1];
-        } catch (_) {}
-      }
-      return placeId
-        ? { placeId, url: `https://map.naver.com/p/entry/place/${placeId}` }
-        : { placeId: '', url: candidate };
+      return globalThis.InchelinMapLinks.parsePlaceUrl(value);
     }
     function normalizeRestaurant(restaurant) {
       if (!restaurant) return null;
@@ -1454,10 +1444,7 @@
       if (!id || !name || (dataSource === 'naver' && !categoryValue)) return null;
       if (/[<>�\r\n\t]|https?:\/\//i.test(name) || name.length > 80) return null;
       if (/애견|반려동물|동물카페|당구|스포츠|오락|게임|노래방|미용|헤어|네일|병원|의원|약국|학원|교육|편의점|마트|부동산/.test(categoryValue)) return null;
-      const naverPlace = normalizeNaverPlaceDetails(
-        restaurant.naverPlaceUrl || restaurant.naverLink,
-        restaurant.naverPlaceId
-      );
+      const mapFields=globalThis.InchelinMapLinks.linkFields({...restaurant,name});
       return {
         id,
         name,
@@ -1490,9 +1477,7 @@
         menuPrice: restaurant.menuPrice ?? null,
         parking: restaurant.parking ?? null,
         privateRoom: typeof restaurant.privateRoom === 'boolean' ? restaurant.privateRoom : null,
-        naverPlaceId: naverPlace.placeId,
-        naverPlaceUrl: globalThis.InchelinPhase1.mapUrl(restaurant.roadAddress||restaurant.address||restaurant.parcelAddress),
-        naverLink: globalThis.InchelinMapLinks.mapLink({name,url:naverPlace.url,placeId:naverPlace.placeId,longitude:restaurant.longitude,latitude:restaurant.latitude}),
+        ...mapFields,
         isRegisteredInInchelin: dataSource === 'inchelin',
         dataSource
       };
@@ -1544,6 +1529,7 @@
         parking: item.parking,
         naverPlaceId: item.naverPlaceId,
         naverPlaceUrl: item.naverPlaceUrl,
+        naverPlaceVerification:item.naverPlaceVerification,
         isRegisteredInInchelin: item.isRegisteredInInchelin,
         dataSource: item.dataSource
       };
@@ -1955,8 +1941,8 @@
       showToast(message.textContent);
     }
     async function resolveRestaurantDetail(restaurant, detailArea) {
-      const addressUrl=globalThis.InchelinPhase1.mapUrl(restaurant.roadAddress||restaurant.address||restaurant.parcelAddress);
-      if(addressUrl){setPhase1Focus(restaurant);window.open(addressUrl,'_blank','noopener,noreferrer');return;}
+      const target=globalThis.InchelinMapLinks.destination(restaurant);
+      if(target.url){setPhase1Focus(restaurant);window.open(target.url,'_blank','noopener,noreferrer');return;}
       showToast('주소 정보 없음');
     }
     let phase1Sheets=null;
@@ -1994,8 +1980,9 @@
         const body = document.createElement('div'); body.className = 'restaurant-card-body';
         const head = document.createElement('div'); head.className = 'restaurant-card-head';
         const actions = document.createElement('div'); actions.className = 'restaurant-detail-area';
-        const detail = document.createElement(restaurant.naverPlaceUrl?'a':'button');detail.className='restaurant-title-link restaurant-map-link';detail.setAttribute('aria-label',restaurant.name+' 주소로 네이버지도 보기');
-        if(restaurant.naverPlaceUrl){detail.href=restaurant.naverPlaceUrl;detail.target='_blank';detail.rel='noopener noreferrer';}
+        const mapTarget=globalThis.InchelinMapLinks.destination(restaurant);
+        const detail = document.createElement(mapTarget.url?'a':'button');detail.className='restaurant-title-link restaurant-map-link';detail.setAttribute('aria-label',restaurant.name+' '+mapTarget.label);
+        if(mapTarget.url){detail.href=mapTarget.url;detail.target='_blank';detail.rel='noopener noreferrer';}
         else{detail.type='button';detail.disabled=true;detail.setAttribute('aria-label',restaurant.name+' 주소 정보 없음');}
         detail.addEventListener('click',()=>setPhase1Focus(restaurant));
         const title = document.createElement('h3'); title.textContent = restaurant.name;detail.appendChild(title);body.appendChild(detail);
@@ -2024,8 +2011,9 @@
         if(evidence){evidence.hidden=false;extra.appendChild(evidence);}
         card.appendChild(extra);
         const expand=document.createElement('button');expand.type='button';expand.className='restaurant-details-toggle';expand.textContent='상세 보기';expand.setAttribute('aria-expanded','false');expand.setAttribute('aria-label',restaurant.name+' 상세 보기');expand.addEventListener('click',()=>{extra.hidden=!extra.hidden;expand.setAttribute('aria-expanded',String(!extra.hidden));expand.textContent=extra.hidden?'상세 보기':'접기';expand.setAttribute('aria-label',restaurant.name+(extra.hidden?' 상세 보기':' 상세 접기'));});
-        const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link restaurant-map-button';map.textContent=restaurant.naverPlaceUrl?'지도 보기':'주소 정보 없음';map.setAttribute('aria-label',restaurant.name+' 네이버지도 주소 검색');
-        if(restaurant.naverPlaceUrl){map.href=restaurant.naverPlaceUrl;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
+        const map=document.createElement(mapTarget.url?'a':'button');map.className='restaurant-map-link restaurant-map-button';map.textContent=mapTarget.label;map.setAttribute('aria-label',restaurant.name+' '+mapTarget.label);
+        if(mapTarget.url){map.href=mapTarget.url;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
+        if(mapTarget.url&&mapTarget.kind!=='detail')globalThis.InchelinMapLinks.hydrate(restaurant).then(fields=>{if(!fields)return;Object.assign(restaurant,fields);detail.href=map.href=fields.mapUrl;map.textContent=fields.mapLinkLabel;detail.setAttribute('aria-label',restaurant.name+' '+fields.mapLinkLabel);map.setAttribute('aria-label',restaurant.name+' '+fields.mapLinkLabel);});
         actions.append(expand,map); card.appendChild(actions); list.appendChild(card);
       });
       globalThis.InchelinRestaurantUI.carousel(group,list);group.appendChild(list);
