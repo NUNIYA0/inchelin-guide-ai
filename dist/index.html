@@ -1123,7 +1123,6 @@
             <div class="messages" id="messages" aria-live="polite"></div>
           </div>
           <div class="chat-dock" id="chatDock"><div class="chat-dock-inner">
-          <section class="comparison-tray" id="comparisonTray" aria-label="비교 트레이" hidden></section>
           <div class="composer-jump-row"><button id="conversationBottom" class="conversation-bottom" type="button" aria-label="맨 아래로" hidden><svg class="ui-icon" aria-hidden="true"><use href="#i-arrow-down"/></svg></button></div>
           <form class="composer chat-composer" id="chatForm">
             <textarea id="chatInput" aria-label="후속 질문 입력" placeholder="후속 질문을 입력하세요" rows="1"></textarea>
@@ -1836,7 +1835,6 @@
     function newChat() {
       conversationEpoch++;
       stopGeneration(false);
-      clearComparisonTray();
       currentId = null;
       chatMessages = [];
       try{sessionStorage.removeItem(scopedKey('inchelin-active-chat'));sessionStorage.removeItem(scopedKey('inchelin-resume-chat'));}catch{}
@@ -1934,8 +1932,6 @@
       if(addressUrl){setPhase1Focus(restaurant);window.open(addressUrl,'_blank','noopener,noreferrer');return;}
       showToast('주소 정보 없음');
     }
-    const comparisonTray = new Map();
-    const comparisonButtons = new Map();
     let phase1Sheets=null;
     async function openPhase1Condition(key='location') {
       try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=139');phase1Sheets=mountPhase1Sheets({send:routeQuestion,locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
@@ -1960,32 +1956,6 @@
     }
     function setIconLabel(node, name, label) { node.textContent=label;node.setAttribute('aria-label',label); }
     function iconHTML(name) { return `<svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><use href="#i-${name}"/></svg>`; }
-    function comparisonMessage(cards) {
-      return cards.map((card, index) => {
-        if (index === cards.length - 1) return card.name;
-        const code = card.name.trim().charCodeAt(card.name.trim().length - 1) - 0xac00;
-        return card.name + (code >= 0 && code < 11172 && code % 28 ? '이랑' : '랑');
-      }).join(' ') + ' 비교해줘';
-    }
-    function renderComparisonTray() {
-      for (const [id, buttons] of comparisonButtons) for (const button of buttons) {
-        const selected = comparisonTray.has(id); setIconLabel(button,selected?'check':'compare-add',selected?'담음':'비교에 담기'); button.setAttribute('aria-pressed', String(selected));button.setAttribute('aria-label',button.restaurantName+' '+(selected?'비교에서 빼기':'비교에 담기'));
-      }
-      const host = document.getElementById?.('comparisonTray');
-      if (!host) return;
-      host.innerHTML = ''; host.hidden = comparisonTray.size === 0;
-      const items = document.createElement('div'); items.className = 'comparison-items';
-      for (const card of comparisonTray.values()) {
-        const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'comparison-item'; setIconLabel(remove,'close',card.name+' 빼기');
-        remove.setAttribute('aria-label', card.name + ' 비교에서 빼기');
-        remove.addEventListener('click', () => { comparisonTray.delete(card.id); renderComparisonTray(); }); items.appendChild(remove);
-      }
-      const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'comparison-submit'; compare.disabled = comparisonTray.size < 2;
-      setIconLabel(compare,'compare',comparisonTray.size < 2 ? '1곳 더 담아 주세요' : '비교하기');compare.setAttribute('aria-label',comparisonTray.size < 2?'1곳 더 담아 주세요':'담은 식당 비교하기');
-      compare.addEventListener('click', () => { const cards = [...comparisonTray.values()]; if (cards.length >= 2) ask(comparisonMessage(cards), { compareCards: cards }); });
-      host.append(items, compare);
-    }
-    function clearComparisonTray() { comparisonTray.clear(); comparisonButtons.clear(); renderComparisonTray(); }
     function renderRestaurantCards(restaurants, showSource = true) {
       const group = document.createElement('section'); group.className = 'restaurant-group';
       const list = document.createElement('div'); list.className = 'restaurant-list';
@@ -2034,25 +2004,14 @@
         if(menus.length>1){const moreMenus=document.createElement('p');moreMenus.className='restaurant-other-menus';moreMenus.textContent=menus.slice(0,8).map(m=>m.name+' · '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join('\n');extra.appendChild(moreMenus);}
         if(verification){const summary=document.createElement('p');summary.className='verification-summary';const unknown=verification.checks.filter(check=>check.status==='unknown').map(check=>check.label),known=verification.checks.filter(check=>check.status==='confirmed'&&check.key!=='distance').map(check=>check.label),failed=verification.checks.filter(check=>check.status==='failed').map(check=>check.label);summary.textContent=[known.length?known.join('·')+' 확인':'직선거리 확인',unknown.length?'미확인: '+unknown.join('·'):null,failed.length?'조건 불충족: '+failed.join('·'):null,verification.status==='experience'?'추천인의 경험 참고':null].filter(Boolean).join(' / ');extra.appendChild(summary);}
         if(evidence){evidence.hidden=false;extra.appendChild(evidence);}
-        const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-compare restaurant-map-link';
-        compare.restaurantName=restaurant.name;
-        if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());
-        comparisonButtons.get(restaurant.id).add(compare);
-        compare.addEventListener('click', () => {
-          if (compare.disabled) return;
-          if (comparisonTray.has(restaurant.id)) comparisonTray.delete(restaurant.id);
-          else if (comparisonTray.size < 3) comparisonTray.set(restaurant.id, restaurant);
-          else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
-          renderComparisonTray();
-        });
-        extra.appendChild(compare);card.appendChild(extra);
+        card.appendChild(extra);
         const expand=document.createElement('button');expand.type='button';expand.className='restaurant-details-toggle';expand.textContent='상세 보기';expand.setAttribute('aria-expanded','false');expand.setAttribute('aria-label',restaurant.name+' 상세 보기');expand.addEventListener('click',()=>{extra.hidden=!extra.hidden;expand.setAttribute('aria-expanded',String(!extra.hidden));expand.textContent=extra.hidden?'상세 보기':'접기';expand.setAttribute('aria-label',restaurant.name+(extra.hidden?' 상세 보기':' 상세 접기'));});
         const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link restaurant-map-button';map.textContent=restaurant.naverPlaceUrl?'지도 보기':'주소 정보 없음';map.setAttribute('aria-label',restaurant.name+' 네이버지도 주소 검색');
         if(restaurant.naverPlaceUrl){map.href=restaurant.naverPlaceUrl;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
         actions.append(expand,map); card.appendChild(actions); list.appendChild(card);
       });
       group.appendChild(list);
-      renderComparisonTray(); return group;
+      return group;
     }
     function quickReplyCard(reply) {
       const raw = String(reply || '').trim();
@@ -2275,7 +2234,6 @@
       return item;
     }
     function renderConversation() {
-      clearComparisonTray();
       messagesEl.innerHTML = '';
       chatMessages.forEach(message => renderMessage(message));
       const lastAI = messagesEl.querySelector('.message.ai:last-child');
@@ -2660,9 +2618,7 @@
       if(['예산 변경','음식 종류 변경','다른 메뉴로','방문 시간 변경','인원 변경'].includes(question)){openPhase1Condition(/예산/.test(question)?'budget':/방문/.test(question)?'visit':/인원/.test(question)?'people':'food');return;}
       if (['지역 바꾸기', '음식 바꾸기', '메뉴 바꾸기', '조건 바꾸기'].includes(question)) { openSearchPicker(question === '지역 바꾸기' ? 'region' : question === '조건 바꾸기' ? null : 'food'); return; }
       if (question === '비교하기') {
-        const cards = [...comparisonTray.values()].slice(0, 3);
-        if (cards.length >= 2) ask(comparisonMessage(cards), { compareCards: cards });
-        else runPlugin(4);
+        runPlugin(4);
         return;
       }
       const value = String(question || '').trim();

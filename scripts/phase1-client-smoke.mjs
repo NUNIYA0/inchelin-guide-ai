@@ -44,7 +44,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
         const getLocalTimeState=()=>({localDateTime:'2026-10-22T12:00:00+09:00',timeZone:'Asia/Seoul',periodLabel:'점심'});
         const pluginState=()=>[...chatMessages].reverse().find(m=>m.meta?.responseModeState)?.meta.responseModeState||{};
         ${fn('safeHttpUrl')}${fn('normalizeNaverPlaceDetails')}${fn('normalizeRestaurant')}${fn('hasExplicitTimeCondition')}${fn('buildAIRequest')}${fn('extractAssistantText')}${fn('assertCompleteAnswer')}${fn('requestAssistant')}${fn('normalizeMessage')}${fn('resizeInput')}
-        ${html.slice(html.indexOf('    const comparisonTray = new Map();'),html.indexOf('    function appendMessage(')).replace(/import\('\/assets\/phase1-sheets.js\?v=\d+'\)/,'loadSheetModule()')}
+        ${html.slice(html.indexOf('    let phase1Sheets=null;'),html.indexOf('    function appendMessage(')).replace(/import\('\/assets\/phase1-sheets.js\?v=\d+'\)/,'loadSheetModule()')}
         ${fn('appendMessage')}${fn('showWelcome')}${fn('newChat')}${fn('showChatView')}${fn('isCurrentLocationIntent')}${fn('routeQuestion')}${fn('ask')}${fn('submitWelcomeQuestion')}${fn('setGenerating')}${fn('showRequestError')}${fn('stopGeneration')}
         ${fn('generateAnswer').replace('async function generateAnswer','async function performGeneration')}
         function generateAnswer(...args){pending=performGeneration(...args);return pending;}
@@ -92,7 +92,9 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       assert.equal(cls(cards[0],'restaurant-media').length,0,'no image means no image area');
       const mapButton=cls(cards[0],'restaurant-map-button')[0];assert.equal(mapButton.textContent,'지도 보기');assert.equal(mapButton.children.length,0,'map action is text only');
       detailToggle.click();assert.equal(details.hidden,false);assert.equal(detailToggle.attributes['aria-expanded'],'true');assert.equal(cls(cards[1],'restaurant-extra')[0].hidden,true);
-      assert.ok(cls(details,'restaurant-compare').length,'comparison remains available');
+      assert.equal(cls(details,'restaurant-compare').length,0,'compare collection removed from details');
+      assert.ok(!html.includes('id="comparisonTray"'),'no comparison tray in composer');
+      assert.ok(!html.includes('비교에 담기'),'no collect label or handler in production UI');
       detailToggle.click();assert.equal(details.hidden,true);assert.equal(rec.requests.length,beforeRequests);assert.equal(JSON.stringify(rec.api.messages),beforeConditions);assert.deepEqual(cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href),links);
       toggle.click();assert.equal(extra.hidden,false);assert.equal(toggle.attributes['aria-expanded'],'true');assert.equal(toggle.textContent,'다른 추천 접기');assert.match(extra.textContent,/── 다른 추천 2개 ──/);
       assert.equal(cls(sections[0],'registered-recommendation').length,3);
