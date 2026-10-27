@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import './history-more-smoke.mjs';
+import './composer-smoke.mjs';
 import {readFile,writeFile,rm} from 'node:fs/promises';
 import productionWorker from '../build/dist/server/index.js';
 // Legacy external-search regressions run with a disconnected source copy.

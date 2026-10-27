@@ -1,0 +1,20 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
+const source=html.match(/    function resizeInput\(el\) \{[\s\S]*?\n    \}/)[0];
+const computed={lineHeight:'26.4px',paddingTop:'8.8px',paddingBottom:'8.8px',borderTopWidth:'0px',borderBottomWidth:'0px'};
+const resize=new Function('getComputedStyle',`let generating=false;${source};return resizeInput;`)(()=>computed);
+const button={id:'welcomeSend'},input={style:{},value:'',scrollHeight:44,closest:()=>({querySelector:()=>button})};
+resize(input);assert.equal(input.style.height,'44px');assert.equal(button.disabled,true);
+input.scrollHeight=70;resize(input);assert.equal(input.style.height,'44px','a long mobile placeholder must not enlarge an empty input');
+input.scrollHeight=44;
+input.value='한 줄';resize(input);assert.equal(input.style.height,'44px');assert.equal(button.disabled,false);
+input.scrollHeight=97;resize(input);assert.equal(input.style.height,'97px');assert.equal(input.style.overflowY,'hidden');
+input.scrollHeight=176;resize(input);assert.equal(input.style.height,'150px');assert.equal(input.style.overflowY,'auto');
+input.scrollHeight=44;input.value='';resize(input);assert.equal(input.style.height,'44px');assert.equal(input.style.overflowY,'hidden');
+// Recompute from actual typography, rather than a fixed textarea content height.
+computed.lineHeight='30px';resize(input);assert.equal(input.style.minHeight,'48px');assert.equal(input.style.maxHeight,'168px');
+assert.match(html,/\.composer textarea \{[^}]*box-sizing:border-box;[^}]*margin:0; padding:8\.8px 0/);
+assert.match(html,/\.composer textarea::placeholder \{ font:inherit; line-height:inherit/);
+assert.match(html,/\.composer, \.chat-composer \{[^}]*align-items: center/);
+console.log('Composer smoke passed: matching placeholder typography, one-line height, multiline growth, five-line cap, shrink and typography-based recalculation.');

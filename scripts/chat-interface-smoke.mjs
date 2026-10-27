@@ -43,7 +43,7 @@ export async function testChatInterface(runCase) {
   await helpers.copyAnswer(message);assert.match(clipboard,/홍대냉면 · 냉면 · 서울 홍대 1/);assert.match(clipboard,/국밥 · 따뜻한/);assert.match(toast,/복사/);
   helpers.regenerateAnswer(message);assert.equal(generated.length,1);assert.equal(generated[0][1].replaceMessage,message);assert.equal(generated[0][0].messages.length,1);assert.equal(helpers.messages.length,2,'no duplicate user bubble');
   helpers.busy(true);helpers.regenerateAnswer(message);assert.equal(generated.length,1);helpers.busy(false);
-  helpers.resizeInput(input);assert.equal(input.style.height,'128px');assert.equal(input.style.overflowY,'auto');input.scrollHeight=26;helpers.resizeInput(input);assert.equal(input.style.height,'26px');assert.equal(input.style.overflowY,'hidden');
+  helpers.resizeInput(input);assert.equal(input.style.height,'150px');assert.equal(input.style.overflowY,'auto');input.scrollHeight=44;helpers.resizeInput(input);assert.equal(input.style.height,'44px');assert.equal(input.style.overflowY,'hidden');
 
   let scrolled=0,button={hidden:true};const win={scrollY:800,innerHeight:600,matchMedia:()=>({matches:true})};
   const scroll=new Function('window','document','requestAnimationFrame',`

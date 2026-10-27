@@ -762,11 +762,12 @@
     .message.user { box-sizing: border-box; max-width: 80%; font-size: 16px; line-height: 1.6; }
     .message .ai-avatar { display: none; }
     .turn-question { font-size: 16px; }
-    .composer, .chat-composer { display: grid; grid-template-columns: 34px minmax(0,1fr) 42px; align-items: end; gap: 8px; min-height: 52px; padding: 8px 10px; border-radius: 28px; }
-    .composer textarea { grid-column: 2; grid-row: 1; height: 26px; max-height: 128px; min-width: 0; margin: 8px 0; overflow-y: hidden; font-size: 16px; line-height: 25.6px; }
+    .composer, .chat-composer { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; align-items: center; gap: 8px; min-height: 62px; padding: 8px 10px; border-radius: 28px; }
+    .composer textarea { grid-column: 2; grid-row: 1; display:block; box-sizing:border-box; appearance:none; height:44px; min-height:44px; max-height:150px; min-width:0; margin:0; padding:8.8px 0; border:0; overflow-y:hidden; font-size:16px; font-weight:400; line-height:1.65; }
+    .composer textarea::placeholder { font:inherit; line-height:inherit; white-space:nowrap; text-overflow:ellipsis; opacity:1; }
     .composer-actions { display: contents; }
-    .composer .plus { grid-column: 1; grid-row: 1; margin-bottom: 4px; }
-    .composer .send { grid-column: 3; grid-row: 1; }
+    .composer .plus { grid-column: 1; grid-row: 1; width:44px; height:44px; margin:0; padding:0; }
+    .composer .send { grid-column: 3; grid-row: 1; width:44px; height:44px; margin:0; padding:0; }
     .chat-dock { border-top: 0; }
     .chat-composer { position: relative; bottom: auto; }
     .answer-actions { display: flex; gap: 4px; margin-top: 12px; }
@@ -1810,9 +1811,17 @@
       generateAnswer(request,{replaceMessage:message});
     }
     function resizeInput(el) {
+      const style = typeof getComputedStyle === 'function' ? getComputedStyle(el) : null;
+      const line = parseFloat(style?.lineHeight) || 26.4;
+      const padding = style ? (parseFloat(style.paddingTop)||0) + (parseFloat(style.paddingBottom)||0) : 17.6;
+      const border = style ? (parseFloat(style.borderTopWidth)||0) + (parseFloat(style.borderBottomWidth)||0) : 0;
+      const minimum = Math.ceil(line + padding + border), maximum = Math.ceil(line * 5 + padding + border);
+      el.style.minHeight = `${minimum}px`;
+      el.style.maxHeight = `${maximum}px`;
       el.style.height = 'auto';
-      el.style.height = `${Math.max(26,Math.min(el.scrollHeight, 128))}px`;
-      el.style.overflowY = el.scrollHeight > 128 ? 'auto' : 'hidden';
+      const contentHeight = el.value ? el.scrollHeight + border : minimum;
+      el.style.height = `${Math.max(minimum,Math.min(contentHeight, maximum))}px`;
+      el.style.overflowY = contentHeight > maximum ? 'auto' : 'hidden';
       const send = el.closest('form').querySelector('.send');
       if (!generating || send.id !== 'chatSend') send.disabled = !el.value.trim();
     }
@@ -3063,7 +3072,7 @@
     qsa('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
     document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
-    window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
+    window.addEventListener('resize', () => { setSidebar(sidebar.classList.contains('open')); ['welcomeInput','chatInput'].forEach(id => { const input=document.getElementById(id); if(input.getClientRects().length)resizeInput(input); }); });
     renderAuthNavigation();
     renderHistory();
     try{if(!location.hash.startsWith('#share=')){const resume=sessionStorage.getItem(scopedKey('inchelin-resume-chat'))||sessionStorage.getItem(scopedKey('inchelin-active-chat'));if(resume){sessionStorage.removeItem(scopedKey('inchelin-resume-chat'));openHistory(resume);}}}catch{}
