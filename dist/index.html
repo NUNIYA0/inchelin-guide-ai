@@ -1023,17 +1023,16 @@
     .location-choice-response .answer-question {margin:0;padding:0;border:0;background:transparent;max-width:560px;}
     .location-choice-response .turn-question {margin:0 0 6px;font:600 18px/1.5 system-ui,"Noto Sans KR",sans-serif;}
     .location-choice-help {margin:0 0 20px;color:#7c8491;font:400 15px/1.6 system-ui,"Noto Sans KR",sans-serif;}
-    .location-choice-response .question-location-choice {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;max-width:560px;}
-    .location-choice-response .question-location-choice .quick-reply {display:flex;align-items:center;justify-content:center;gap:12px;min-width:0;min-height:56px;height:auto;padding:12px 16px;border:1px solid #d8dde5;border-radius:999px;background:#fff;color:#17191d;box-shadow:none;white-space:nowrap;font:400 16px/1.5 system-ui,"Noto Sans KR",sans-serif;}
+    .location-choice-response .question-location-choice {display:flex;flex-wrap:wrap;gap:8px;margin:0;}
+    .location-choice-response .question-location-choice .quick-reply {display:flex;flex:0 0 auto;align-items:center;justify-content:center;gap:6px;min-width:fit-content;min-height:44px;height:44px;padding:8px 14px;border:1px solid #d8dde5;border-radius:999px;background:#fff;color:#17191d;box-shadow:none;white-space:nowrap;font:400 14px/1.5 system-ui,"Noto Sans KR",sans-serif;}
     .location-choice-response .quick-reply-title {font:inherit;white-space:nowrap;}
-    .location-choice-response .supplied-icon {width:22px;height:22px;flex:0 0 22px;}
+    .location-choice-response .supplied-icon {width:18px;height:18px;flex:0 0 18px;}
     .location-choice-response .question-location-choice .quick-reply:hover:not(:disabled):not([aria-pressed=true]) {background:#f7f8fa;border-color:#9da6b3;}
     .location-choice-response .question-location-choice .quick-reply:active:not(:disabled) {transform:none;}
     .location-choice-response .question-location-choice .quick-reply[aria-pressed=true] {background:#f1f2f5;border:1px solid #252a32;font-weight:600!important;opacity:1;}
     .location-choice-response .question-location-choice .quick-reply[aria-pressed=true] .quick-reply-title {font-weight:600!important;}
     .location-choice-response .question-location-choice .quick-reply:focus-visible {outline:2px solid #4f70b5;outline-offset:3px;}
-    @media(max-width:480px){.location-choice-response .question-location-choice{gap:8px;}.location-choice-response .question-location-choice .quick-reply{gap:8px;padding:12px 8px;font-size:14px;}.location-choice-response .turn-question{font-size:17px;}.location-choice-help{font-size:14px;}}
-    @media(max-width:359px){.location-choice-response .question-location-choice{grid-template-columns:minmax(0,1fr);}}
+    @media(max-width:480px){.location-choice-response .question-location-choice .quick-reply{padding:8px 12px;}.location-choice-response .turn-question{font-size:17px;}.location-choice-help{font-size:14px;}}
     /* One self-hosted UI family, including late-mounted plugin sheets. */
     @font-face {font-family:'Pretendard';src:url('/assets/fonts/PretendardVariable.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap;}
     :root {--ui-font:'Pretendard',sans-serif;--plugin-body-font:'Pretendard',sans-serif;}
