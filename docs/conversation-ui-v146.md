@@ -4,7 +4,7 @@ The user-provided mockup guides presentation only. Existing API, classification,
 search, geolocation, radius filtering, address-only Naver map URLs and registered
 dataset remain unchanged. No unsupported microphone or feedback feature added.
 
-- White page, light gray sidebar (open on desktop, drawer on mobile), right user
+- White page, original sidebar appearance and toggle behavior, right user
   bubble, background-free AI text, centered 760px conversation and fixed composer.
 - Desktop restaurant grid: two columns; <=767px: one column. Natural-height rows.
 - Cards show a main-menu entry and its recorded price, straight-line distance,

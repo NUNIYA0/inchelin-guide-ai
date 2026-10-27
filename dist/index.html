@@ -945,14 +945,8 @@
     .verification-toggle {min-height:44px;max-width:100%;border:1px solid #ddd;border-radius:22px;padding:8px 12px;background:white;font:400 14px/1.5 system-ui,sans-serif;}
     .condition-evidence[hidden] {display:none!important;}
     /* Conversation redesign: actual authored data stays visible; auxiliary facts expand locally. */
-    .sidebar,.chat-view,.chat-dock {font-family:system-ui,"Noto Sans KR",sans-serif;}
-    :root {--sidebar:278px;--conversation-width:760px;}
-    .rail,.sidebar {background:#f5f5f6;border-color:#e7e8eb;}
-    .sidebar {padding:22px 16px;}
-    .sidebar .new-chat {min-height:48px;padding:12px 16px;border:1px solid #d9dde3;border-radius:12px;background:#fff;color:#16181b;font-size:14px;gap:12px;}
-    .history-label {margin:28px 12px 12px;color:#737b86;font-size:13px;}
-    .history-item {min-height:44px;padding:12px;color:#353a43;font-size:14px;}
-    .history-row:has(.active),.history-item.active {background:#e9eaec;border-radius:10px;}
+    .chat-view,.chat-dock {font-family:system-ui,"Noto Sans KR",sans-serif;}
+    :root {--conversation-width:760px;}
     .chat-view,.chat-dock-inner {width:min(var(--conversation-width),100%);max-width:var(--conversation-width);margin-inline:auto;}
     .chat-view {padding-inline:0;}
     .messages {padding:24px 0 calc(var(--dock-height,130px) + 28px);}
@@ -3084,7 +3078,7 @@
     qsa('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
     document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
-    window.addEventListener('resize', () => setSidebar(window.innerWidth>768&&sidebar.classList.contains('open')));
+    window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
     renderAuthNavigation();
     renderHistory();
     try{if(!location.hash.startsWith('#share=')){const resume=sessionStorage.getItem(scopedKey('inchelin-resume-chat'))||sessionStorage.getItem(scopedKey('inchelin-active-chat'));if(resume){sessionStorage.removeItem(scopedKey('inchelin-resume-chat'));openHistory(resume);}}}catch{}
@@ -3119,7 +3113,6 @@
     }).catch(() => {
       document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });
     });
-    setSidebar(window.innerWidth>768);
     if (!loadSharedConversationFromHash()) updateShareVisibility();
   })(
     selector => document.querySelector(selector),
