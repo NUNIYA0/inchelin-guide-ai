@@ -1037,6 +1037,7 @@
     .restaurant-group + .turn-notice {margin:12px 0 0;color:#7c8491;}
   </style>
   <link rel="stylesheet" href="/assets/location-picker.css?v=154" />
+  <link rel="stylesheet" href="/assets/restaurant-ui.css?v=155" />
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -1210,9 +1211,10 @@
 
   <div class="toast" id="toast" role="status"></div>
 
-<script src="assets/response-rules.js?rules=v145"></script>
+<script src="assets/response-rules.js?rules=v155"></script>
 <script src="assets/naver-map.js?rules=v145"></script>
-<script src="assets/phase1-core.js?rules=v152"></script>
+<script src="assets/phase1-core.js?rules=v155"></script>
+<script src="assets/restaurant-ui.js?v=155"></script>
 <script src="assets/recommendation-flags.js?rules=v145"></script>
 <script src="assets/recommendations-ui.js?rules=v145"></script>
   <script>
@@ -1461,6 +1463,7 @@
         recommendedBy: String(restaurant.recommendedBy || restaurant.recommender || '').trim(),
         recommender: String(restaurant.recommendedBy || restaurant.recommender || '').trim(),
         imageUrl: safeHttpUrl(restaurant.imageUrl),
+        photos:Array.isArray(restaurant.photos)?restaurant.photos:[],photoLookupEnabled:restaurant.photoLookupEnabled===true,registeredSourceId:restaurant.registeredSourceId||null,
         businessStatus: String(restaurant.businessStatus || 'unknown').trim(),
         distanceMeters: restaurant.distanceMeters !== null && restaurant.distanceMeters !== undefined && Number.isFinite(Number(restaurant.distanceMeters)) ? Math.max(0, Math.round(Number(restaurant.distanceMeters))) : null,
         distanceKind:restaurant.distanceKind||'straight',originLabel:String(restaurant.originLabel||restaurant.regionLabel||''),
@@ -1518,6 +1521,7 @@
         roadAddress: item.roadAddress,
         recommendedBy: item.recommendedBy,
         imageUrl: item.imageUrl,
+        photos:item.photos,photoLookupEnabled:false,registeredSourceId:item.registeredSourceId,
         businessStatus: item.businessStatus,
         recommendationReason: item.recommendationReason,
         openingHours: item.openingHours,
@@ -1935,17 +1939,13 @@
     }
     let phase1Sheets=null;
     async function openPhase1Condition(key='location') {
-      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=154');phase1Sheets=mountPhase1Sheets({send:(message,options)=>options?.locationSelection?ask(message,options):routeQuestion(message),locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
+      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=155');phase1Sheets=mountPhase1Sheets({send:(message,options)=>options?.locationSelection?ask(message,options):routeQuestion(message),locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
       catch{showToast('선택창을 열지 못했어요. 입력창에 원하는 조건을 말씀해 주세요.');$('#chatInput').focus();}
     }
     function setPhase1Focus(card){const message=[...chatMessages].reverse().find(m=>m.meta?.responseModeState?.phase1);if(message){const state=message.meta.responseModeState;state.phase1.focusCardId=card.id;state.shownPlaces=[...new Map([...(state.shownPlaces||[]),card].map(c=>[c.id,c])).values()].slice(-50);saveConversation();}}
-    function renderPhase1Conditions(chips){
-      const group=document.createElement('div');group.className='result-conditions phase1-conditions';group.setAttribute('aria-label','적용 중인 조건');
-      const hint=document.createElement('small');hint.className='conditions-hint';hint.textContent='현재 조건 · 눌러 변경';group.appendChild(hint);
-      const removeMessages={food:'음식 조건 해제해줘',budget:'예산 제한 없애줘',companion:'동행 조건 해제해줘',people:'인원 조건 해제해줘',visit:'방문 시간 조건 해제해줘',purpose:'목적 조건 해제해줘',vibe:'분위기 조건 해제해줘',parking:'주차 조건 해제해줘'};
-      for(const chip of chips){const item=document.createElement('span');item.className='phase1-condition';const edit=document.createElement('button');edit.type='button';edit.className='meal-chip';edit.textContent=chip.label+' ▾';edit.setAttribute('aria-label',chip.label+' 변경');edit.addEventListener('click',()=>openPhase1Condition(chip.key));item.appendChild(edit);
-        if(chip.removable){const remove=document.createElement('button');remove.type='button';remove.className='phase1-remove';remove.textContent='×';remove.setAttribute('aria-label',chip.label+' 해제');remove.addEventListener('click',()=>routeQuestion(removeMessages[chip.key]));item.appendChild(remove);}group.appendChild(item);}
-      return group;
+    function renderPhase1Conditions(chips,conditions={}){
+      const summary=document.createElement('p');summary.className='applied-conditions phase1-conditions';summary.setAttribute('aria-label','적용 중인 조건');
+      summary.textContent=chips.filter(chip=>chip.key!=='radiusMeters'||conditions.radiusConfirmed!==false).map(chip=>chip.label+(chip.key==='location'?' 기준':'')).join(' · ');return summary;
     }
     function uiIcon(name) {
       const supplied={copy:'copy',regenerate:'refresh',location:'map-pin',search:'search',info:'circle-alert'};
@@ -1965,7 +1965,7 @@
       restaurants.slice(0, 3).forEach(restaurant => {
         const verification=restaurant.conditionVerification;
         const groupLabel=verification?.status==='unconfirmed'?'미확인 후보 · 조건 충족 보장 아님':verification?.status==='experience'?'추천인의 경험을 참고한 식당':'확인된 조건에 맞는 식당';
-        if(verification&&lastVerification!==groupLabel){const label=document.createElement('p');label.className='verification-group';label.textContent=groupLabel;list.appendChild(label);lastVerification=groupLabel;}
+        if(verification&&lastVerification!==groupLabel){const label=document.createElement('p');label.className='verification-group';label.textContent=groupLabel;group.appendChild(label);lastVerification=groupLabel;}
         const card = document.createElement('article'); card.className = 'restaurant-card';
         card.historyLabel = restaurant.name;
         const content = document.createElement('div'); content.className = 'restaurant-card-content';
@@ -1991,12 +1991,7 @@
         const source=document.createElement('p');source.className='card-source';source.textContent=restaurant.dataSource==='inchelin'?'인슐랭 앱 등록 식당':restaurant.recommendationBundle?.status==='matched'?'네이버 검색 · 앱 등록 추천 정보':'네이버 검색 · 앱 등록 추천 아님';
         let evidence=null;
         if(verification?.checks?.some(check=>check.key!=='distance')){evidence=document.createElement('div');evidence.className='condition-evidence';evidence.hidden=true;for(const check of verification.checks.filter(check=>check.key!=='distance')){const line=document.createElement('p');line.textContent=check.label+': '+(check.status==='confirmed'?'확인':check.status==='experience'?'추천인 경험':check.status==='failed'?'불충족':'미확인')+' — '+check.basis;evidence.appendChild(line);}}
-        if (restaurant.imageUrl) {
-          const media = document.createElement('div'); media.className = 'restaurant-media';
-          const image = document.createElement('img'); image.className = 'restaurant-image'; image.src = restaurant.imageUrl;
-          image.alt = restaurant.name + ' 사진'; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
-          image.addEventListener('error', () => media.remove(), { once: true }); media.appendChild(image); content.appendChild(media);
-        }
+        content.appendChild(globalThis.InchelinRestaurantUI.photo(restaurant));
         content.appendChild(body);
         card.appendChild(content);
         const authored=globalThis.InchelinRecommendationsUI?.render(restaurant.recommendationBundle);
@@ -2011,7 +2006,7 @@
         if(restaurant.naverPlaceUrl){map.href=restaurant.naverPlaceUrl;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
         actions.append(expand,map); card.appendChild(actions); list.appendChild(card);
       });
-      group.appendChild(list);
+      globalThis.InchelinRestaurantUI.carousel(group,list);group.appendChild(list);
       return group;
     }
     function quickReplyCard(reply) {
@@ -2081,18 +2076,13 @@
         const hasQuestion=allowed('question')&&Boolean(message.meta?.turnPolicy?.questionText);
         const locationChoice=hasQuestion&&message.meta?.phase1&&message.meta.turnPolicy?.next_question?.slot==='region'&&Boolean(message.meta.turnPolicy.questionHelp);
         if(locationChoice)item.classList.add('location-choice-response');
-        if(message.meta?.phase1&&message.meta.conditionChips?.length)resultSection.appendChild(renderPhase1Conditions(message.meta.conditionChips));
+        if(message.meta?.phase1&&message.meta.conditionChips?.length)resultSection.appendChild(renderPhase1Conditions(message.meta.conditionChips,message.meta.responseModeState?.phase1?.conditions));
         const conditionKey=message.meta?.searchConditions?JSON.stringify(message.meta.searchConditions):'';
         const priorAI=[...messagesEl.children].filter(node=>node.chatRole==='assistant');
         const previousAI=extra.includes('regenerated')?priorAI.at(-2):priorAI.at(-1);
         item.responseConditionKey=conditionKey;
         if (allowed('text') && conditionKey && conditionKey !== previousAI?.responseConditionKey) {
-          const conditions = document.createElement('div'); conditions.className = 'result-conditions'; conditions.setAttribute('aria-label', '현재 검색 조건');
-          for (const [axis, label] of [['region', message.meta.searchConditions.region], ['food', message.meta.searchConditions.food]]) {
-            if (!label) continue;
-            const chip = document.createElement('button'); chip.type = 'button'; chip.className = 'meal-chip'; chip.textContent = label; chip.setAttribute('aria-label', (axis === 'region' ? '지역 바꾸기: ' : '음식 바꾸기: ') + label);
-            chip.addEventListener('click', () => { if (!chip.disabled) openSearchPicker(axis); }); conditions.appendChild(chip);
-          }
+          const conditions = document.createElement('p'); conditions.className = 'applied-conditions';conditions.textContent=[message.meta.searchConditions.region,message.meta.searchConditions.food].filter(Boolean).join(' · ');
           resultSection.appendChild(conditions);
         }
         if (allowed('text')&&!locationChoice) resultSection.appendChild(copy);
@@ -2104,6 +2094,7 @@
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
         const answerLayout = locationChoice?'location-choice':message.meta?.turnPolicy?.answerLayout || (message.meta?.flow === 'menu_category' ? 'category' : message.meta?.flow === 'region' ? 'region' : ['region','companion'].includes(message.meta?.turnPolicy?.next_question?.slot) ? message.meta.turnPolicy.next_question.slot : null);
         if (answerLayout) answers.classList.add('question-' + answerLayout);
+        if(message.meta?.turnPolicy?.next_question?.slot==='radiusMeters')answers.classList.add('radius-answer');
         const answerTop = document.createElement('div'); answerTop.className = 'answer-full-row answer-top';
         const answerTiles = document.createElement('div'); answerTiles.className = 'answer-tiles';
         const answerBottom = document.createElement('div'); answerBottom.className = 'answer-full-row answer-bottom';
@@ -2617,8 +2608,9 @@
     }
     function routeQuestion(question) {
       if(['지역·역 선택','지역·역 선택하기'].includes(question)){openPhase1Condition('location');return;}
-      if(['예산 변경','음식 종류 변경','다른 메뉴로','방문 시간 변경','인원 변경'].includes(question)){openPhase1Condition(/예산/.test(question)?'budget':/방문/.test(question)?'visit':/인원/.test(question)?'people':'food');return;}
-      if (['지역 바꾸기', '음식 바꾸기', '메뉴 바꾸기', '조건 바꾸기'].includes(question)) { openSearchPicker(question === '지역 바꾸기' ? 'region' : question === '조건 바꾸기' ? null : 'food'); return; }
+      if(['예산 변경','음식 종류 변경','다른 메뉴로','방문 시간 변경','인원 변경','음식 바꾸기','메뉴 바꾸기'].includes(question)){ask(question);return;}
+      if(question==='지역 바꾸기'){openPhase1Condition('location');return;}
+      if(question==='조건 바꾸기'){pluginReply('바꾸고 싶은 위치·거리·음식·예산을 대화로 말씀해 주세요.');return;}
       if (question === '비교하기') {
         runPlugin(4);
         return;

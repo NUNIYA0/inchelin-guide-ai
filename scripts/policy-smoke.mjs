@@ -15,6 +15,7 @@ import {testPhase3} from './phase3-smoke.mjs';
 import {testPhase4} from './phase4-smoke.mjs';
 import {testConversationScroll} from './scroll-smoke.mjs';
 import {testRegisteredData} from './registered-data-smoke.mjs';
+import {testCardsV155} from './cards-v155-smoke.mjs';
 const api=globalThis.InchelinPhase1;
 const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
@@ -27,13 +28,17 @@ export async function requestCase(message,{state=null,currentLocation=null,curre
 // Legacy v137/v138 card assertions now explicitly exercise the consent continuation.
 // New v139 tests and the consent client scenario call requestCase directly.
 export async function runCase(message,options={}){
-  const initial=await requestCase(message,options);
+  let initial=await requestCase(message,options);
+  // Historical card regressions continue after the newly required radius choice.
+  if(initial.body.meta?.turnPolicy?.next_question?.slot==='radiusMeters')initial=await requestCase('1km 이내로 찾아줘',{...options,state:initial.body.meta.responseModeState});
   if(initial.body.meta?.turnPolicy?.answerChoices?.some(c=>c.label==='미확인 후보 보기')){
     const accepted=await requestCase('미확인 조건을 알고 후보도 보여줘',{...options,state:initial.body.meta.responseModeState});accepted.initial=initial;return accepted;
   }
   return initial;
 }
+async function legacyRequestCase(message,options={}){const r=await requestCase(message,options);return r.body.meta?.turnPolicy?.next_question?.slot==='radiusMeters'?requestCase('1km 이내로 찾아줘',{...options,state:r.body.meta.responseModeState}):r;}
 const c=r=>r.body.meta.responseModeState.phase1.conditions,s=r=>r.body.meta.responseModeState;
+await testCardsV155(requestCase,productionWorker);
 for(const [h,m,p] of [[9,59,'morning'],[10,0,'lunch'],[13,59,'lunch'],[14,0,'afternoon'],[16,59,'afternoon'],[17,0,'evening'],[20,59,'evening'],[21,0,'lateNight'],[23,59,'lateNight'],[0,0,'lateNight'],[4,59,'lateNight'],[5,0,'morning']]){
   assert.equal(api.period(h+m/60),p);for(const generated of [undefined,[],null,['영업 중인 식당 찾아줘','홍대에서 냉면 먹을래'],['점심으로 가볍게 먹을 곳 찾아줘']]){const rows=api.welcome(h+m/60,generated);assert.equal(rows.length,3);assert.equal(new Set(rows.map(q=>q.prompt)).size,3);assert.ok(rows.every(q=>!/영업|홍대|강남|디저트/.test(q.prompt)));}
 }
@@ -73,18 +78,18 @@ const vague=await runCase('여기 지도 보여줘',{state:s(bulk)});assert.equa
 const focusedState=s(bulk);focusedState.phase1.focusCardId=bulk.body.restaurants[1].id;const focused=await runCase('여기 지도 보여줘',{state:focusedState});assert.equal(focused.body.restaurants[0].id,bulk.body.restaurants[1].id);
 for(const r of [bulk,seongsu,noAddress])for(const card of r.body.restaurants){for(const key of ['imageUrl','menus','prices','recommenderName','otherRecommendations','openingHours'])assert.equal(card[key],null);assert.equal(card.recommendedBy,'');assert.equal(card.recommendationReason,'');}
 assert.equal(normalizeKoreanParticles('홍대은 냉면를 골라봐요.',['홍대','냉면']),'홍대는 냉면을 골라봐요.');
-const faq=await runCase('추천은 어떤 기준으로 하나요?');assert.equal(faq.calls.length,0);assert.equal(faq.body.restaurants.length,0);assert.match(faq.body.message,/직선거리 1km/);
+const faq=await runCase('추천은 어떤 기준으로 하나요?');assert.equal(faq.calls.length,0);assert.equal(faq.body.restaurants.length,0);assert.match(faq.body.message,/반경/);
 assert.deepEqual(noLocation.body.meta.conditionChips,[]);assert.deepEqual(foodOnly.body.meta.conditionChips,[]);
 assert.ok(bulk.body.meta.notice.split(/[.!?]/).filter(x=>x.trim()).length<=2);
 assert.ok(!/주차|분위기|시간|좌석/.test(bulk.body.meta.notice),'only applicable conditions');
 assert.ok(remove.body.restaurants.every(card=>card.conditionVerification.checks.find(check=>check.key==='visit')?.blocking===false),'meal context does not require opening evidence');
 const v138Samples=await testRecommendations(runCase);
-const v139Samples=await testPhase3(requestCase);
-const v140Samples=await testPhase4(requestCase);
-await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},requestCase);
+const v139Samples=await testPhase3(legacyRequestCase);
+const v140Samples=await testPhase4(legacyRequestCase);
+await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},legacyRequestCase,requestCase);
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
 testConversationScroll(html);
-await testRegisteredData(requestCase,productionWorker);
+await testRegisteredData(legacyRequestCase,productionWorker);
 const pickerCSS=await productionWorker.fetch(new Request('https://example.test/assets/location-picker.css?v=152'),env,{});
 assert.equal(pickerCSS.status,200);assert.match(pickerCSS.headers.get('content-type'),/text\/css/,'picker styles must not be served as binary');assert.match(await pickerCSS.text(),/\.bottom-sheet\.location-picker/);
 assert.ok(!/id="guide(?:Rail|Side)"/.test(html),'usage-guide navigation removed from both sidebar states');

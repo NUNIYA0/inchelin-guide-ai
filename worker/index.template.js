@@ -23,8 +23,10 @@ import { createChatTiming } from './request-timing.js';
 import './response-rules.js';
 import './phase1-core.js';
 import {createRecommendationCatalog, dedupeRestaurants} from './recommendations.js';
+import {lookupRestaurantPhoto} from './restaurant-photos.js';
 import {evaluateConditions,unknownScopes,consentKeys} from './condition-evidence.js';
 const recommendationData = __RECOMMENDATION_DATA__;
+const photoSource = __PHOTO_SOURCE__;
 const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
 import {resolveRegisteredCards} from './registered-search.js';
 
@@ -2326,6 +2328,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   // v136 meal_time could be inferred from the clock, so it is not a provided
   // optional condition. Only explicitly parsed v137 visit values are retained.
   const old=prior.conditions||{location:migratedLocation,food:previous.slots?.menu||previous.slots?.food_type||null,budget:previous.preferences?.budget||null,companion:previous.slots?.companion||null,vibe:previous.preferences?.vibe||null,parking:previous.slots?.parking??null,visit:null};
+  if(old.radiusConfirmed==null&&previous.lastCards?.length)old.radiusConfirmed=true;
   const parsed=api.parse(latest,old,context),c=parsed.conditions;
   const recommendationCatalog=registeredRecommendationCatalog;
   const registeredOnly=recommendationCatalog.exclusive||(/네이버.*(?:검색|찾)/.test(latest)?false:/등록.*(?:추천|식당)|추천인.*(?:있는|맛집)/.test(latest)||prior.registeredOnly===true);
@@ -2337,12 +2340,12 @@ async function phase1ChatResponse(latest,context,env,execution){
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
   const plan=(message,restaurants=[],{question='',questionHelp='',choices=[],notice='',intent='place_search',error=false}={})=>{
-    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...card,conditionVerification:evaluateConditions(card,c)}));
+    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...card,photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
     state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
     answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',...(recommendationCatalog.exclusive?{registeredData:{count:recommendationCatalog.entries().length,sourceDate:recommendationData.sourceDate,sourceHash:recommendationData.sourceHash,exclusive:true}}:{}),conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
-    turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
+    turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':!c.radiusConfirmed?'radiusMeters':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   if(!c.location||parsed.ambiguous||parsed.unknownStation){
     state.lastCards=[];
@@ -2351,6 +2354,9 @@ async function phase1ChatResponse(latest,context,env,execution){
     return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,questionHelp,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
   }
   if(parsed.invalidRadius)return plan('거리를 임의로 바꾸지 않고 기다릴게요.',[],{question:'0보다 큰 직선거리를 m나 km로 알려주시겠어요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'2km 이내',message:'2km 이내로 찾아줘'}]});
+  if(!c.radiusConfirmed){state.stage='radius_asked';return plan(withParticle(c.location.label,'을/를')+' 기준으로 찾아볼게요.',[],{question:'어느 정도 거리까지 찾아볼까요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'3km 이내',message:'3km 이내로 찾아줘'}]});}
+  if(/^(?:음식 종류 변경|음식 바꾸기|메뉴 바꾸기|다른 메뉴로)$/.test(latest))return plan('먹고 싶은 음식으로 바꿔볼게요.',[],{question:'어떤 음식이 끌리세요?',choices:['한식','냉면','국밥','파스타'].map(food=>({label:food,message:food+' 먹을 곳 찾아줘'}))});
+  if(/^예산 변경$/.test(latest))return plan('원하는 예산을 말씀해 주세요.',[],{question:'한 끼 예산은 어느 정도인가요?',choices:[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'2만 원 이하',message:'2만 원 이하로 찾아줘'},{label:'제한 없음',message:'예산 제한 없애줘'}]});
   if(registeredOnly&&!recommendationCatalog.active)return plan('등록된 추천 정보를 현재 불러올 수 없어요. 추천인·추천 이유가 있는 등록 맛집 대신 외부 검색을 사용하려면 아래에서 선택해 주세요.',[],{choices:[{label:'네이버 검색으로 찾기',message:'네이버 검색으로 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
   const targets=[];
   for(const [i,pattern] of [[0,/첫\s*번째|처음|1\s*번째/],[1,/두\s*번째|2\s*번째/],[2,/세\s*번째|3\s*번째/]])if(pattern.test(latest)&&cards[i])targets.push(cards[i]);
@@ -2975,6 +2981,11 @@ export default {
       }
     }
 
+    if(url.pathname==='/api/restaurant-photo'){
+      if(request.method!=='GET')return json({error:'Method not allowed'},405);
+      const id=String(url.searchParams.get('id')||'').slice(0,120),row=registeredRecommendationCatalog.entries().find(r=>r.sourceId===id);
+      return json(await lookupRestaurantPhoto(row,photoSource,env));
+    }
     if (url.pathname === "/api/reverse-geocode") {
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);
       return handleReverseGeocode(request, env);

@@ -21,7 +21,7 @@
   function distance(a,b){if(!coords(a)||!coords(b))return null;const rad=n=>n*Math.PI/180,dlat=rad(b.latitude-a.latitude),dlng=rad(b.longitude-a.longitude),v=Math.sin(dlat/2)**2+Math.cos(rad(a.latitude))*Math.cos(rad(b.latitude))*Math.sin(dlng/2)**2;return 6371008.8*2*Math.atan2(Math.sqrt(v),Math.sqrt(Math.max(0,1-v)));}
   function findCenters(text){const matches=centers.flatMap(c=>c.aliases.flatMap(alias=>[...text.matchAll(new RegExp(alias+'(?=$|[\\s,.!?]|에서|으로|로|이나|이랑|랑|과|와|하고|또는|말고|역(?![가-힣])|쪽|근처|주변|맛집|음식|추천|냉면|삼겹살|파스타)','g'))].map(m=>({center:c,index:m.index,length:alias.length}))));return matches.sort((a,b)=>a.index-b.index||a.length-b.length);}
   function parse(text,previous={},context={}){
-    text=clean(text);const c={location:null,radiusMeters:1000,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,requireOpen:false,visitAt:null,vibe:null,parking:null,...JSON.parse(JSON.stringify(previous||{}))};
+    text=clean(text);const c={location:null,radiusMeters:1000,radiusConfirmed:false,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,requireOpen:false,visitAt:null,vibe:null,parking:null,...JSON.parse(JSON.stringify(previous||{}))};
     if(c.location&&!coords(c.location))c.location=null;
     c.radiusMeters=Number.isFinite(Number(c.radiusMeters))&&Number(c.radiusMeters)>0?Number(c.radiusMeters):1000;
     const matches=findCenters(text),unique=[...new Set(matches.map(m=>m.center.label))];
@@ -36,7 +36,7 @@
     const requested=text.match(/(\d+(?:\.\d+)?)\s*(km|킬로미터|킬로|m|미터)\s*(?:이내|안|로|으로|반경|범위|까지|$)/i);
     const meters=requested?Number(requested[1])*(/^(?:km|킬로)/i.test(requested[2])?1000:1):null;
     const invalidRadius=requested&&(!Number.isFinite(meters)||meters<=0);
-    if(requested&&!invalidRadius)c.radiusMeters=meters;
+    if(requested&&!invalidRadius){c.radiusMeters=meters;c.radiusConfirmed=true;}
     const foods=dishes.flatMap(food=>[...text.matchAll(new RegExp(food,'g'))].map(m=>({food,index:m.index}))).sort((a,b)=>a.index-b.index||a.food.length-b.food.length);
     if(foods.length)c.food=foods.at(-1).food;
     const budget=text.match(/(?:(\d+(?:\.\d+)?|한|일)?\s*만\s*(?:(\d+)\s*천)?\s*원|(\d[\d,]*)\s*원)\s*(이하|미만|정도|까지)?/);

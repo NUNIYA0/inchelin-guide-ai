@@ -18,7 +18,7 @@
       const nameValue=document.createElement('span');nameValue.className='recommendation-value';nameValue.textContent=record.recommenderName?.trim()?record.recommenderName:'추천인 정보 없음';name.append(nameLabel,nameValue);
       const reason=document.createElement('p');reason.className='authored-reason';
       const reasonLabel=document.createElement('span');reasonLabel.className='recommendation-label';reasonLabel.textContent='추천 이유';
-      const reasonValue=document.createElement('span');reasonValue.className='recommendation-value';reasonValue.textContent=record.reason?.trim()?'“'+record.reason+'”':'추천 이유 없음';if(!record.reason?.trim())reasonValue.className+=' missing-authored-reason';reason.append(reasonLabel,reasonValue);
+      const reasonValue=document.createElement('span');reasonValue.className='recommendation-value';reasonValue.textContent=record.reason?.trim()?'“'+record.reason+'”':'아직 등록된 추천 이유가 없어요.';if(!record.reason?.trim())reasonValue.className+=' missing-authored-reason';reason.append(reasonLabel,reasonValue);
       item.append(name,reason);return item;
     };
     if(!bundle.representative){const empty=document.createElement('p');empty.className='recommendations-empty';empty.textContent='등록된 추천이 없어요';section.append(empty);return section;}

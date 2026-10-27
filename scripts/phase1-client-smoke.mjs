@@ -2,8 +2,9 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import '../dist/assets/recommendation-flags.js';
 import '../dist/assets/recommendations-ui.js';
+import '../dist/assets/restaurant-ui.js';
 
-export async function testPhase1Client(runCase,samples,requestCase=runCase){
+export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRequestCase=requestCase){
   const deploymentFlags=globalThis.InchelinRecommendationFlags;
   globalThis.InchelinRecommendationFlags={enabled:false,connected:false};
   const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
@@ -32,7 +33,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
         if(kind==='network')throw new Error('network');
         if(kind==='hang')return new Promise((resolve,reject)=>options.signal.addEventListener('abort',()=>reject(Object.assign(new Error('stopped'),{name:'AbortError'}))));
         if(kind==='json')return new Response('{');
-        const result=await(kind==='consent'?requestCase:runCase)(request.messages.at(-1).content,{state:request.context.responseModeState,locationSelection:request.context.locationSelection,demoMode:request.context.demoMode,...(kind==='zero'?{data:{items:[]}}:{})});
+        const result=await(kind==='radius-flow'?rawRequestCase:kind==='consent'?requestCase:runCase)(request.messages.at(-1).content,{state:request.context.responseModeState,locationSelection:request.context.locationSelection,demoMode:request.context.demoMode,...(kind==='zero'?{data:{items:[]}}:{})});
         result.body.meta.generatedAt+=skew;if(kind==='version')result.body.meta.responseRulesVersion='v136';return Response.json(result.body);
       };
       const source=`
@@ -81,7 +82,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       const rec=app();rec.api.render({role:'assistant',content:samples.solo.body.message,restaurants:samples.solo.body.restaurants,meta:samples.solo.body.meta});
       const sections=cls(rec.elements.messages,'registered-recommendations');assert.equal(sections.length,3);
       assert.match(sections[0].textContent,/테스트 전용 작성자 하나/);assert.ok(sections[0].textContent.includes(samples.fixture.restaurants[0].recommendations[0].reason));
-      assert.match(sections[1].textContent,/추천인 정보 없음/);assert.match(sections[1].textContent,/추천 이유 없음/);assert.equal(cls(sections[1],'recommendations-toggle').length,0);
+      assert.match(sections[1].textContent,/추천인 정보 없음/);assert.match(sections[1].textContent,/아직 등록된 추천 이유가 없어요/);assert.equal(cls(sections[1],'recommendations-toggle').length,0);
       assert.match(sections[2].textContent,/등록된 추천이 없어요/);assert.equal(cls(sections[2],'recommendations-toggle').length,0);
       const toggle=cls(sections[0],'recommendations-toggle')[0],extra=cls(sections[0],'additional-recommendations')[0];
       assert.equal(toggle.textContent,'다른 추천 2개 보기');assert.equal(extra.hidden,true);
@@ -89,7 +90,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       const cards=cls(rec.elements.messages,'restaurant-card'),details=cls(cards[0],'restaurant-extra')[0],detailToggle=cls(cards[0],'restaurant-details-toggle')[0];
       assert.equal(details.hidden,true);assert.equal(cls(details,'registered-recommendations').length,0,'authored pair is never hidden in details');
       assert.equal(cls(details,'restaurant-address').length,1);assert.equal(cls(cards[0],'photo-missing').length,0);
-      assert.equal(cls(cards[0],'restaurant-media').length,0,'no image means no image area');
+      assert.equal(cls(cards[0],'restaurant-media').length,1,'no image keeps an equal-size placeholder');assert.match(cls(cards[0],'restaurant-photo-empty')[0].textContent,/등록된 사진이 없어요/);
       const mapButton=cls(cards[0],'restaurant-map-button')[0];assert.equal(mapButton.textContent,'지도 보기');assert.equal(mapButton.children.length,0,'map action is text only');
       detailToggle.click();assert.equal(details.hidden,false);assert.equal(detailToggle.attributes['aria-expanded'],'true');assert.equal(cls(cards[1],'restaurant-extra')[0].hidden,true);
       assert.equal(cls(details,'restaurant-compare').length,0,'compare collection removed from details');
@@ -101,10 +102,10 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       toggle.click();assert.equal(extra.hidden,true);assert.equal(rec.requests.length,beforeRequests);assert.equal(JSON.stringify(rec.api.messages),beforeConditions);assert.deepEqual(cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href),links);
       rec.api.render({role:'assistant',content:samples.solo.body.message,restaurants:samples.solo.body.restaurants,meta:samples.solo.body.meta});toggle.click();assert.equal(extra.hidden,false);assert.equal(cls(rec.elements.messages,'additional-recommendations').at(-1).hidden,true,'only the clicked card expands, including historical cards');
     }finally{globalThis.InchelinRecommendationFlags=oldFlags;globalThis.document=a.document;}
-    assert.ok(cls(a.elements.messages,'phase1-condition').length>=4);assert.match(a.elements.messages.textContent,/강남역에서 직선 100m/);
+    assert.equal(cls(a.elements.messages,'phase1-condition').length,0);assert.equal(cls(a.elements.messages,'phase1-conditions')[0].children.length,0,'conditions are read-only text');assert.match(a.elements.messages.textContent,/강남역에서 직선 100m/);
     const before=JSON.stringify(a.api.messages);const link=cls(a.elements.messages,'restaurant-map-link').find(n=>n.tagName==='A');assert.ok(link.href.includes(encodeURIComponent('서울특별시')));link.click();assert.equal(a.api.messages.length,2);assert.equal(a.api.request().context.responseModeState.phase1.focusCardId,a.api.messages[1].restaurants[0].id);assert.ok(before.includes('강남역'));
-    await a.api.edit('radiusMeters');const dialog=a.document.body.children.at(-1);assert.equal(dialog.open,true);assert.equal(flatten(dialog).find(n=>n.textContent==='1km 이내').attributes['aria-pressed'],'true');assert.ok(flatten(dialog).some(n=>n.placeholder==='예: 800m, 1.5km'));const five=flatten(dialog).find(n=>n.tagName==='BUTTON'&&n.textContent==='500m 이내');five.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);assert.equal(a.api.request().context.responseModeState.phase1.conditions.food,'한식');
-    const latestConditions=cls(a.elements.messages,'phase1-conditions').at(-1);const remove=flatten(latestConditions).find(n=>n.attributes['aria-label']==='1만 원 이하 해제');remove.click();await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.budget,null);assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
+    a.api.send('500m 이내로 찾아줘');await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);assert.equal(a.api.request().context.responseModeState.phase1.conditions.food,'한식');
+    a.api.send('예산 제한 없애줘');await a.api.done();assert.equal(a.api.request().context.responseModeState.phase1.conditions.budget,null);assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
     await a.api.edit('location');const regionDialog=a.document.body.children.at(-1);flatten(regionDialog).find(n=>n.attributes['aria-label']==='역삼역 지하철역').click();
     assert.equal(cls(regionDialog,'location-apply')[0].disabled,false);cls(regionDialog,'location-apply')[0].click();await a.api.done();
     assert.equal(a.requests.at(-1).context.locationSelection.id,'station:역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.location.id,'station:역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.location.label,'역삼역');assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,500);
@@ -154,7 +155,22 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       if(withCards){const group=cls(result,'restaurant-group')[0];assert.equal(result.children.indexOf(notes[0]),result.children.indexOf(group)+1,'common note directly follows whole card list');assert.equal(cls(group,'turn-notice').length,0,'not repeated within cards');}
       else assert.equal(cls(result,'restaurant-group').length,0,'cardless notice remains available');
     }
-    const missing=app();missing.api.render({role:'assistant',content:samples.noAddress.body.message,restaurants:samples.noAddress.body.restaurants,meta:samples.noAddress.body.meta});assert.ok(cls(missing.elements.messages,'restaurant-map-link').some(n=>n.disabled&&n.textContent==='주소 정보 없음'));assert.equal(cls(missing.elements.messages,'restaurant-media').length,0);
+    const missing=app();missing.api.render({role:'assistant',content:samples.noAddress.body.message,restaurants:samples.noAddress.body.restaurants,meta:samples.noAddress.body.meta});assert.ok(cls(missing.elements.messages,'restaurant-map-link').some(n=>n.disabled&&n.textContent==='주소 정보 없음'));assert.equal(cls(missing.elements.messages,'restaurant-photo-empty').length,samples.noAddress.body.restaurants.length);
+    {
+      const card={name:'테스트 사진 카드',dataSource:'inchelin',photos:[{url:'https://test.example/a.jpg',source:'registered'},{url:'https://test.example/b.jpg',source:'registered',isPrimary:true}]};
+      const frame=globalThis.InchelinRestaurantUI.photo(card),image=cls(frame,'restaurant-image')[0],empty=cls(frame,'restaurant-photo-empty')[0];assert.equal(image.src,card.photos[1].url);image.events.load();assert.equal(empty.hidden,true);image.events.error();assert.equal(empty.hidden,false);assert.equal(cls(frame,'restaurant-image').length,0);assert.equal(frame.className,'restaurant-media','failure preserves image frame');
+      assert.equal(globalThis.InchelinRestaurantUI.choosePhoto({...card,photos:card.photos.map(p=>({...p,isPrimary:false}))}).url,card.photos[0].url);
+      const group=new Node(),list=new Node();for(let i=0;i<3;i++){const card=new Node('article');card.className='restaurant-card';card.getBoundingClientRect=()=>({width:300});list.append(card);}list.clientWidth=624;list.scrollWidth=936;list.scrollLeft=0;list.scrollTo=({left})=>{list.scrollLeft=left;list.events.scroll?.();};
+      globalThis.InchelinRestaurantUI.carousel(group,list);const nav=cls(group,'restaurant-carousel-nav');assert.equal(nav[0].disabled,true);assert.equal(nav[1].disabled,false);nav[1].click();assert.equal(nav[1].disabled,true);assert.equal(nav[0].disabled,false);nav[0].click();assert.equal(list.scrollLeft,0);
+      list.events.keydown({key:'End',target:list,preventDefault(){}});assert.equal(list.scrollLeft,312);list.events.keydown({key:'Home',target:list,preventDefault(){}});assert.equal(list.scrollLeft,0);
+      list.events.pointerdown({pointerType:'mouse',button:0,target:{closest:()=>null},clientX:250,clientY:0,pointerId:1});list.events.pointermove({clientX:30,clientY:1,preventDefault(){}});list.events.pointerup();let suppressed=false;list.events.click({preventDefault(){suppressed=true;},stopImmediatePropagation(){}});assert.equal(suppressed,true,'drag cannot activate a card action');
+      const single=new Node(),one=new Node();one.className='restaurant-card';single.append(one);const only=new Node();globalThis.InchelinRestaurantUI.carousel(only,single);assert.equal(cls(only,'restaurant-carousel-nav').length,0);
+    }
+    {
+      const raw=app({kind:'radius-flow'});raw.api.type('강남역');await raw.api.done();assert.equal(cls(raw.elements.messages,'restaurant-card').length,0);assert.equal(cls(raw.elements.messages,'radius-answer').length,1);
+      const one=cls(raw.elements.messages,'quick-reply').find(n=>n.attributes['aria-label']==='1km 이내');one.click();await raw.api.done();assert.equal(cls(raw.elements.messages,'restaurant-card').length,3);assert.equal(raw.api.request().context.responseModeState.phase1.conditions.radiusMeters,1000);assert.equal(cls(raw.elements.messages,'phase1-remove').length,0);
+      raw.api.send('3km까지 넓혀줘');await raw.api.done();assert.equal(raw.api.request().context.responseModeState.phase1.conditions.radiusMeters,3000);assert.equal(cls(raw.elements.messages,'history-check').length,0);
+    }
     for(const kind of ['network','json','zero','version']){const a=app({kind});a.api.type('강남역에서 추천해줘');await a.api.done();assert.equal(a.api.busy,false);assert.ok(cls(a.elements.messages,'retry-button').length);assert.equal(/새 버전/.test(a.elements.messages.textContent),kind==='version');if(kind==='zero'){assert.ok(cls(a.elements.messages,'answer-chips').length);assert.equal(a.api.request().context.responseModeState.phase1.conditions.radiusMeters,1000);}if(kind==='version'){cls(a.elements.messages,'retry-button')[0].click();assert.equal(a.reloaded,true);assert.ok(a.memory.get('inchelin-resume-chat'));}}
     const stopped=app({kind:'hang'});stopped.api.type('강남역에서 추천해줘');stopped.api.stop();await stopped.api.done();assert.match(stopped.elements.messages.textContent,/멈췄어요|다시 시도/);assert.equal(stopped.api.busy,false);
     const slow=app({kind:'hang',clock:true});slow.api.type('강남역에서 추천해줘');[...slow.timers.values()].find(t=>t.ms===20000).action();assert.match(slow.elements.messages.textContent,/조금 더 걸리고/);[...slow.timers.values()].find(t=>t.ms===45000).action();await slow.api.done();assert.match(slow.elements.messages.textContent,/45초/);assert.ok(cls(slow.elements.messages,'retry-button').length);

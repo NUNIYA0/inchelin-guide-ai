@@ -46,6 +46,8 @@ const requestTiming=await readFile(join(root,'worker','request-timing.js'),'utf8
 const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8');
 const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');
 const recommendations=await readFile(join(root,'worker','recommendations.js'),'utf8');
+const restaurantPhotos=await readFile(join(root,'worker','restaurant-photos.js'),'utf8');
+const photoSource=JSON.parse(await readFile(join(root,'data','photo-source.json'),'utf8'));
 const registeredSearch=await readFile(join(root,'worker','registered-search.js'),'utf8');
 const conditionEvidence=await readFile(join(root,'worker','condition-evidence.js'),'utf8');
 const recommendationConfig=JSON.parse(await readFile(join(root,'data','recommendation-source.json'),'utf8'));
@@ -78,6 +80,7 @@ const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
   .replace("__ASSETS__", JSON.stringify(assets))
   .replace("__RECOMMENDATION_DATA__", JSON.stringify(recommendationData))
+  .replace("__PHOTO_SOURCE__", JSON.stringify(photoSource))
   .replace("__SERVICE_FAQ__", JSON.stringify(serviceFaq));
 
 const hostingManifest = await readFile(join(root, ".openai", "hosting.json"));
@@ -88,6 +91,8 @@ await Promise.all([
   }),
   writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(outputRoot, 'dist', 'server', 'recommendations.js'), recommendations),
+  writeFile(join(outputRoot,'dist','server','restaurant-photos.js'),restaurantPhotos),
+  writeFile(join(hostingOutputRoot,'server','restaurant-photos.js'),restaurantPhotos),
   writeFile(join(outputRoot, 'dist', 'server', 'registered-search.js'), registeredSearch),
   writeFile(join(hostingOutputRoot, 'server', 'registered-search.js'), registeredSearch),
   writeFile(join(outputRoot, 'dist', 'server', 'condition-evidence.js'), conditionEvidence),
