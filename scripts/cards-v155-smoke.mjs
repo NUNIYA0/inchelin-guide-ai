@@ -12,7 +12,7 @@ export async function testCardsV155(request,worker){
   const current=await request('지금 내 주변에서 찾아줘',{currentLocation:globalThis.InchelinPhase1.centers[0]});assert.equal(current.body.meta.turnPolicy.next_question.slot,'radiusMeters');
   const row={sourceId:'test-only-photo',name:'테스트 가게 역삼점',roadAddress:'서울 강남구 테스트로 1'},approval={restaurantSourceId:row.sourceId,restaurantName:row.name,roadAddress:row.roadAddress,imageUrl:'https://photo.example/approved.jpg',sourceUrl:'https://source.example/original',attribution:'테스트 권리자',rightsBasis:'테스트 전용 허락 기록',identityVerified:true,rightsVerified:true};
   let calls=0;const fetcher=async(url,options)=>{calls++;assert.ok(new URL(url).searchParams.get('query').includes(row.name+' '+row.roadAddress));assert.ok(options.headers['X-NCP-APIGW-API-KEY']);return Response.json({items:[{title:'다른 식당 사진',link:'https://photo.example/wrong.jpg'},{title:row.name,link:approval.imageUrl}]});};
-  const env={NAVER_API_HUB_CLIENT_ID:'mock',NAVER_API_HUB_CLIENT_SECRET:'mock'};
+  const env={CONVERSATION_PLANNER_MODE:"legacy-test",NAVER_API_HUB_CLIENT_ID:'mock',NAVER_API_HUB_CLIENT_SECRET:'mock'};
   assert.equal((await lookupRestaurantPhoto(row,{enabled:false},env,fetcher)).status,'not_configured');assert.equal(calls,0);
   assert.equal((await lookupRestaurantPhoto(row,{enabled:true,approvals:[{...approval,rightsVerified:false}]},env,fetcher)).status,'verification_required');assert.equal(calls,0);
   const approved=await lookupRestaurantPhoto(row,{enabled:true,approvals:[approval]},env,fetcher);assert.equal(approved.photo.url,approval.imageUrl);assert.equal(approved.photo.sourceUrl,approval.sourceUrl);assert.equal(approved.photo.restaurantSourceId,row.sourceId);assert.equal(calls,1);

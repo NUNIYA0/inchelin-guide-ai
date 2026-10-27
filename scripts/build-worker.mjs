@@ -45,6 +45,8 @@ const naverMap = await readFile(join(root,'worker','naver-map.js'),'utf8');
 await writeFile(join(root,'dist','assets','naver-map.js'),naverMap);
 const requestTiming=await readFile(join(root,'worker','request-timing.js'),'utf8');
 const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8');
+const conversationPlanner=await readFile(join(root,'worker','conversation-planner.js'),'utf8');
+const locationResolver=await readFile(join(root,'worker','location-resolver.js'),'utf8');
 const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');
 const recommendations=await readFile(join(root,'worker','recommendations.js'),'utf8');
 const restaurantPhotos=await readFile(join(root,'worker','restaurant-photos.js'),'utf8');
@@ -88,7 +90,7 @@ const hostingManifest = await readFile(join(root, ".openai", "hosting.json"));
 await Promise.all([
   ...[outputRoot,hostingOutputRoot].flatMap(directory=>{
     const server=directory===outputRoot?join(directory,'dist','server'):join(directory,'server');
-    return [writeFile(join(server,'phase1-core.js'),phase1Core),writeFile(join(server,'main-dishes.js'),mainDishes),writeFile(join(server,'related-questions.js'),relatedQuestions),writeFile(join(server,'naver-map.js'),naverMap),writeFile(join(server,'request-timing.js'),requestTiming),writeFile(join(server,'response-rules.js'),responseRules)];
+    return [writeFile(join(server,'conversation-planner.js'),conversationPlanner),writeFile(join(server,'location-resolver.js'),locationResolver),writeFile(join(server,'phase1-core.js'),phase1Core),writeFile(join(server,'main-dishes.js'),mainDishes),writeFile(join(server,'related-questions.js'),relatedQuestions),writeFile(join(server,'naver-map.js'),naverMap),writeFile(join(server,'request-timing.js'),requestTiming),writeFile(join(server,'response-rules.js'),responseRules)];
   }),
   writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(outputRoot, 'dist', 'server', 'recommendations.js'), recommendations),

@@ -1634,6 +1634,7 @@
         return [];
       }
     }
+    function compactPlannerState(state){const card=({registeredFacts,recommendationBundle,...value})=>value;return {...state,lastCards:(state.lastCards||[]).slice(0,3).map(card),shownPlaces:(state.shownPlaces||[]).slice(-12).map(card)};}
     function buildAIRequest(nextMessages) {
       const archivedStateMessage=[...nextMessages].reverse().find(message=>message.role==='assistant'&&message.meta?.responseModeState);
       nextMessages=nextMessages.filter(message=>message.role==='user'||!message.meta?.staleResponse&&globalThis.InchelinResponseRules.isCurrent(message.meta));
@@ -1660,7 +1661,7 @@
       }));
       return {
         conversationId: currentId,
-        messages: nextMessages,
+        messages: nextMessages.slice(-24).map(({role,content})=>({role,content:String(content||'').slice(0,2400)})),
         context: {
           responseRulesVersion:globalThis.InchelinResponseRules.VERSION,
           currentLocalDatetime: state.localDateTime,
@@ -1677,7 +1678,7 @@
           } : null,
           hasRestaurantResults: recentRestaurants.length > 0,
           recentRestaurants,
-          responseModeState: latestStateMessage?.meta?.responseModeState || null
+          responseModeState: latestStateMessage?.meta?.responseModeState ? compactPlannerState(latestStateMessage.meta.responseModeState) : null
         }
       };
     }

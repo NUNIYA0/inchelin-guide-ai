@@ -3,6 +3,7 @@ import './history-more-smoke.mjs';
 import './history-manager-smoke.mjs';
 import './composer-smoke.mjs';
 import './place-links-smoke.mjs';
+import {contextSamples} from './context-planner-smoke.mjs';
 import {readFile,writeFile,rm} from 'node:fs/promises';
 import productionWorker from '../build/dist/server/index.js';
 // Legacy external-search regressions run with a disconnected source copy.
@@ -21,7 +22,7 @@ import {testConversationScroll} from './scroll-smoke.mjs';
 import {testRegisteredData} from './registered-data-smoke.mjs';
 import {testCardsV155} from './cards-v155-smoke.mjs';
 const api=globalThis.InchelinPhase1;
-const env={RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
+const env={CONVERSATION_PLANNER_MODE:'legacy-test',RESTAURANT_DATA_SOURCE:'naver',NAVER_API_HUB_CLIENT_ID:'mock-id',NAVER_API_HUB_CLIENT_SECRET:'mock-secret',CHAT_TIMING_LOGS:'false'};
 function item(center,meters,index=0,extra={}){return {title:'테스트 식당 '+index,category:'음식점>양식>이탈리안음식',address:'서울특별시 성동구 성수동2가 '+index,roadAddress:'서울특별시 성동구 연무장길 '+index,mapx:String(Math.round(center.longitude*1e7)),mapy:String(Math.round((center.latitude+meters/6371008.8*180/Math.PI)*1e7)),...extra};}
 const dataset=query=>{const center=api.centers.find(c=>query.startsWith(c.label))||api.centers[0];return {items:[100,400,800,1000.2,2000].map((m,i)=>item(center,m,i,/한식/.test(query)?{category:'음식점>한식'}:{}))};};
 export async function requestCase(message,{state=null,currentLocation=null,currentLocationName='',locationSelection=null,data=dataset,status=200,workerOverride=worker,demoMode=false,currentLocalDatetime='2026-10-22T12:00:00+09:00'}={}){
@@ -90,7 +91,7 @@ assert.ok(remove.body.restaurants.every(card=>card.conditionVerification.checks.
 const v138Samples=await testRecommendations(runCase);
 const v139Samples=await testPhase3(legacyRequestCase);
 const v140Samples=await testPhase4(legacyRequestCase);
-await testPhase1Client(runCase,{noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},legacyRequestCase,requestCase);
+await testPhase1Client(runCase,{contextSamples,noLocation,regionOnly,bulk,none,failed,noAddress,...v138Samples,...v139Samples,...v140Samples},legacyRequestCase,requestCase);
 const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');assert.match(html,/메뉴·가격·영업시간은 변경될 수 있어요/);assert.match(html,/inchelin-resume-chat/);
 testConversationScroll(html);
 await testRegisteredData(legacyRequestCase,productionWorker);
