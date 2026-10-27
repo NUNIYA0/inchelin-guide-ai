@@ -1025,6 +1025,16 @@
     .location-choice-response .question-location-choice .quick-reply:active:not(:disabled) {background:#eef0f3;transform:translateY(1px);}
     @media(max-width:480px){.location-choice-response .question-location-choice{gap:8px;}.location-choice-response .question-location-choice .quick-reply{gap:8px;padding:12px 8px;font-size:14px;}.location-choice-response .turn-question{font-size:17px;}.location-choice-help{font-size:14px;}}
     @media(max-width:359px){.location-choice-response .question-location-choice{grid-template-columns:minmax(0,1fr);}}
+    /* One self-hosted UI family, including late-mounted plugin sheets. */
+    @font-face {font-family:'Pretendard';src:url('/assets/fonts/PretendardVariable.woff2') format('woff2');font-style:normal;font-weight:100 900;font-display:swap;}
+    :root {--ui-font:'Pretendard',sans-serif;--plugin-body-font:'Pretendard',sans-serif;}
+    body,body * {font-family:var(--ui-font)!important;}
+    .message,.message.user,.ai-bubble,.message-copy,.turn-question,.location-choice-response .turn-question,.chat-input,.composer textarea {font-size:16px!important;font-weight:400!important;line-height:1.65!important;}
+    .restaurant-title-link h3 {font-size:18px!important;font-weight:600!important;line-height:1.45!important;}
+    button,[role='button'],.restaurant-map-button,.restaurant-details-toggle,.quick-reply-title,.location-choice-response .quick-reply-title {font-size:14px!important;font-weight:500!important;}
+    .restaurant-category,.restaurant-distance,.restaurant-address,.card-source,.verification-summary,.condition-evidence,.condition-evidence p,.restaurant-other-menus,.location-choice-help,.conditions-hint,.related-label,.dialog-sub,.sidebar-foot,.history-label,.disclaimer,.menu-hint,.quick-reply-description,.quick-reply-reason {font-size:13px!important;font-weight:400!important;}
+    .registered-menu,.registered-recommendation .recommender-name,.authored-reason,.recommendation-label,.recommendation-value,.recommendations-empty,.plugin-copy,.plugin-description {font-size:14px!important;font-weight:400!important;}
+    .location-choice-help {font-size:14px!important;}
   </style>
 </head>
 <body>
