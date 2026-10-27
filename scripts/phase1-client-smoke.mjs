@@ -77,6 +77,14 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       const toggle=cls(sections[0],'recommendations-toggle')[0],extra=cls(sections[0],'additional-recommendations')[0];
       assert.equal(toggle.textContent,'다른 추천 2개 보기');assert.equal(extra.hidden,true);
       const beforeRequests=rec.requests.length,beforeConditions=JSON.stringify(rec.api.messages),links=cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href);
+      const cards=cls(rec.elements.messages,'restaurant-card'),details=cls(cards[0],'restaurant-extra')[0],detailToggle=cls(cards[0],'restaurant-details-toggle')[0];
+      assert.equal(details.hidden,true);assert.equal(cls(details,'registered-recommendations').length,0,'authored pair is never hidden in details');
+      assert.equal(cls(details,'restaurant-address').length,1);assert.equal(cls(cards[0],'photo-missing').length,0);
+      assert.equal(cls(cards[0],'restaurant-media').length,0,'no image means no image area');
+      const mapButton=cls(cards[0],'restaurant-map-button')[0];assert.equal(mapButton.textContent,'지도 보기');assert.equal(mapButton.children.length,0,'map action is text only');
+      detailToggle.click();assert.equal(details.hidden,false);assert.equal(detailToggle.attributes['aria-expanded'],'true');assert.equal(cls(cards[1],'restaurant-extra')[0].hidden,true);
+      assert.ok(cls(details,'restaurant-compare').length,'comparison remains available');
+      detailToggle.click();assert.equal(details.hidden,true);assert.equal(rec.requests.length,beforeRequests);assert.equal(JSON.stringify(rec.api.messages),beforeConditions);assert.deepEqual(cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href),links);
       toggle.click();assert.equal(extra.hidden,false);assert.equal(toggle.attributes['aria-expanded'],'true');assert.equal(toggle.textContent,'다른 추천 접기');assert.match(extra.textContent,/── 다른 추천 2개 ──/);
       assert.equal(cls(sections[0],'registered-recommendation').length,3);
       toggle.click();assert.equal(extra.hidden,true);assert.equal(rec.requests.length,beforeRequests);assert.equal(JSON.stringify(rec.api.messages),beforeConditions);assert.deepEqual(cls(rec.elements.messages,'restaurant-map-link').filter(n=>n.tagName==='A').map(n=>n.href),links);

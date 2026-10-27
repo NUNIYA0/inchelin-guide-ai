@@ -13,8 +13,12 @@
     const section=document.createElement('section');section.className='registered-recommendations';section.setAttribute('aria-label','등록된 추천');
     const pair=record=>{
       const item=document.createElement('div');item.className='registered-recommendation';
-      const name=document.createElement('p');name.className='recommender-name';name.textContent=record.recommenderName?.trim()?'추천인: '+record.recommenderName:'추천인 정보 없음';
-      const reason=document.createElement('p');reason.className='authored-reason';reason.textContent=record.reason?.trim()?'추천 이유: “'+record.reason+'”':'추천 이유 없음';
+      const name=document.createElement('p');name.className='recommender-name';
+      const nameLabel=document.createElement('span');nameLabel.className='recommendation-label';nameLabel.textContent='추천인';
+      const nameValue=document.createElement('span');nameValue.className='recommendation-value';nameValue.textContent=record.recommenderName?.trim()?record.recommenderName:'추천인 정보 없음';name.append(nameLabel,nameValue);
+      const reason=document.createElement('p');reason.className='authored-reason';
+      const reasonLabel=document.createElement('span');reasonLabel.className='recommendation-label';reasonLabel.textContent='추천 이유';
+      const reasonValue=document.createElement('span');reasonValue.className='recommendation-value';reasonValue.textContent=record.reason?.trim()?'“'+record.reason+'”':'추천 이유 없음';if(!record.reason?.trim())reasonValue.className+=' missing-authored-reason';reason.append(reasonLabel,reasonValue);
       item.append(name,reason);return item;
     };
     if(!bundle.representative){const empty=document.createElement('p');empty.className='recommendations-empty';empty.textContent='등록된 추천이 없어요';section.append(empty);return section;}

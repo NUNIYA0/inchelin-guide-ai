@@ -944,6 +944,80 @@
     .verification-summary {font:500 13px/1.6 system-ui,sans-serif;color:#444;margin:8px 0;overflow-wrap:anywhere;}
     .verification-toggle {min-height:44px;max-width:100%;border:1px solid #ddd;border-radius:22px;padding:8px 12px;background:white;font:400 14px/1.5 system-ui,sans-serif;}
     .condition-evidence[hidden] {display:none!important;}
+    /* Conversation redesign: actual authored data stays visible; auxiliary facts expand locally. */
+    .sidebar,.chat-view,.chat-dock {font-family:system-ui,"Noto Sans KR",sans-serif;}
+    :root {--sidebar:278px;--conversation-width:760px;}
+    .rail,.sidebar {background:#f5f5f6;border-color:#e7e8eb;}
+    .sidebar {padding:22px 16px;}
+    .sidebar .new-chat {min-height:48px;padding:12px 16px;border:1px solid #d9dde3;border-radius:12px;background:#fff;color:#16181b;font-size:14px;gap:12px;}
+    .history-label {margin:28px 12px 12px;color:#737b86;font-size:13px;}
+    .history-item {min-height:44px;padding:12px;color:#353a43;font-size:14px;}
+    .history-row:has(.active),.history-item.active {background:#e9eaec;border-radius:10px;}
+    .chat-view,.chat-dock-inner {width:min(var(--conversation-width),100%);max-width:var(--conversation-width);margin-inline:auto;}
+    .chat-view {padding-inline:0;}
+    .messages {padding:24px 0 calc(var(--dock-height,130px) + 28px);}
+    .message {margin-bottom:32px;}
+    .message.ai {width:100%;max-width:100%;background:transparent;grid-template-columns:32px minmax(0,1fr);gap:12px;}
+    .message.ai>.ai-avatar {width:32px;height:32px;}
+    .ai-bubble {min-width:0;max-width:100%;background:transparent;border:0;box-shadow:none;padding:0;font:400 16px/1.65 system-ui,"Noto Sans KR",sans-serif;}
+    .ai-avatar {width:32px;height:32px;flex:0 0 32px;}
+    .message.user {max-width:80%;margin-left:auto;margin-bottom:32px;background:#f0f1f3;border-radius:22px;padding:14px 20px;color:#111;font-size:16px;line-height:1.6;}
+    .user-bubble {background:#f0f1f3;border-radius:22px;padding:14px 20px;color:#111;font-size:16px;line-height:1.6;}
+    .restaurant-list {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:auto;align-items:stretch;gap:12px;max-width:100%;}
+    .restaurant-card,.restaurant-card.has-registered-recommendations {display:flex;flex-direction:column;position:relative;height:auto;min-height:0;padding:20px;border:1px solid #dfe2e7;border-radius:14px;background:#fff;box-shadow:none;gap:0;overflow:hidden;}
+    .restaurant-card-content,.restaurant-card-body {display:flex;flex-direction:column;min-width:0;width:100%;}
+    .restaurant-title-link.restaurant-map-link {display:block;position:static;min-height:0;padding:0;border:0;background:none;text-align:left;text-decoration:none;white-space:normal;}
+    .restaurant-title-link h3 {display:block;white-space:normal;overflow-wrap:anywhere;padding:0;margin:0;font:700 20px/1.4 system-ui,"Noto Sans KR",sans-serif;-webkit-line-clamp:unset;}
+    .restaurant-card-head {order:-1;position:static;display:flex;flex-wrap:wrap;gap:6px;margin:0 0 8px;}
+    .restaurant-category {font:400 13px/1.5 system-ui,sans-serif;color:#727b88;padding:0;background:none;border:0;border-radius:0;}
+    .restaurant-category+.restaurant-category::before {content:'·';margin-right:6px;}
+    .registered-menu {font:400 15px/1.6 system-ui,"Noto Sans KR",sans-serif;margin:8px 0 10px;color:#17191d;}
+    .restaurant-distance {display:flex;align-items:center;gap:6px;position:static;margin:0;color:#747d8a;font:400 13px/1.6 system-ui,sans-serif;white-space:normal;}
+    .restaurant-media {height:150px;margin-bottom:16px;border-radius:8px;overflow:hidden;}
+    .registered-recommendations {border-top:1px solid #e2e5e9;margin:18px 0 0;padding:16px 0 4px;}
+    .registered-recommendation .recommender-name {display:flex;align-items:baseline;gap:12px;margin:0 0 16px;font:400 14px/1.6 system-ui,"Noto Sans KR",sans-serif;}
+    .recommendation-label {color:#74808e;font-weight:500;flex-shrink:0;}
+    .recommendation-value {color:#17191d;white-space:pre-wrap;overflow-wrap:anywhere;min-width:0;}
+    .authored-reason {display:flex;flex-direction:column;gap:6px;margin:0 0 12px;font:400 14px/1.65 system-ui,"Noto Sans KR",sans-serif;}
+    .missing-authored-reason {color:#78818e;}
+    .restaurant-detail-area {position:static;display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0;margin-top:auto;padding-top:16px;width:100%;}
+    .restaurant-detail-area .restaurant-map-button,.restaurant-details-toggle {display:flex;align-items:center;justify-content:center;position:static;width:100%;height:auto;min-height:44px;padding:10px 8px;border:1px solid #aab0ba;border-radius:10px;background:#fff;font:400 14px/1.4 "Sebang Gothic","Noto Sans KR",sans-serif;color:#16181c;cursor:pointer;text-decoration:none;white-space:nowrap;}
+    .restaurant-detail-area a::after,.restaurant-map-button::after {content:none;}
+    .restaurant-detail-area button:hover,.restaurant-detail-area a:hover {background:#f4f5f7;}
+    .restaurant-extra {border-top:1px solid #eee;margin-top:12px;padding-top:8px;font-size:13px;}
+    .restaurant-extra[hidden] {display:none!important;}
+    .restaurant-extra .restaurant-address {display:block;white-space:normal;overflow:visible;-webkit-line-clamp:unset;font-size:13px;color:#737b86;line-height:1.6;margin:8px 0;}
+    .restaurant-other-menus {white-space:pre-line;color:#59616c;line-height:1.7;}
+    .restaurant-extra .restaurant-compare {position:static;min-height:44px;padding:8px 12px;border:1px solid #d7dbe1;border-radius:9px;background:#fff;font-size:13px;}
+    .restaurant-map-button:disabled {color:#8b9099;background:#f5f5f5;cursor:not-allowed;}
+    .phase1-conditions {display:flex;flex-wrap:wrap;gap:8px;margin:16px 0;}
+    .conditions-hint {font-size:12px;color:#858b95;}
+    .phase1-condition {border:1px solid #dce0e6;border-radius:24px;background:#fff;overflow:hidden;}
+    .phase1-condition .meal-chip {min-height:40px;padding:8px 13px;border:0;border-radius:24px;background:transparent;font-size:13px;font-weight:400;}
+    .phase1-condition .phase1-remove {min-width:36px;min-height:44px;}
+    .answer-question {background:#fafafa;border:1px solid #eee;border-radius:16px;padding:16px;margin-top:24px;}
+    .answer-followup {margin-top:24px;}
+    .related-question {min-height:48px;border-radius:14px;background:#f5f5f5;padding:12px 16px;font-size:14px;}
+    .answer-actions {margin:14px 0 8px;gap:8px;}
+    .answer-action {width:36px;height:36px;min-height:36px;color:#6e7781;}
+    .supplied-icon {width:19px;height:19px;object-fit:contain;display:block;}
+    .turn-notice {padding-left:26px;background:url('/assets/chat-ui/circle-alert.png') left 2px/18px 18px no-repeat;}
+    .restaurant-detail-area button,.restaurant-detail-area a,.chat-dock button {font-family:system-ui,"Noto Sans KR",sans-serif;}
+    .chat-dock {border:0;background:linear-gradient(transparent,#fff 20px);padding:20px 24px max(6px,env(safe-area-inset-bottom));}
+    .chat-dock .composer {border:1px solid #dfe2e8;border-radius:30px;background:#fff;box-shadow:0 5px 24px #00000008;}
+    .chat-dock textarea {font-size:16px;line-height:1.6;}
+    @media(max-width:767px){
+      .chat-view {width:100%;padding-inline:0;}
+      .message.ai {gap:0;grid-template-columns:minmax(0,1fr);}
+      .message.ai>.ai-avatar {display:none;}.message.ai>.ai-bubble {grid-column:1;}
+      .restaurant-list {grid-template-columns:minmax(0,1fr);gap:12px;}
+      .restaurant-card,.restaurant-card.has-registered-recommendations {padding:18px;min-height:0;}
+      .restaurant-title-link h3 {font-size:19px;white-space:normal;}
+      .message.user {max-width:85%;}.user-bubble {padding:12px 16px;}
+      .mobile-start {white-space:nowrap;min-width:64px;padding-inline:12px;font:400 13px/1.4 system-ui,sans-serif;}
+      .chat-dock {padding-inline:12px;}.chat-dock-inner {width:100%;}
+      .phase1-condition .meal-chip {white-space:nowrap;}
+    }
   </style>
 </head>
 <body>
@@ -1860,6 +1934,8 @@
       return group;
     }
     function uiIcon(name) {
+      const supplied={copy:'copy',regenerate:'refresh',location:'map-pin',search:'search',info:'circle-alert'};
+      if(supplied[name]){const image=document.createElement('img');image.className='ui-icon supplied-icon';image.src='/assets/chat-ui/'+supplied[name]+'.png';image.alt='';image.setAttribute('aria-hidden','true');return image;}
       const ns='http://www.w3.org/2000/svg';
       const make=tag=>document.createElementNS?document.createElementNS(ns,tag):document.createElement(tag);
       const svg=make('svg');svg.setAttribute('class','ui-icon');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
@@ -1920,8 +1996,9 @@
         if (restaurant.regionLabel) { const area = document.createElement('span'); area.className = 'restaurant-category restaurant-region'; area.textContent = restaurant.regionLabel; head.appendChild(area); }
         body.appendChild(head);
         const menus=restaurant.registeredFacts?.menus||[];
-        const menu=document.createElement('p');menu.className='registered-menu';menu.textContent=menus.length?menus.slice(0,2).map(m=>m.name+' · '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(' / '):'메뉴·가격 정보 없음';body.appendChild(menu);
-        if(Number.isFinite(restaurant.distanceMeters)&&restaurant.originLabel){const distance=document.createElement('p');distance.className='restaurant-distance';distance.textContent=restaurant.originLabel+'에서 직선 '+restaurant.distanceMeters+'m';body.appendChild(distance);}
+        const representativeMenu=menus.find(m=>m.mainDish===true)||menus[0];
+        const menu=document.createElement('p');menu.className='registered-menu';menu.textContent=representativeMenu?representativeMenu.name+' · '+(Number.isFinite(representativeMenu.priceKRW)?representativeMenu.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음'):'메뉴·가격 정보 없음';body.appendChild(menu);
+        if(Number.isFinite(restaurant.distanceMeters)&&restaurant.originLabel){const distance=document.createElement('p');distance.className='restaurant-distance';const label=document.createElement('span');label.textContent=restaurant.originLabel+'에서 직선 '+restaurant.distanceMeters+'m';distance.append(uiIcon('location'),label);body.appendChild(distance);}
         const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address || '주소 정보 없음'; address.setAttribute('title',address.textContent);
         const source=document.createElement('p');source.className='card-source';source.textContent=restaurant.dataSource==='inchelin'?'인슐랭 앱 등록 식당':restaurant.recommendationBundle?.status==='matched'?'네이버 검색 · 앱 등록 추천 정보':'네이버 검색 · 앱 등록 추천 아님';
         let evidence=null;
@@ -1930,15 +2007,16 @@
           const media = document.createElement('div'); media.className = 'restaurant-media';
           const image = document.createElement('img'); image.className = 'restaurant-image'; image.src = restaurant.imageUrl;
           image.alt = restaurant.name + ' 사진'; image.loading = 'lazy'; image.referrerPolicy = 'no-referrer';
-          image.addEventListener('error', () => {media.replaceChildren();const fallback=document.createElement('span');fallback.textContent='사진을 불러오지 못했어요';media.appendChild(fallback);}, { once: true }); media.appendChild(image); content.appendChild(media);
-        }else{const noPhoto=document.createElement('p');noPhoto.className='photo-missing';noPhoto.textContent='사진 정보 없음';content.appendChild(noPhoto);}
+          image.addEventListener('error', () => media.remove(), { once: true }); media.appendChild(image); content.appendChild(media);
+        }
         content.appendChild(body);
         card.appendChild(content);
         const authored=globalThis.InchelinRecommendationsUI?.render(restaurant.recommendationBundle);
         if(authored){card.classList.add('has-registered-recommendations');card.appendChild(authored);}
-        card.append(source,address);
-        if(verification){const summary=document.createElement('p');summary.className='verification-summary';const unknown=verification.checks.filter(check=>check.status==='unknown').map(check=>check.label),known=verification.checks.filter(check=>check.status==='confirmed'&&check.key!=='distance').map(check=>check.label),failed=verification.checks.filter(check=>check.status==='failed').map(check=>check.label);summary.textContent=[known.length?known.join('·')+' 확인':'직선거리 확인',unknown.length?'미확인: '+unknown.join('·'):null,failed.length?'조건 불충족: '+failed.join('·'):null,verification.status==='experience'?'추천인의 경험 참고':null].filter(Boolean).join(' / ');card.appendChild(summary);}
-        if(evidence){const toggle=document.createElement('button');toggle.type='button';toggle.className='verification-toggle';toggle.textContent='확인 상태 자세히';toggle.setAttribute('aria-expanded','false');toggle.setAttribute('aria-label',restaurant.name+' 확인 상태 자세히');toggle.addEventListener('click',()=>{evidence.hidden=!evidence.hidden;toggle.setAttribute('aria-expanded',String(!evidence.hidden));toggle.textContent=evidence.hidden?'확인 상태 자세히':'확인 상태 접기';});card.append(toggle,evidence);}
+        const extra=document.createElement('div');extra.className='restaurant-extra';extra.hidden=true;extra.append(address,source);
+        if(menus.length>1){const moreMenus=document.createElement('p');moreMenus.className='restaurant-other-menus';moreMenus.textContent=menus.slice(0,8).map(m=>m.name+' · '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join('\n');extra.appendChild(moreMenus);}
+        if(verification){const summary=document.createElement('p');summary.className='verification-summary';const unknown=verification.checks.filter(check=>check.status==='unknown').map(check=>check.label),known=verification.checks.filter(check=>check.status==='confirmed'&&check.key!=='distance').map(check=>check.label),failed=verification.checks.filter(check=>check.status==='failed').map(check=>check.label);summary.textContent=[known.length?known.join('·')+' 확인':'직선거리 확인',unknown.length?'미확인: '+unknown.join('·'):null,failed.length?'조건 불충족: '+failed.join('·'):null,verification.status==='experience'?'추천인의 경험 참고':null].filter(Boolean).join(' / ');extra.appendChild(summary);}
+        if(evidence){evidence.hidden=false;extra.appendChild(evidence);}
         const compare = document.createElement('button'); compare.type = 'button'; compare.className = 'restaurant-compare restaurant-map-link';
         compare.restaurantName=restaurant.name;
         if (!comparisonButtons.has(restaurant.id)) comparisonButtons.set(restaurant.id, new Set());
@@ -1950,9 +2028,11 @@
           else { showToast('식당은 3곳까지 비교할 수 있어요.'); return; }
           renderComparisonTray();
         });
-        const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link';map.textContent=restaurant.naverPlaceUrl?'네이버지도 보기':'주소 정보 없음';
+        extra.appendChild(compare);card.appendChild(extra);
+        const expand=document.createElement('button');expand.type='button';expand.className='restaurant-details-toggle';expand.textContent='상세 보기';expand.setAttribute('aria-expanded','false');expand.setAttribute('aria-label',restaurant.name+' 상세 보기');expand.addEventListener('click',()=>{extra.hidden=!extra.hidden;expand.setAttribute('aria-expanded',String(!extra.hidden));expand.textContent=extra.hidden?'상세 보기':'접기';expand.setAttribute('aria-label',restaurant.name+(extra.hidden?' 상세 보기':' 상세 접기'));});
+        const map=document.createElement(restaurant.naverPlaceUrl?'a':'button');map.className='restaurant-map-link restaurant-map-button';map.textContent=restaurant.naverPlaceUrl?'지도 보기':'주소 정보 없음';map.setAttribute('aria-label',restaurant.name+' 네이버지도 주소 검색');
         if(restaurant.naverPlaceUrl){map.href=restaurant.naverPlaceUrl;map.target='_blank';map.rel='noopener noreferrer';map.addEventListener('click',()=>setPhase1Focus(restaurant));}else{map.type='button';map.disabled=true;}
-        actions.append(map,compare); card.appendChild(actions); list.appendChild(card);
+        actions.append(expand,map); card.appendChild(actions); list.appendChild(card);
       });
       group.appendChild(list);
       renderComparisonTray(); return group;
@@ -2078,6 +2158,7 @@
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
             title.textContent = card.title;
+            if(/^(?:현재 위치로 찾기|현재 위치 연결|지역·역 선택)$/.test(card.title))button.appendChild(uiIcon(card.title==='지역·역 선택'?'search':'location'));
             button.appendChild(title);
             if (card.description && !actionReply) {
               const description = document.createElement('span');
@@ -3003,7 +3084,7 @@
     qsa('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
     document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
-    window.addEventListener('resize', () => setSidebar(sidebar.classList.contains('open')));
+    window.addEventListener('resize', () => setSidebar(window.innerWidth>768&&sidebar.classList.contains('open')));
     renderAuthNavigation();
     renderHistory();
     try{if(!location.hash.startsWith('#share=')){const resume=sessionStorage.getItem(scopedKey('inchelin-resume-chat'))||sessionStorage.getItem(scopedKey('inchelin-active-chat'));if(resume){sessionStorage.removeItem(scopedKey('inchelin-resume-chat'));openHistory(resume);}}}catch{}
@@ -3038,6 +3119,7 @@
     }).catch(() => {
       document.addEventListener('click', event => { if (event.target.closest('[data-meal-tool]')) showToast('메뉴 도구를 불러오지 못했어요. 새로고침해 주세요.'); });
     });
+    setSidebar(window.innerWidth>768);
     if (!loadSharedConversationFromHash()) updateShareVisibility();
   })(
     selector => document.querySelector(selector),
