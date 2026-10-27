@@ -42,7 +42,7 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
         const copy=make('span','location-result-copy'),head=make('span','location-result-head');
         head.append(make('span','location-result-name',row.label),make('span','location-type',row.type==='station'?'지하철역':'지역'));
         copy.append(head,make('span','location-result-detail',row.detail));
-        const radio=make('span','location-radio');radio.setAttribute('aria-hidden','true');choice.append(copy,radio);
+        choice.append(copy);
         choice.addEventListener('click',()=>{selected=row;apply.disabled=false;for(const item of list.children)item.setAttribute('aria-checked',String(item===choice));});
         choice.addEventListener('keydown',event=>{if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;event.preventDefault();const rows=[...list.children],index=rows.indexOf(choice),next=event.key==='Home'?0:event.key==='End'?rows.length-1:(index+(event.key==='ArrowDown'?1:-1)+rows.length)%rows.length;rows[next]?.focus();rows[next]?.click();});
         list.append(choice);

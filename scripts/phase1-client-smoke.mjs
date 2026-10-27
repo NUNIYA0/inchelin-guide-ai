@@ -118,7 +118,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       filter('station').click();await flush();assert.equal(cls(dialog,'location-result').length,7);
       const input=flatten(dialog).find(n=>n.tagName==='INPUT');input.value='홍대';input.events.input();await flush();assert.equal(cls(dialog,'location-result').length,1);
       filter('region').click();await flush();assert.equal(cls(dialog,'location-result').length,1);
-      const row=cls(dialog,'location-result')[0];row.click();assert.equal(row.attributes['aria-checked'],'true');assert.equal(find('location-apply').disabled,false);
+      const row=cls(dialog,'location-result')[0];row.click();assert.equal(row.attributes.role,'radio');assert.equal(row.attributes['aria-checked'],'true');assert.equal(find('location-apply').disabled,false);assert.equal(cls(dialog,'location-radio').length,0,'single-selection semantics without decorative radio markers');
       find('location-apply').click();assert.equal(dialog.open,false);assert.equal(sent[0][0],'홍대에서 추천해줘');assert.equal(sent[0][1].locationSelection.id,'region:홍대');
       const selected=sent[0][1].locationSelection,parsed=globalThis.InchelinPhase1.parse(sent[0][0],{radiusMeters:500,food:'냉면'},{locationSelection:selected}).conditions;
       assert.equal(parsed.location.latitude,selected.latitude);assert.equal(parsed.location.longitude,selected.longitude);assert.equal(parsed.radiusMeters,500);assert.equal(parsed.food,'냉면');
@@ -141,6 +141,10 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       }finally{globalThis.innerWidth=oldWidth;globalThis.innerHeight=oldHeight;globalThis.visualViewport=oldViewport;}
       const forged=globalThis.InchelinPhase1.parse('강남역',{}, {locationSelection:{...catalog[0],latitude:0}}).conditions;
       assert.equal(forged.location.latitude,catalog[0].latitude,'request cannot replace authoritative coordinates');
+    }
+    {
+      const history=app();history.api.render({role:'assistant',content:'골라주세요.',quickReplies:['한식','중식'],meta:{answer_plan:['text','chips']}});history.api.render({role:'user',content:'한식'});
+      const selected=cls(history.elements.messages,'history-selected');assert.ok(selected.length);assert.equal(selected[0].attributes['aria-pressed'],'true');assert.equal(cls(history.elements.messages,'history-check').length,0,'history selection adds no check icon');
     }
     for(const withCards of [true,false]){
       const noticeApp=app(),notice='인원·방문 목적·해당 시간 영업 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.';

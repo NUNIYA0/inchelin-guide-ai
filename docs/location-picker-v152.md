@@ -54,3 +54,12 @@ mobile. Keyboard-height compact mode keeps the original search/footer priority.
 Desktop layout, location catalogue, selection and confirmation are unchanged.
 Browser checked at 390x844, 360x800 and 390x440 (short-height simulation);
 physical mobile keyboard remains unverified.
+
+## v154 selection presentation
+
+Removed decorative radio circles and automatic history check icons. Results retain
+native button + `role=radio` / `aria-checked` single-selection semantics. A selected
+row uses a gray background, dark 1px border and 600-weight location name. Default
+and selected borders remain 1px; selected location-method buttons use the same
+treatment. Filters retain black/white `aria-pressed` styling. Keyboard focus has
+a distinct blue outline; unselected hover uses a lighter background/border.

@@ -318,8 +318,7 @@
     .menu-choice:active { transform: scale(.985); background: #eee; border-color: #888; }
     .history-inactive .quick-reply, .history-inactive .meal-chip { opacity: .5; }
     .history-inactive .quick-reply, .history-inactive .meal-chip { cursor: default; pointer-events: none; }
-    .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 2px solid #222; background: #f7f7f7; color: #111; }
-    .history-check { color: #111; font-size: 16px; font-weight: 700; margin-left: 6px; }
+    .history-inactive .quick-reply.history-selected, .history-inactive .restaurant-card.history-selected { opacity: 1; border: 1px solid #222; background: #f7f7f7; color: #111; }
     .alternative-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
     .related-questions { display: grid; gap: 8px; width: 100%; min-width: 0; margin-top: 20px; }
     .related-label { margin: 0 0 2px; color: #777; font: 400 13px/1.5 system-ui, sans-serif; }
@@ -363,7 +362,6 @@
     .question-companion .quick-reply { flex: 0 0 auto; min-width: fit-content; white-space: nowrap; justify-content: center; padding: 8px 12px; }
     .answer-chips > .quick-reply-chip { flex: 0 0 auto; min-width: fit-content; white-space: nowrap; }
     .answer-chips > .quick-reply-chip .quick-reply-title { min-width: fit-content; white-space: nowrap; overflow-wrap: normal; word-break: normal; }
-    .answer-chips .history-check { flex-shrink: 0; white-space: nowrap; }
     .question-companion .quick-reply.skip-chip { flex: 0 0 auto; padding: 8px 12px; }
     .answer-chips[hidden], .menu-cards[hidden], .action-chips[hidden], .menu-more[hidden] { display: none !important; }
     .action-chips { margin-top: 16px; border-top: 1px solid #f1f1f1; padding-top: 12px; }
@@ -824,8 +822,6 @@
     .conversation-bottom[hidden] { display:none; }
     .chat-dock { z-index:25; }
     .messages { padding-bottom:calc(var(--dock-height, 180px) + 24px); }
-    .history-check { display:inline-flex; align-items:center; }
-    .history-check .ui-icon { width:16px; height:16px; }
     .meal-chip[aria-pressed="true"]::before { content:none; }
     .answer-results { display:grid; gap:12px; min-width:0; }
     .answer-results .restaurant-group { margin:0; }
@@ -1021,8 +1017,11 @@
     .location-choice-response .question-location-choice .quick-reply {display:flex;align-items:center;justify-content:center;gap:12px;min-width:0;min-height:56px;height:auto;padding:12px 16px;border:1px solid #d8dde5;border-radius:12px;background:#fff;color:#17191d;box-shadow:none;white-space:nowrap;font:400 16px/1.5 system-ui,"Noto Sans KR",sans-serif;}
     .location-choice-response .quick-reply-title {font:inherit;white-space:nowrap;}
     .location-choice-response .supplied-icon {width:22px;height:22px;flex:0 0 22px;}
-    .location-choice-response .question-location-choice .quick-reply:hover:not(:disabled) {background:#f7f8fa;border-color:#9da6b3;}
-    .location-choice-response .question-location-choice .quick-reply:active:not(:disabled) {background:#eef0f3;transform:translateY(1px);}
+    .location-choice-response .question-location-choice .quick-reply:hover:not(:disabled):not([aria-pressed=true]) {background:#f7f8fa;border-color:#9da6b3;}
+    .location-choice-response .question-location-choice .quick-reply:active:not(:disabled) {transform:none;}
+    .location-choice-response .question-location-choice .quick-reply[aria-pressed=true] {background:#f1f2f5;border:1px solid #252a32;font-weight:600!important;opacity:1;}
+    .location-choice-response .question-location-choice .quick-reply[aria-pressed=true] .quick-reply-title {font-weight:600!important;}
+    .location-choice-response .question-location-choice .quick-reply:focus-visible {outline:2px solid #4f70b5;outline-offset:3px;}
     @media(max-width:480px){.location-choice-response .question-location-choice{gap:8px;}.location-choice-response .question-location-choice .quick-reply{gap:8px;padding:12px 8px;font-size:14px;}.location-choice-response .turn-question{font-size:17px;}.location-choice-help{font-size:14px;}}
     @media(max-width:359px){.location-choice-response .question-location-choice{grid-template-columns:minmax(0,1fr);}}
     /* One self-hosted UI family, including late-mounted plugin sheets. */
@@ -1037,7 +1036,7 @@
     .location-choice-help {font-size:14px!important;}
     .restaurant-group + .turn-notice {margin:12px 0 0;color:#7c8491;}
   </style>
-  <link rel="stylesheet" href="/assets/location-picker.css?v=153" />
+  <link rel="stylesheet" href="/assets/location-picker.css?v=154" />
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -1936,7 +1935,7 @@
     }
     let phase1Sheets=null;
     async function openPhase1Condition(key='location') {
-      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=153');phase1Sheets=mountPhase1Sheets({send:(message,options)=>options?.locationSelection?ask(message,options):routeQuestion(message),locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
+      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=154');phase1Sheets=mountPhase1Sheets({send:(message,options)=>options?.locationSelection?ask(message,options):routeQuestion(message),locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
       catch{showToast('선택창을 열지 못했어요. 입력창에 원하는 조건을 말씀해 주세요.');$('#chatInput').focus();}
     }
     function setPhase1Focus(card){const message=[...chatMessages].reverse().find(m=>m.meta?.responseModeState?.phase1);if(message){const state=message.meta.responseModeState;state.phase1.focusCardId=card.id;state.shownPlaces=[...new Map([...(state.shownPlaces||[]),card].map(c=>[c.id,c])).values()].slice(-50);saveConversation();}}
@@ -2032,22 +2031,21 @@
         group.historyRetired = true;
         if(group.classList.contains('phase1-conditions')){group.hidden=true;group.setAttribute('aria-hidden','true');}
         group.classList.add('history-inactive');
+        const methodChoice=group.classList.contains('question-location-choice')?[...group.querySelectorAll('.quick-reply')].find(button=>button.locationMethodSelected):null;
         group.querySelectorAll('.restaurant-card').forEach((card,index)=> {
           const ordinal = [/(?:첫\s*번째|처음|1\s*번째)/,/(?:두\s*번째|2\s*번째)/,/(?:세\s*번째|3\s*번째)/][index];
           if (!card.historyMarked && (card.historyLabel && content.includes(card.historyLabel) || ordinal?.test(content))) {
             card.historyMarked = true; card.classList.add('history-selected');
-            const check = document.createElement('span'); check.className = 'history-check'; check.appendChild(uiIcon('check')); card.appendChild(check);
           }
         });
         group.querySelectorAll('.quick-reply, .meal-chip, .related-question').forEach(button => {
           if (button.disabled) return;
           const label = button.historyLabel || button.textContent;
-          const selected = label && (content === button.historyMessage || content.includes(label)) && !/다른 메뉴|다른 곳|조건 바꾸기/.test(label);
+          const selected = methodChoice?button===methodChoice:label && (content === button.historyMessage || content.includes(label)) && !/다른 메뉴|다른 곳|조건 바꾸기/.test(label);
           button.disabled = true; button.setAttribute('aria-disabled','true'); button.setAttribute('tabindex','-1');
           if (button.tagName === 'A') button.removeAttribute('href');
           if (selected) {
             button.classList.add('history-selected'); button.setAttribute('aria-pressed','true');
-            const check = document.createElement('span'); check.className = 'history-check'; check.appendChild(uiIcon('check')); button.appendChild(check);
           }
         });
       });
@@ -2132,6 +2130,7 @@
             button.className = `quick-reply${followupChip ? ' quick-reply-chip' : actionReply ? ' quick-reply-action' : ''}`;
             if (card.title === '다른 메뉴 보기') button.classList.add('menu-more');
             button.setAttribute('aria-label', card.description ? `${card.title}: ${card.description}` : card.title);
+            if(answerLayout==='location-choice')button.setAttribute('aria-pressed','false');
             button.historyLabel = card.title;
             button.historyMessage = (message.meta?.turnPolicy?.answerChoices || message.meta?.turnPolicy?.next_question?.chips || []).find(choice=>choice.label === card.title || choice.label === card.originalTitle)?.message;
             if (answerLayout === 'region' && card.title === '현재 위치 연결') { button.classList.add('location-primary'); button.historyMessage = '지금 내 주변에서 찾아줘'; }
@@ -2153,6 +2152,7 @@
             if (card.title === '상관없어요') button.classList.add('skip-chip');
             button.addEventListener('click', () => {
               if (button.disabled) return;
+              if(answerLayout==='location-choice')for(const method of answers.querySelectorAll('.quick-reply')){method.locationMethodSelected=method===button;method.setAttribute('aria-pressed',String(method===button));}
               const isCuisineCategory = /^(?:한식|중식|일식|양식|분식|카페 식사)$/.test(card.title);
               if (card.description && !isCuisineCategory && !isCurrentLocationIntent(card.title) && !/^(?:지역 직접 입력|직접 입력|지역 정하기)$/.test(card.title)) {
                 chooseMenuCard(card.title);
