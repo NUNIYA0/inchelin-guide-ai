@@ -311,7 +311,7 @@ export async function testConversationUI(runCase) {
   assert.match(responsiveCards,/\.restaurant-title-link::after \{[^}]*inset:0; z-index:1/,'whole card opens its existing detail link without nesting a button');
   assert.match(responsiveCards,/\.restaurant-compare.restaurant-map-link \{ position:relative; z-index:2/,'compare remains separately clickable above stretched link');
   assert.match(html,/\.message\.ai > \.ai-avatar \{[^}]*width:24px; height:24px/);
-  assert.match(html,/\.composer-jump-row \{ display:none; height:52px; padding-bottom:12px; justify-content:flex-end/);
+  assert.match(html,/\.composer-jump-row \{ display:none; height:52px; padding-bottom:12px; justify-content:center/);
   assert.match(html,/\.conversation-bottom \{ position:static; z-index:1; width:40px; height:40px/);
   assert.ok(html.indexOf('id="comparisonTray"')<html.indexOf('id="conversationBottom"'));assert.ok(html.indexOf('id="conversationBottom"')<html.indexOf('id="chatForm"'));
   assert.match(responsiveCards,/grid-template-columns:minmax\(0,1fr\); grid-auto-rows:1fr; align-items:stretch; gap:12px/);
