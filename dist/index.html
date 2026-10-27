@@ -133,7 +133,8 @@
       .history-more { opacity:0; pointer-events:none; }
       .history-row:hover .history-more, .history-row:focus-within .history-more, .history-more[aria-expanded="true"] { opacity:1; pointer-events:auto; }
     }
-    @media (any-pointer:coarse), (hover:none) { .history-more { opacity:1; pointer-events:auto; } }
+    @media (pointer:coarse), (hover:none) { .history-more { opacity:1; pointer-events:auto; } }
+    .history-touch-input .history-more { opacity:1; pointer-events:auto; }
     .history-action-menu { position: fixed; z-index: 1200; display: none; width: 132px; padding: 6px; border: 1px solid #dedede; border-radius: 11px; background: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.12); }
     .history-action-menu.open { display: block; animation: reveal .15s ease-out; }
     .history-action-menu button { width: 100%; border: 0; border-radius: 7px; background: transparent; padding: 9px 10px; color: #444; font-size: 13px; font-weight: 400; text-align: left; cursor: pointer; }
@@ -1047,6 +1048,7 @@
   </style>
   <link rel="stylesheet" href="/assets/location-picker.css?v=154" />
   <link rel="stylesheet" href="/assets/restaurant-ui.css?v=155" />
+  <link rel="stylesheet" href="/assets/history-manager.css?v=160" />
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -1093,9 +1095,9 @@
       <div class="history-list" id="historyList"></div>
       <div class="sidebar-foot" id="sidebarAccountArea"></div>
     </aside>
-    <div class="history-action-menu" id="historyActionMenu" role="menu" aria-hidden="true">
-      <button type="button" role="menuitem" data-history-action="rename">이름 변경</button>
-      <button type="button" role="menuitem" class="danger" data-history-action="delete">삭제</button>
+    <div class="history-action-menu" id="historyActionMenu" role="menu" aria-label="대화 관리" aria-hidden="true">
+      <button type="button" role="menuitem" data-history-action="rename"><svg class="ui-icon" aria-hidden="true" focusable="false"><use href="#i-new-chat"/></svg>이름 변경</button>
+      <button type="button" role="menuitem" class="danger" data-history-action="delete"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/></svg>삭제</button>
     </div>
     <div class="scrim" id="scrim"></div>
 
@@ -1224,6 +1226,7 @@
 <script src="assets/naver-map.js?rules=v145"></script>
 <script src="assets/phase1-core.js?rules=v155"></script>
 <script src="assets/restaurant-ui.js?v=155"></script>
+<script src="assets/history-manager.js?v=160"></script>
 <script src="assets/recommendation-flags.js?rules=v145"></script>
 <script src="assets/recommendations-ui.js?rules=v145"></script>
   <script>
@@ -1295,6 +1298,8 @@
     let activeSuggestions = [];
     let lastAIRequest = null;
     let historyMenuId = null;
+    let historyMenuOpener = null;
+    const historyManager = globalThis.InchelinHistoryUI.create({list:$('#historyList'),getHistories:()=>histories,setHistories:next=>{histories=next;},save:next=>localStorage.setItem(scopedKey('insight-ai-history'),JSON.stringify(next)),render:()=>renderHistory(),restoreFocus:id=>restoreHistoryFocus(id),onDeleted:id=>{if(currentId===id)newChat();},toast:text=>showToast(text)});
     let currentLocationName = '';
     let currentLocationCoords = null;
     let locationRequestInFlight = false;
@@ -2270,6 +2275,7 @@
       try { renderHistory(); } catch (_) { /* Sidebar failure cannot block answer generation. */ }
     }
     function renderHistory() {
+      historyManager.cancelRename(false);
       closeHistoryMenu();
       const list = $('#historyList');
       if (!histories.length) { list.innerHTML = '<div class="history-empty">아직 대화가 없습니다.</div>'; return; }
@@ -2299,18 +2305,27 @@
     function escapeHTML(value) {
       return String(value).replace(/[&<>'"]/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[character]);
     }
-    function closeHistoryMenu() {
+    function restoreHistoryFocus(id) {
+      const target=qsa('[data-history-menu]').find(b=>b.dataset.historyMenu===id)||qsa('[data-history-menu]')[0];
+      if(sidebar.classList.contains('open')&&target){target.focus();return;}
+      const input=chatView.classList.contains('active')?$('#chatInput'):$('#welcomeInput');input?.focus();
+    }
+    function closeHistoryMenu(restore=false) {
+      const opener=historyMenuOpener;
       historyActionMenu.classList.remove('open');
       historyActionMenu.setAttribute('aria-hidden', 'true');
       qsa('[data-history-menu]').forEach(button => button.setAttribute('aria-expanded', 'false'));
       historyMenuId = null;
+      historyMenuOpener = null;
+      if(restore&&opener?.isConnected)opener.focus();
     }
     function openHistoryMenu(id, button) {
       if (historyMenuId === id && historyActionMenu.classList.contains('open')) {
-        closeHistoryMenu();
+        closeHistoryMenu(true);
         return;
       }
       historyMenuId = id;
+      historyMenuOpener = button;
       historyActionMenu.classList.add('open');
       historyActionMenu.setAttribute('aria-hidden', 'false');
       qsa('[data-history-menu]').forEach(item => item.setAttribute('aria-expanded', String(item === button)));
@@ -2322,20 +2337,8 @@
       historyActionMenu.querySelector('button')?.focus();
     }
     function manageHistory(id, action) {
-      const item = histories.find(h => h.id === id);
-      if (!item) return;
-      if (action === 'delete') {
-        if (!confirm('이 대화를 삭제할까요?')) return;
-        histories = histories.filter(h => h.id !== id);
-        localStorage.setItem(scopedKey('insight-ai-history'), JSON.stringify(histories));
-        if (currentId === id) newChat();
-      } else if (action === 'rename') {
-        const nextTitle = prompt('새 대화 이름을 입력하세요.', item.title);
-        if (nextTitle === null || !nextTitle.trim()) return;
-        item.title = nextTitle.trim().slice(0, 40);
-        localStorage.setItem(scopedKey('insight-ai-history'), JSON.stringify(histories));
-      }
-      renderHistory();
+      if(action==='rename')historyManager.rename(id);
+      else if(action==='delete')historyManager.requestDelete(id);
     }
     function setGenerating(value) {
       generating = value;
@@ -2789,6 +2792,14 @@
       closeHistoryMenu();
       manageHistory(id, actionButton.dataset.historyAction);
     });
+    historyActionMenu.addEventListener('keydown',event=>{
+      if(event.key==='Tab'){closeHistoryMenu(true);return;}
+      if(!['ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+      event.preventDefault();const items=[...historyActionMenu.querySelectorAll('[role="menuitem"]')],index=items.indexOf(document.activeElement);
+      const next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowDown'?1:-1)+items.length)%items.length;items[next]?.focus();
+    });
+    $('#historyList').addEventListener('scroll',()=>closeHistoryMenu(true),{passive:true});
+    document.addEventListener('pointerdown',event=>document.documentElement.classList.toggle('history-touch-input',event.pointerType==='touch'),{passive:true,capture:true});
     $('#sidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
     $('#mobileSidebarToggle').addEventListener('click', () => setSidebar(!sidebar.classList.contains('open')));
     $('#sidebarClose').addEventListener('click', () => setSidebar(false));
@@ -3070,8 +3081,8 @@
     qsa('[data-close]').forEach(button => button.addEventListener('click', () => closeOverlay(button.dataset.close)));
     qsa('.overlay').forEach(overlay => overlay.addEventListener('click', event => { if (event.target === overlay) closeOverlay(overlay.id); }));
     qsa('[data-toast]').forEach(el => el.addEventListener('click', () => showToast(el.dataset.toast)));
-    document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(); });
-    document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(); } });
+    document.addEventListener('click', event => { if (!moreMenu.contains(event.target) && !event.target.closest('.more-trigger')) { moreMenu.classList.remove('open'); qsa('.more-trigger').forEach(item => item.setAttribute('aria-expanded', 'false')); } if (!taskMenu.contains(event.target) && !event.target.closest('.task-trigger')) { taskMenu.classList.remove('open'); qsa('.task-trigger').forEach(b => b.setAttribute('aria-expanded', 'false')); } if (!historyActionMenu.contains(event.target) && !event.target.closest('[data-history-menu]')) closeHistoryMenu(historyActionMenu.contains(document.activeElement)); });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') { qsa('.overlay.open').forEach(o => closeOverlay(o.id)); moreMenu.classList.remove('open'); taskMenu.classList.remove('open'); closeHistoryMenu(true); } });
     window.addEventListener('resize', () => { setSidebar(sidebar.classList.contains('open')); ['welcomeInput','chatInput'].forEach(id => { const input=document.getElementById(id); if(input.getClientRects().length)resizeInput(input); }); });
     renderAuthNavigation();
     renderHistory();
