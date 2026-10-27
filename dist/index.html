@@ -124,8 +124,16 @@
     .history-row { position: relative; display: flex; align-items: center; gap: 4px; }
     .history-item { min-width: 0; flex: 1; border: 0; background: transparent; padding: 9px 8px; text-align: left; border-radius: 8px; color: #727272; font-size: 13px; font-weight: 400; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .history-item:hover { background: #ededed; }
-    .history-more { flex: 0 0 28px; width: 28px; height: 28px; border: 0; background: transparent; border-radius: 7px; cursor: pointer; color: #888; }
+    .history-more { flex: 0 0 44px; width: 44px; height: 44px; display:grid; place-items:center; border: 0; background: transparent; border-radius: 8px; cursor: pointer; color: #888; }
     .history-more:hover { background: #e9e9e9; }
+    .history-more-icon { width:22px; height:22px; background:url('/assets/chat-more/more-horizontal-gray.png') center/contain no-repeat; pointer-events:none; }
+    .history-more:hover .history-more-icon, .history-more[aria-expanded="true"] .history-more-icon { background-image:url('/assets/chat-more/more-horizontal-dark.png'); }
+    .history-more:focus-visible { outline:2px solid #333; outline-offset:2px; }
+    @media (hover:hover) and (pointer:fine) {
+      .history-more { opacity:0; pointer-events:none; }
+      .history-row:hover .history-more, .history-row:focus-within .history-more, .history-more[aria-expanded="true"] { opacity:1; pointer-events:auto; }
+    }
+    @media (any-pointer:coarse), (hover:none) { .history-more { opacity:1; pointer-events:auto; } }
     .history-action-menu { position: fixed; z-index: 1200; display: none; width: 132px; padding: 6px; border: 1px solid #dedede; border-radius: 11px; background: #fff; box-shadow: 0 12px 30px rgba(0,0,0,.12); }
     .history-action-menu.open { display: block; animation: reveal .15s ease-out; }
     .history-action-menu button { width: 100%; border: 0; border-radius: 7px; background: transparent; padding: 9px 10px; color: #444; font-size: 13px; font-weight: 400; text-align: left; cursor: pointer; }
@@ -2256,7 +2264,7 @@
       closeHistoryMenu();
       const list = $('#historyList');
       if (!histories.length) { list.innerHTML = '<div class="history-empty">아직 대화가 없습니다.</div>'; return; }
-      list.innerHTML = histories.map(h => `<div class="history-row"><button class="history-item" data-open-history="${h.id}">${escapeHTML(h.title)}</button><button class="history-more" data-history-menu="${h.id}" aria-label="${escapeHTML(h.title)} 대화 관리" aria-haspopup="menu" aria-expanded="false">${iconHTML('menu')}</button></div>`).join('');
+      list.innerHTML = histories.map(h => `<div class="history-row"><button class="history-item" data-open-history="${h.id}">${escapeHTML(h.title)}</button><button class="history-more" data-history-menu="${h.id}" aria-label="대화 더보기" aria-haspopup="menu" aria-controls="historyActionMenu" aria-expanded="false"><span class="history-more-icon" aria-hidden="true"></span></button></div>`).join('');
     }
     function openHistory(id) {
       const history = histories.find(h => h.id === id);
@@ -2760,10 +2768,10 @@
       submitWelcomeQuestion(item.prompt);
     });
     $('#historyList').addEventListener('click', event => {
-      const open = event.target.closest('[data-open-history]');
       const menu = event.target.closest('[data-history-menu]');
+      if (menu) { event.preventDefault(); event.stopPropagation(); openHistoryMenu(menu.dataset.historyMenu, menu); return; }
+      const open = event.target.closest('[data-open-history]');
       if (open) openHistory(open.dataset.openHistory);
-      if (menu) openHistoryMenu(menu.dataset.historyMenu, menu);
     });
     historyActionMenu.addEventListener('click', event => {
       const actionButton = event.target.closest('[data-history-action]');

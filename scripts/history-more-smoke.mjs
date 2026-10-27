@@ -1,0 +1,25 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+
+const html=await readFile(new URL('../dist/index.html',import.meta.url),'utf8');
+const render=html.match(/    function renderHistory\(\) \{[\s\S]*?\n    \}/)[0];
+const list={innerHTML:''};
+new Function('$','histories','closeHistoryMenu','escapeHTML',render+';renderHistory();')(()=>list,[{id:'test-history-only',title:'긴 제목 테스트'}],()=>{},v=>v);
+assert.match(list.innerHTML,/aria-label="대화 더보기"/);
+assert.match(list.innerHTML,/aria-haspopup="menu" aria-controls="historyActionMenu" aria-expanded="false"/);
+assert.match(list.innerHTML,/history-more-icon/);
+assert.doesNotMatch(list.innerHTML,/#i-menu|≡/);
+const listener=html.match(/    \$\('#historyList'\)\.addEventListener\('click', event => \{[\s\S]*?\n    \}\);/)[0];
+let handler,opened=0,menus=0,prevented=0,stopped=0;
+new Function('$','openHistory','openHistoryMenu',listener)(()=>({addEventListener:(name,fn)=>{handler=fn;}}),()=>opened++,()=>menus++);
+const menu={dataset:{historyMenu:'test-history-only'}};
+handler({target:{closest:s=>s==='[data-history-menu]'?menu:null},preventDefault:()=>prevented++,stopPropagation:()=>stopped++});
+assert.deepEqual([opened,menus,prevented,stopped],[0,1,1,1],'more opens its menu without changing conversations');
+handler({target:{closest:s=>s==='[data-open-history]'?{dataset:{openHistory:'test-history-only'}}:null}});
+assert.equal(opened,1,'title still opens the conversation');
+assert.match(html,/\.history-more \{ flex: 0 0 44px/,'space remains reserved while transparent');
+assert.match(html,/\.history-item \{[^}]*min-width: 0;[^}]*text-overflow: ellipsis; white-space: nowrap/);
+assert.match(html,/@media \(hover:hover\) and \(pointer:fine\)/);
+assert.match(html,/\.history-row:hover \.history-more, \.history-row:focus-within \.history-more, \.history-more\[aria-expanded="true"\]/);
+assert.match(html,/@media \(any-pointer:coarse\), \(hover:none\)/);
+console.log('Sidebar more smoke passed: horizontal icon, reserved title space, hover/focus/open/touch visibility rules, isolated menu click.');
