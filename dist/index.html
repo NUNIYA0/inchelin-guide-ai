@@ -1035,6 +1035,7 @@
     .restaurant-category,.restaurant-distance,.restaurant-address,.card-source,.verification-summary,.condition-evidence,.condition-evidence p,.restaurant-other-menus,.location-choice-help,.conditions-hint,.related-label,.dialog-sub,.sidebar-foot,.history-label,.disclaimer,.menu-hint,.quick-reply-description,.quick-reply-reason {font-size:13px!important;font-weight:400!important;}
     .registered-menu,.registered-recommendation .recommender-name,.authored-reason,.recommendation-label,.recommendation-value,.recommendations-empty,.plugin-copy,.plugin-description {font-size:14px!important;font-weight:400!important;}
     .location-choice-help {font-size:14px!important;}
+    .restaurant-group + .turn-notice {margin:12px 0 0;color:#7c8491;}
   </style>
 </head>
 <body>
@@ -2097,10 +2098,10 @@
         }
         if (allowed('text')&&!locationChoice) resultSection.appendChild(copy);
         const isMenuTurn = allowed('menu_cards') && message.meta?.menuCards?.length;
-        if (!isMenuTurn && allowed('notice') && message.meta?.notice) {
-          const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; resultSection.appendChild(notice);
-        }
         if (allowed('place_cards') && message.restaurants?.length) resultSection.appendChild(renderRestaurantCards(message.restaurants.slice(0,message.meta?.answer_limits?.place_cards || 3),allowed('source')));
+        if (!isMenuTurn && allowed('notice') && message.meta?.notice) {
+          const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.setAttribute('role','note'); notice.textContent = message.meta.notice; resultSection.appendChild(notice);
+        }
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
         const answerLayout = locationChoice?'location-choice':message.meta?.turnPolicy?.answerLayout || (message.meta?.flow === 'menu_category' ? 'category' : message.meta?.flow === 'region' ? 'region' : ['region','companion'].includes(message.meta?.turnPolicy?.next_question?.slot) ? message.meta.turnPolicy.next_question.slot : null);
         if (answerLayout) answers.classList.add('question-' + answerLayout);
