@@ -1012,6 +1012,19 @@
       .chat-dock {padding-inline:12px;}.chat-dock-inner {width:100%;}
       .phase1-condition .meal-chip {white-space:nowrap;}
     }
+    /* Only the initial location choice uses the reference's two-action layout. */
+    .location-choice-response .answer-results:empty {display:none;}
+    .location-choice-response .answer-question {margin:0;padding:0;border:0;background:transparent;max-width:560px;}
+    .location-choice-response .turn-question {margin:0 0 6px;font:600 18px/1.5 system-ui,"Noto Sans KR",sans-serif;}
+    .location-choice-help {margin:0 0 20px;color:#7c8491;font:400 15px/1.6 system-ui,"Noto Sans KR",sans-serif;}
+    .location-choice-response .question-location-choice {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:0;max-width:560px;}
+    .location-choice-response .question-location-choice .quick-reply {display:flex;align-items:center;justify-content:center;gap:12px;min-width:0;min-height:56px;height:auto;padding:12px 16px;border:1px solid #d8dde5;border-radius:12px;background:#fff;color:#17191d;box-shadow:none;white-space:nowrap;font:400 16px/1.5 system-ui,"Noto Sans KR",sans-serif;}
+    .location-choice-response .quick-reply-title {font:inherit;white-space:nowrap;}
+    .location-choice-response .supplied-icon {width:22px;height:22px;flex:0 0 22px;}
+    .location-choice-response .question-location-choice .quick-reply:hover:not(:disabled) {background:#f7f8fa;border-color:#9da6b3;}
+    .location-choice-response .question-location-choice .quick-reply:active:not(:disabled) {background:#eef0f3;transform:translateY(1px);}
+    @media(max-width:480px){.location-choice-response .question-location-choice{gap:8px;}.location-choice-response .question-location-choice .quick-reply{gap:8px;padding:12px 8px;font-size:14px;}.location-choice-response .turn-question{font-size:17px;}.location-choice-help{font-size:14px;}}
+    @media(max-width:359px){.location-choice-response .question-location-choice{grid-template-columns:minmax(0,1fr);}}
   </style>
 </head>
 <body>
@@ -2097,6 +2110,8 @@
         const resultSection=document.createElement('section');resultSection.className='answer-results';resultSection.setAttribute('aria-label','답변 결과');
         const questionSection=document.createElement('section');questionSection.className='answer-question';questionSection.setAttribute('aria-label','답변 선택');
         const hasQuestion=allowed('question')&&Boolean(message.meta?.turnPolicy?.questionText);
+        const locationChoice=hasQuestion&&message.meta?.phase1&&message.meta.turnPolicy?.next_question?.slot==='region'&&Boolean(message.meta.turnPolicy.questionHelp);
+        if(locationChoice)item.classList.add('location-choice-response');
         if(message.meta?.phase1&&message.meta.conditionChips?.length)resultSection.appendChild(renderPhase1Conditions(message.meta.conditionChips));
         const conditionKey=message.meta?.searchConditions?JSON.stringify(message.meta.searchConditions):'';
         const priorAI=[...messagesEl.children].filter(node=>node.chatRole==='assistant');
@@ -2111,14 +2126,14 @@
           }
           resultSection.appendChild(conditions);
         }
-        if (allowed('text')) resultSection.appendChild(copy);
+        if (allowed('text')&&!locationChoice) resultSection.appendChild(copy);
         const isMenuTurn = allowed('menu_cards') && message.meta?.menuCards?.length;
         if (!isMenuTurn && allowed('notice') && message.meta?.notice) {
           const notice = document.createElement('p'); notice.className = 'turn-notice'; notice.textContent = message.meta.notice; resultSection.appendChild(notice);
         }
         if (allowed('place_cards') && message.restaurants?.length) resultSection.appendChild(renderRestaurantCards(message.restaurants.slice(0,message.meta?.answer_limits?.place_cards || 3),allowed('source')));
         const answers = document.createElement('div'); answers.className = 'quick-replies quick-replies-followup answer-chips'; answers.setAttribute('aria-label', '질문 선택지');
-        const answerLayout = message.meta?.turnPolicy?.answerLayout || (message.meta?.flow === 'menu_category' ? 'category' : message.meta?.flow === 'region' ? 'region' : ['region','companion'].includes(message.meta?.turnPolicy?.next_question?.slot) ? message.meta.turnPolicy.next_question.slot : null);
+        const answerLayout = locationChoice?'location-choice':message.meta?.turnPolicy?.answerLayout || (message.meta?.flow === 'menu_category' ? 'category' : message.meta?.flow === 'region' ? 'region' : ['region','companion'].includes(message.meta?.turnPolicy?.next_question?.slot) ? message.meta.turnPolicy.next_question.slot : null);
         if (answerLayout) answers.classList.add('question-' + answerLayout);
         const answerTop = document.createElement('div'); answerTop.className = 'answer-full-row answer-top';
         const answerTiles = document.createElement('div'); answerTiles.className = 'answer-tiles';
@@ -2189,6 +2204,7 @@
         bubble.appendChild(resultSection);
         if (hasQuestion) {
           const question = document.createElement('p'); question.className = 'turn-question'; question.textContent = message.meta.turnPolicy.questionText; questionSection.appendChild(question);
+          if(locationChoice){const help=document.createElement('p');help.className='location-choice-help';help.textContent=message.meta.turnPolicy.questionHelp;questionSection.appendChild(help);}
         }
         for (const group of [answerTop, answerTiles, answerBottom]) if (group.children.length) answers.appendChild(group);
         if (allowed('chips') && answers.children.length) (hasQuestion?questionSection:bubble).appendChild(answers);

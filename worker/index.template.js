@@ -2336,18 +2336,19 @@ async function phase1ChatResponse(latest,context,env,execution){
   state.shownPlaces=catalog;
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
-  const plan=(message,restaurants=[],{question='',choices=[],notice='',intent='place_search',error=false}={})=>{
+  const plan=(message,restaurants=[],{question='',questionHelp='',choices=[],notice='',intent='place_search',error=false}={})=>{
     restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...card,conditionVerification:evaluateConditions(card,c)}));
     state.lastCards=recommendationCatalog.enrich(state.lastCards,c);
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:1,slots:state.slots},responseModeState:state,
     answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',...(recommendationCatalog.exclusive?{registeredData:{count:recommendationCatalog.entries().length,sourceDate:recommendationData.sourceDate,sourceHash:recommendationData.sourceHash,exclusive:true}}:{}),conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
-    turnPolicy:{intro:message,questionText:question,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
+    turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   if(!c.location||parsed.ambiguous||parsed.unknownStation){
     state.lastCards=[];
-    const question=parsed.ambiguous?'어느 역을 기준으로 찾을까요?':parsed.unknownStation?'어느 지역의 역인지 알려주시겠어요? 지금 선택 가능한 역도 아래에서 골라주세요.':'어디에서 드실 예정이세요? 동네나 역 이름을 직접 입력해 주셔도 돼요.';
-    return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
+    const question=parsed.ambiguous?'어느 역을 기준으로 찾을까요?':parsed.unknownStation?'어느 지역의 역인지 알려주시겠어요? 지금 선택 가능한 역도 아래에서 골라주세요.':'어디에서 드실 예정이세요?';
+    const questionHelp=!parsed.ambiguous&&!parsed.unknownStation?'동네나 역 이름을 알려주시거나, 현재 위치로 찾아보세요.':'';
+    return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,questionHelp,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
   }
   if(parsed.invalidRadius)return plan('거리를 임의로 바꾸지 않고 기다릴게요.',[],{question:'0보다 큰 직선거리를 m나 km로 알려주시겠어요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'2km 이내',message:'2km 이내로 찾아줘'}]});
   if(registeredOnly&&!recommendationCatalog.active)return plan('등록된 추천 정보를 현재 불러올 수 없어요. 추천인·추천 이유가 있는 등록 맛집 대신 외부 검색을 사용하려면 아래에서 선택해 주세요.',[],{choices:[{label:'네이버 검색으로 찾기',message:'네이버 검색으로 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});

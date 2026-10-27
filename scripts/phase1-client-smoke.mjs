@@ -59,7 +59,16 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       const a=app({skew});a.api.type(prompt);await a.api.done();assert.equal(a.api.messages.length,2,prompt);assert.equal(a.requests.length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);
       assert.ok(a.elements.chatView.classList.contains('active'));assert.equal(a.elements.welcome.style.display,'none');assert.equal(a.api.busy,false);
       const hasLocation=/홍대|성수|강남역/.test(prompt);assert.equal(cls(a.elements.messages,'restaurant-card').length,hasLocation?3:0,prompt);assert.equal(cls(a.elements.messages,'turn-question').length,hasLocation?0:1);assert.ok(!/새 버전/.test(a.elements.messages.textContent));
-      if(!hasLocation)assert.equal(cls(a.elements.messages,'phase1-conditions').length,0,'no chips until location is resolved');
+      if(!hasLocation){
+        assert.equal(cls(a.elements.messages,'phase1-conditions').length,0,'no chips until location is resolved');
+        assert.equal(cls(a.elements.messages,'location-choice-response').length,1);
+        assert.equal(cls(a.elements.messages,'turn-question')[0].textContent,'어디에서 드실 예정이세요?');
+        assert.match(cls(a.elements.messages,'location-choice-help')[0].textContent,/동네나 역 이름/);
+        const actions=cls(a.elements.messages,'question-location-choice')[0];assert.equal(actions.children.length,2);
+        assert.deepEqual(actions.children.map(n=>n.attributes['aria-label']),['현재 위치로 찾기','지역·역 선택']);
+        assert.equal(cls(actions,'supplied-icon').length,2);
+        assert.equal(cls(a.elements.messages,'answer-results')[0].children.length,0,'no duplicated intro above location question');
+      }
     }
     for(let index=0;index<3;index++){const a=app();a.api.clickRow(index);await a.api.done();assert.equal(a.api.messages.length,2);assert.equal(cls(a.elements.messages,'turn-question').length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);}
     const gated=app({kind:'consent'});gated.api.type('강남역에서 한식, 만 원 이하로 혼자 먹을 거야');await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,0);assert.match(gated.elements.messages.textContent,/연결되지|미확인/);const consent=cls(gated.elements.messages,'quick-reply').find(n=>n.textContent==='미확인 후보 보기');assert.ok(consent);consent.click();await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,3);assert.ok(cls(gated.elements.messages,'condition-evidence').length);assert.match(gated.elements.messages.textContent,/미확인/);assert.equal(gated.api.request().context.responseModeState.phase1.conditions.budget,'1만 원 이하');
