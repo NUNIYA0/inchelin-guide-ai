@@ -1037,7 +1037,7 @@
     .location-choice-help {font-size:14px!important;}
     .restaurant-group + .turn-notice {margin:12px 0 0;color:#7c8491;}
   </style>
-  <link rel="stylesheet" href="/assets/location-picker.css?v=152" />
+  <link rel="stylesheet" href="/assets/location-picker.css?v=153" />
 </head>
 <body>
   <svg xmlns="http://www.w3.org/2000/svg" style="display:none" aria-hidden="true">
@@ -1936,7 +1936,7 @@
     }
     let phase1Sheets=null;
     async function openPhase1Condition(key='location') {
-      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=152');phase1Sheets=mountPhase1Sheets({send:(message,options)=>options?.locationSelection?ask(message,options):routeQuestion(message),locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
+      try{if(!phase1Sheets){const {mountPhase1Sheets}=await import('/assets/phase1-sheets.js?v=153');phase1Sheets=mountPhase1Sheets({send:(message,options)=>options?.locationSelection?ask(message,options):routeQuestion(message),locate:requestCurrentLocation,isBusy:()=>generating||locationRequestInFlight,getConditions:()=>pluginState().phase1?.conditions||{}});}phase1Sheets.open(key);}
       catch{showToast('선택창을 열지 못했어요. 입력창에 원하는 조건을 말씀해 주세요.');$('#chatInput').focus();}
     }
     function setPhase1Focus(card){const message=[...chatMessages].reverse().find(m=>m.meta?.responseModeState?.phase1);if(message){const state=message.meta.responseModeState;state.phase1.focusCardId=card.id;state.shownPlaces=[...new Map([...(state.shownPlaces||[]),card].map(c=>[c.id,c])).values()].slice(-50);saveConversation();}}

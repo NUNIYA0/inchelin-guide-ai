@@ -24,7 +24,9 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
   let input,clear,list,status,apply,filters;
   const syncViewport=()=>{
     const viewport=globalThis.visualViewport,height=viewport?.height||globalThis.innerHeight||800,offset=viewport?.offsetTop||0;
-    const mobile=(globalThis.innerWidth||1024)<768,box=Math.max(0,Math.min(mobile?700:680,height-(mobile?8:48)));
+    const mobile=(globalThis.innerWidth||1024)<768;
+    const preferred=mobile?Math.max(570,Math.round(height*.70)):680;
+    const box=Math.max(0,Math.min(mobile?700:680,preferred,height-(mobile?8:48)));
     sheet.dialog.classList[height<600?'add':'remove']('location-compact');
     sheet.dialog.style.height=box+'px';sheet.dialog.style.top=(offset+(mobile?height-box:(height-box)/2))+'px';
   };

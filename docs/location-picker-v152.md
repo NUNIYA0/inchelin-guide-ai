@@ -43,3 +43,14 @@ restaurant sources, address-map links and sidebar remain unchanged.
   viewport simulation. Preview uses real restaurant records with mocked coordinates.
 - Real mobile OS keyboard and physical-device location permission: not verified.
 - Full countrywide geographic search/address/line metadata: not connected.
+
+## v153 mobile presentation
+
+Mobile gets a visible decorative handle, 24px top corners, outlined cancel button,
+roomier result rows, and a preferred height near 70% of the visual viewport (570px
+minimum content target, 700px cap, always bounded by the actual available height).
+Scope copy is visually hidden but remains available to assistive technology on
+mobile. Keyboard-height compact mode keeps the original search/footer priority.
+Desktop layout, location catalogue, selection and confirmation are unchanged.
+Browser checked at 390x844, 360x800 and 390x440 (short-height simulation);
+physical mobile keyboard remains unverified.

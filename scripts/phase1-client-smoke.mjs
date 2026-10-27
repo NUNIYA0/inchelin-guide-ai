@@ -134,7 +134,9 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase){
       try{
         globalThis.innerWidth=1280;globalThis.innerHeight=900;globalThis.visualViewport=undefined;
         const pc=createLocationPicker({send:()=>{}});pc.open();assert.equal(pc.dialog.style.height,'680px');assert.equal(pc.dialog.style.top,'110px');pc.dialog.close();
-        globalThis.innerWidth=390;globalThis.visualViewport={height:400,offsetTop:20,addEventListener(){},removeEventListener(){}};
+        globalThis.innerWidth=390;globalThis.visualViewport={height:844,offsetTop:0,addEventListener(){},removeEventListener(){}};
+        const mobile=createLocationPicker({send:()=>{}});mobile.open();assert.equal(mobile.dialog.style.height,'591px');assert.equal(mobile.dialog.style.top,'253px');mobile.dialog.close();
+        globalThis.visualViewport={height:400,offsetTop:20,addEventListener(){},removeEventListener(){}};
         const keyboard=createLocationPicker({send:()=>{}});keyboard.open();assert.equal(keyboard.dialog.style.height,'392px');assert.equal(keyboard.dialog.style.top,'28px');assert.ok(keyboard.dialog.classList.contains('location-compact'));keyboard.dialog.close();
       }finally{globalThis.innerWidth=oldWidth;globalThis.innerHeight=oldHeight;globalThis.visualViewport=oldViewport;}
       const forged=globalThis.InchelinPhase1.parse('강남역',{}, {locationSelection:{...catalog[0],latitude:0}}).conditions;
