@@ -2370,7 +2370,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   }
   if(detailed){
     if(!targets.length || parsed.intents.includes('compare')&&targets.length<2)return plan('어느 식당을 말씀하시는지 골라주세요.',[],{question:parsed.intents.includes('compare')?'비교할 식당 두 곳은 어디인가요?':'어느 식당이 궁금하세요?',choices:cards.slice(0,3).map(card=>({label:card.name,message:card.name+' 자세히 알려줘'})),intent:'specific_place'});
-    state.phase1.focusCardId=targets[0].id;
+    state.phase1.focusCardId=targets.length===1?targets[0].id:null;
     for(const card of targets){Object.assign(card,recommendationCatalog.enrich([card],c)[0]);Object.assign(card,globalThis.InchelinMapLinks.linkFields(card));}
     const info=targets.map(card=>`${card.name}: ${card.category||'음식 종류는 확인되지 않았어요'}, ${card.address||'주소 정보가 없어요'}${Number.isFinite(card.distanceMeters)?`, ${card.originLabel||c.location?.label||'기준 위치'}에서 직선 ${Math.round(card.distanceMeters)}m`:''}`).join('\n');
     const details=targets.map(card=>{
@@ -2400,7 +2400,9 @@ async function phase1ChatResponse(latest,context,env,execution){
       const area=String(row.roadAddress||'').split(/\s+/).slice(0,2).join(' ');
       const result=await provider.searchRestaurants({messages:[{role:'user',content:row.name}],locationName:area,intentAnalysis:{phase1:true,location:area,foodCategory:'',needsRestaurantSearch:true},exactQuery:row.name+' '+area});
       if(!result.configured||result.errorCode)throw new Error('registered_lookup_failed');return result.places;
-    }));
+    },directive?{progressive:true,acceptedUnknowns,excludeIds:directive.action==='search_more'?catalog.map(card=>card.id):[]}:{}));
+    searchDiagnostics=resolved.diagnostics;
+    if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'registered_search_stages',...searchDiagnostics}));
     registered=resolved.cards;if(resolved.attempted>0&&resolved.failures===resolved.attempted)error=true;
   }
   const deferredExternal=!registeredOnly&&unsupported.length>0&&registered.length<3;

@@ -36,4 +36,11 @@ const lookup=async row=>{const i=Number(row.sourceId.split('-').at(-1));return [
 const old=await resolveRegisteredCards(catalog,conditions,api,lookup);assert.equal(old.cards.length,0);
 const progressive=await resolveRegisteredCards(catalog,conditions,api,lookup,{progressive:true});assert.ok(progressive.cards.length>=3);assert.equal(progressive.attempted,12);assert.equal(progressive.diagnostics.outsideRadius,8);
 assert.equal(actionSchema([],['search'],keys).properties.changes.required.length,keys.length);
+const pending={phase1:{pendingQuestion:{slot:'radiusMeters'},conditions:{...defaults(),location:center}}};
+const numberAnswer=readModelPlan(raw({task:'information',action:'answer'}),[{role:'user',content:'1km'}],pending);
+assert.equal(numberAnswer.action,'search');assert.equal(numberAnswer.changes.find(c=>c.slot==='radiusMeters').value,1000);
+const confirmed=await applyPlan(numberAnswer,pending,{},resolver);assert.equal(confirmed.conditions.radiusConfirmed,true);
+const explain=read(raw({task:'information',action:'service',faqId:'how_to.radius'}),'1km 반경은 무슨 뜻이야?');assert.equal(explain.changes.length,0,'distance in an explanation must not mutate search');
+const budgetQuestion=read(raw({task:'change_conditions',action:'search',clarificationReason:'missing_budget',changes:{...raw().changes,budget:{op:'set',value:null,evidence:'더 저렴'}}}),'더 저렴한 곳');assert.equal(budgetQuestion.action,'clarify');assert.equal(budgetQuestion.question.slot,'budget');
+const current=await applyPlan({...raw(),changes:[{slot:'requireOpen',op:'set',value:true}],openingTimeBasis:'current'},{phase1:{conditions:{...conditions,visit:'내일 저녁',visitAt:'2026-10-29T19:00:00+09:00'}}},{currentLocalDatetime:'2026-10-28T12:00:00+09:00'},resolver);assert.equal(current.conditions.visit,'지금');assert.equal(current.conditions.visitAt,'2026-10-28T12:00:00+09:00');
 console.log('Semantic regressions passed: partial facts before clarification, evidence/default separation, ready execution, consent normalization, time/open separation, factual copy preservation, menu concepts and progressive candidates. All upstream calls mocked.');

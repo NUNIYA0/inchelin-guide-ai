@@ -45,10 +45,12 @@ try{
   contextSamples.push(first);assert.equal(state.phase1.conditions.location.label,'광화문역');assert.equal(first.restaurants.length,0);assert.equal(first.meta.turnPolicy.next_question.slot,'radiusMeters');assert.equal(state.phase1.conditionOrigins.radiusMeters,'default');assert.equal(state.phase1.conditionOrigins.visit,'explicit');
   const searched=await turn('1km',{changes:[change('radiusMeters',1000)]});
   contextSamples.push(searched);assert.equal(searched.restaurants.length,3);assert.equal(state.phase1.conditions.visit,'오늘 점심');assert.equal(state.phase1.conditionOrigins.radiusMeters,'explicit');
+  assert.equal(searched.meta.searchDiagnostics.candidateLimit,24,'production API must actually connect progressive lookup');
   for(const card of searched.restaurants){assert.equal(card.mapLinkKind,'detail');assert.ok(card.distanceMeters<=1000);assert.ok(source.restaurants.some(row=>row.sourceId===card.registeredSourceId));}
   const details=await turn('거기는 연락할 수 있어?',{action:'details',targetIds:[searched.restaurants[1].id],detailFields:['hours','phone']});
   assert.equal(details.restaurants[0].id,searched.restaurants[1].id);assert.match(details.message,/연락처|전화번호/);assert.equal(calls.length,1,'detail interpretation comes only from model target/fields, not words');
   const comparison=await turn('이 두 곳은 어때?',{action:'compare',targetIds:searched.restaurants.slice(0,2).map(c=>c.id)});assert.equal(comparison.restaurants.length,2);assert.ok(comparison.restaurants.every(card=>comparison.message.includes(card.name)));assert.equal(calls.length,1);
+  const ordinalCompare=await turn('첫 번째랑 두 번째 중 어디가 나아?',{task:'information',action:'answer',informationRequest:'compare_places',referencePositions:[1,2]});assert.equal(ordinalCompare.meta.intent,'compare');assert.equal(ordinalCompare.restaurants.length,2);assert.equal(state.phase1.focusCardId,null);
   const before=structuredClone(state.phase1.conditions);
   const cheaper=await turn('더 저렴한 곳',{action:'clarify',question:question('budget','한 끼 예산은 어느 정도인가요?')});
   contextSamples.push(cheaper);assert.deepEqual(state.phase1.conditions,before);assert.equal(calls.filter(x=>x.includes('naver')).length,0);assert.match(cheaper.meta.turnPolicy.questionText,/예산/);
@@ -79,6 +81,7 @@ try{
   const cleared=await applyPlan({...base(),changes:[{slot:'budget',op:'clear',value:null}]},{phase1:{conditions:{...kept,budget:'10000원 이하'}}},{},()=>null);assert.equal(cleared.conditions.budget,null);assert.equal(cleared.conditions.location.label,'홍대입구역');
   state={conversationId:'context-test',phase1:{conditions:{...kept,budget:'10,000원 이하'}}};
   const lower=await turn('그보다 싼 곳',{action:'clarify',question:{...question('budget','예산을 얼마까지 낮춰볼까요?'),replaceExisting:true}});assert.equal(lower.meta.turnPolicy.next_question.slot,'budget');assert.equal(state.phase1.conditions.budget,'10,000원 이하');
+  const unknownBudget=await turn('더 저렴한 곳',{task:'change_conditions',action:'search',clarificationReason:'missing_budget',changes:[change('budget',null)]});assert.equal(unknownBudget.meta.phase1Failure,false);assert.equal(unknownBudget.meta.turnPolicy.next_question.slot,'budget');assert.equal(state.phase1.conditions.budget,'10,000원 이하');
   state={conversationId:'context-test',phase1:{conditions:{...kept,location:point,companion:'혼밥'},pendingUnknowns:['companion'],acceptedUnknowns:[]}};
   const consent=await turn('미확인 조건을 알고 후보도 보여줘',{task:'consent',action:'answer',unknownConsent:true});
   assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(consent.meta.phase1Failure,false);
