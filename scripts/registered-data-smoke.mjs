@@ -19,7 +19,10 @@ export async function testRegisteredData(request,workerOverride){
   const raw=(row,index)=>({title:row.name,roadAddress:row.roadAddress,address:row.roadAddress,category:'음식점>한식',mapx:String(Math.round(c.location.longitude*1e7)),mapy:String(Math.round((c.location.latitude+(index+1)*.0005)*1e7))});
   const data=query=>{const index=rows.findIndex(row=>query.startsWith(row.name+' '));assert.ok(index>=0,'only registered-name queries, never a generic external substitute');return {items:[raw(rows[index],index),{...raw(rows[index],index),title:'등록 목록 밖 테스트 식당'}]};};
   const result=await request('강남역',{workerOverride,data});
-  assert.equal(result.calls.length,rows.length);assert.equal(result.body.restaurants.length,3);
+  // Earlier journeys may already have enriched some registered identities. A
+  // cached coordinate is valid; require all shortlist entries be examined, not
+  // a network miss for every entry in a shared Worker module.
+  assert.ok(result.calls.length<=rows.length);assert.equal(result.body.meta.searchDiagnostics.lookedUp,rows.length);assert.equal(result.body.restaurants.length,3);
   assert.equal(result.body.meta.dataConnectionStatus,'connected_snapshot');
   for(const card of result.body.restaurants){
     const row=source.restaurants.find(r=>r.sourceId===card.registeredSourceId);assert.ok(row);

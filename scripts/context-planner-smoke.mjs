@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import worker from '../build/dist/server/index.js';
+// Isolate mocked coordinate cache from other suites' actual-catalogue assertions.
+const worker=(await import(new URL('../build/dist/server/index.js',import.meta.url).href+'?context-smoke-isolated')).default;
 import {applyPlan,validatePlan,isolateState,plannerInput} from '../worker/conversation-planner.js';
 const faq=JSON.parse(await readFile(new URL('../data/service-faq.json',import.meta.url),'utf8'));
 const source=JSON.parse(await readFile(new URL('../data/private/restaurants-261026.json',import.meta.url),'utf8'));
@@ -87,6 +88,20 @@ try{
   assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(consent.meta.phase1Failure,false);
   await turn('500m 안으로',{task:'change_conditions',changes:[change('radiusMeters',500)]});
   assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(state.phase1.conditions.companion,'혼밥');assert.equal(state.phase1.conditions.radiusMeters,500);assert.ok(!state.phase1.pendingUnknowns?.includes('companion'));
+  // A journey assertion must reach real catalogue cards, not merely store slots.
+  state=null;history=[];coords=api.centers.find(c=>c.label==='역삼역');
+  let journey=await turn('역삼역 맛집 찾아줘');assert.equal(journey.meta.turnPolicy.next_question.slot,'radiusMeters');
+  journey=await turn('1km');assert.equal(journey.restaurants.length,3);const journeyPoint=structuredClone(state.phase1.conditions.location);
+  journey=await turn('좀 더 싼 곳은?',{task:'change_conditions',budgetRelation:'cheaper'});assert.equal(journey.meta.turnPolicy.next_question.slot,'budget');assert.deepEqual(state.phase1.conditions.location,journeyPoint);
+  journey=await turn('2만원 이하로',{task:'change_conditions',changes:[change('budget',20000)]});
+  if(state.phase1.pendingUnknowns?.length)journey=await turn('미확인 조건을 알고 후보도 보여줘',{task:'consent',unknownConsent:true});
+  assert.equal(journey.restaurants.length,3,'budget reply/consent must reach recommendations again');
+  journey=await turn('영업 조건은 빼고 같은 조건으로',{task:'change_conditions',referencePositions:[3],changes:[{slot:'requireOpen',op:'clear',value:false}]});assert.equal(journey.meta.phase1Failure,false);assert.equal(state.phase1.conditions.requireOpen,false);
+  state=null;history=[];
+  journey=await turn('두 번째 식당 주소 알려줘',{task:'information',action:'details',referencePositions:[2],detailFields:['address']});assert.equal(journey.meta.phase1Failure,false);assert.ok(journey.meta.turnPolicy.questionText);assert.equal(journey.restaurants.length,0);
+  journey=await turn('역삼역 1km 맛집 찾아줘');assert.equal(journey.restaurants.length,3,'missing target must be recoverable into a fresh search');
+  journey=await turn('현재 위치로 찾아줘',{task:'change_conditions',locationReference:'current'});assert.equal(state.phase1.conditions.location,null);assert.equal(journey.restaurants.length,0);assert.ok(journey.meta.turnPolicy.questionText);
+  journey=await turn('역삼역에서 찾아줘');assert.equal(journey.restaurants.length,3,'manual location recovers without repeating a confirmed radius');
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

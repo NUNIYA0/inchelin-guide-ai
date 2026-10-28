@@ -7,6 +7,7 @@ export function actionSchema(faqIds,actions,slots){
     changes:{type:'object',properties:Object.fromEntries(slots.map(slot=>[slot,update])),required:slots,additionalProperties:false},
     clarificationReason:{type:['string','null'],enum:[null,'missing_location','missing_radius','missing_budget','ambiguous_condition','ambiguous_place','ambiguous_location','other']},question,
     informationRequest:{type:['string','null'],enum:[null,'compare_places','place_details','map','service','general']},referencePositions:{type:'array',maxItems:3,items:{type:'integer',minimum:1,maximum:3}},openingTimeBasis:{type:['string','null'],enum:[null,'current','requested_visit']},
+    locationReference:{type:['string','null'],enum:[null,'current','named']},budgetRelation:{type:['string','null'],enum:[null,'cheaper']},
     answer:{type:['string','null']},faqId:{type:['string','null'],enum:[null,...faqIds]},targetIds:{type:'array',maxItems:3,items:{type:'string'}},detailFields:{type:'array',maxItems:6,items:{type:'string',enum:['menus','hours','phone','parking','seating','address']}},unknownConsent:{type:['boolean','null']},consentEvidence:{type:['string','null']},clearContext:{type:'boolean'}};
   return {type:'object',properties,required:Object.keys(properties),additionalProperties:false};
 }
@@ -17,6 +18,22 @@ export function distanceLiterals(text){
 export function readModelPlan(raw,messages,state={}){
   if(!raw||!tasks.includes(raw.task)||!raw.changes||Array.isArray(raw.changes))throw new Error('invalid_semantic_contract');
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'',literals=distanceLiterals(latest);
+  const recommendation=['recommend','change_conditions'].includes(raw.task);
+  // Validate explicitly supplied supported point literals only after the model
+  // chooses a search task. This cannot route FAQ/quoted place names to search.
+  if(recommendation&&!['ambiguous_location','ambiguous_condition'].includes(raw.clarificationReason)){
+    const centers=globalThis.InchelinPhase1?.centers||[];
+    const found=centers.flatMap(center=>(center.aliases||[center.label]).filter(alias=>{
+      const escaped=alias.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+      return new RegExp('(?:^|[\\s,])'+escaped+'(?=$|[\\s,.!?]|에서|으로|로|쪽|근처|주변|맛집)').test(latest);
+    }).map(alias=>({center,alias})));
+    if(new Set(found.map(m=>m.center.label)).size===1&&!raw.changes.location&&raw.locationReference!=='current'){
+      const match=found.sort((a,b)=>b.alias.length-a.alias.length)[0];
+      raw={...raw,changes:{...raw.changes,location:{op:'set',value:match.center.label,evidence:match.alias}}};
+    }
+    if(raw.locationReference==='current')raw={...raw,changes:{...raw.changes,location:{op:'set',value:'current',evidence:latest}}};
+    if(raw.budgetRelation==='cheaper'&&!raw.changes.budget)raw={...raw,clarificationReason:'missing_budget'};
+  }
   const bare=/^\s*\d+(?:\.\d+)?\s*(?:km|m|킬로미터|킬로|키로|미터)\s*(?:이내)?[.!]?\s*$/i.test(latest);
   // A typed numeric answer to an actual pending radius question is the same
   // contract as choosing a radius button. This does not classify arbitrary text.
@@ -25,6 +42,7 @@ export function readModelPlan(raw,messages,state={}){
   const users=messages.filter(m=>m.role==='user').map(m=>normalized(m.content));
   const quoted=value=>typeof value==='string'&&normalized(value).length>0&&users.some(text=>text.includes(normalized(value)));
   const rejected=[],changes=[];
+  let unclearClear=false;
   for(const [slot,update] of Object.entries(raw.changes)){
     if(!update)continue;
     if(slot==='budget'&&raw.clarificationReason==='missing_budget'&&update.op==='set'){rejected.push(slot);continue;}
@@ -32,25 +50,30 @@ export function readModelPlan(raw,messages,state={}){
     if(update.op==='set'&&update.value===null){rejected.push(slot);continue;}
     if(slot==='radiusMeters'&&update.op==='set'&&(!Number.isFinite(update.value)||update.value<=0||update.value>100000))throw new Error('invalid_number');
     if(!quoted(update.evidence)){rejected.push(slot);continue;}
+    // A destructive delta needs a named condition/value, not a bare deictic
+    // quote. Rejecting this delta preserves the rest of the current conditions.
+    if(update.op==='clear'&&/^(?:그|이|저|해당)\s*(?:조건|거|것)(?:은|는|을|를)?\s*(?:빼|제거|취소|없애)/.test(latest.trim())){unclearClear=true;continue;}
     // Numeric unit validation is input validation, not intent classification.
     if(slot==='radiusMeters'&&update.op==='set'){
       const quote=normalized(update.evidence),matches=[...quote.matchAll(/(\d+(?:\.\d+)?)(km|킬로미터|킬로|키로|m|미터)/g)];
       const spelledOut=!/\d/.test(quote)&&/(?:킬로|키로|미터)/.test(quote);
       if(!spelledOut&&!matches.some(m=>Math.abs(Number(m[1])*(['km','킬로미터','킬로','키로'].includes(m[2])?1000:1)-update.value)<.01)){rejected.push(slot);continue;}
     }
-    changes.push({slot,...update});
+    changes.push({slot,...update,...(update.op==='clear'?{value:null}:{})});
   }
+  if(unclearClear){changes.length=0;raw={...raw,action:'clarify',clarificationReason:'ambiguous_condition',question:{slot:'clarify',text:'어떤 조건을 빼드릴까요?',choices:[],replaceExisting:true}};}
   if(raw.unknownConsent!==null&&!quoted(raw.consentEvidence))throw new Error('consent_evidence_required');
   if(raw.clarificationReason==='missing_budget')raw={...raw,question:{slot:'budget',text:'한 끼 예산을 얼마까지 생각하세요?',choices:[],replaceExisting:true}};
   else if(raw.action==='clarify'&&!raw.question&&raw.clarificationReason)raw={...raw,question:{slot:'clarify',text:'어떤 조건을 말씀하시는지 알려주시겠어요?',choices:[],replaceExisting:false}};
   let action=raw.action;
   const requested={compare_places:'compare',place_details:'details',map:'map',service:'service'}[raw.informationRequest];
   if(raw.task==='information'&&requested)action=requested;
-  let targetIds=raw.targetIds||[];
-  if(raw.referencePositions?.length){
+  let targetIds=['details','compare','map'].includes(action)?raw.targetIds||[]:[];
+  if(['details','compare','map'].includes(action)&&raw.referencePositions?.length){
     const positions=[...new Set(raw.referencePositions)];
-    if(positions.some(index=>!Number.isInteger(index)||index<1||index>3||!state.lastCards?.[index-1]?.id))throw new Error('unknown_reference');
-    targetIds=positions.map(index=>state.lastCards[index-1].id);
+    if(positions.some(index=>!Number.isInteger(index)||index<1||index>3||!state.lastCards?.[index-1]?.id)){
+      targetIds=[];action='clarify';raw={...raw,task:'information',clarificationReason:'ambiguous_place',question:{slot:'clarify',text:'아직 어떤 식당인지 알 수 없어요. 식당 이름을 알려주시거나 먼저 먹을 곳을 찾아볼까요?',choices:[],replaceExisting:true}};
+    }else targetIds=positions.map(index=>state.lastCards[index-1].id);
   }
   if(raw.unknownConsent!==null)action='search';
   if(raw.clarificationReason==='missing_budget')action='clarify';
@@ -75,6 +98,8 @@ task: recommend=먹을 곳을 찾는 요청/필수 조건 답변, change_conditi
 action: search=실제 식당 검색, search_more=이미 본 곳 제외하고 같은 조건 검색, update_search=변경 후 검색, clarify=딱 하나 모호한 정보 확인, details/compare/map=실제 보여준 ID 조회, service=FAQ ID 선택, answer=사실을 지어내지 않는 짧은 대화, reset=초기화.
 위치만 검색 필수다. 반경 미확정이면 서버가 반경 선택을 물으므로 임의로 1000을 changes에 넣지 않는다. 반경은 단위가 포함된 원문 숫자만 미터로 변환한다. 음식·인원·시간·예산을 필수로 묻지 않는다. 위치/반경이 준비되면 search로 진행하고 같은 질문을 반복하지 않는다. 음식이 없다고 종류를 질문하지 않는다.
 location은 장소 이름/current만, 좌표를 만들지 않는다. 새 위치는 새 이름만 보내며 나머지 조건은 유지한다. 기기 위치가 없으면 사용 허용/좌표 확인이 끝났다고 말하지 않는다.
+locationReference는 이번 요청의 위치 대상이다. 현재 위치·내 주변으로 옮기는 요청이면 current와 changes.location=current를 반드시 함께 반환한다. 기기 좌표가 없더라도 이전 역 좌표를 유지하지 않는다. 장소 이름을 명시하면 named와 그 위치 변경을 반환하며, 위치를 언급하지 않았으면 null이다. '역삼역 1km 맛집', '강남역에서 한식 1km'처럼 조사 생략·복합 요청에서도 장소를 빠뜨리지 않는다.
+budgetRelation은 금액을 지정하지 않은 상대 가격 변경('좀 더 싼 곳', '지금보다 저렴한 곳', '가격 부담이 덜한 쪽')이면 cheaper다. 금액이 명시되면 budget에 원 단위 수를 넣고 budgetRelation=null이다. cheaper는 금액을 추측하거나 같은 목록을 반복하지 않고 missing_budget으로 예산 하나만 확인한다.
 visit은 사용자가 말한 방문 날짜·식사 시간(예: 오늘 점심/내일 저녁)을 반드시 담는다. visitAt은 구체 시각을 말한 경우 ISO 시각으로, 현재 시각은 localTime 기준으로 해석한다. 식사 맥락 자체는 requireOpen이 아니다. '지금 영업 중인 곳만/내일 7시에 영업하는 곳만'은 requireOpen=true이다. 영업정보가 없다고 이 조건을 삭제하지 않는다.
 openingTimeBasis는 필수 영업 요청의 기준 시각이다. '지금 영업 중인 곳만'이면 current, '그 시간에 영업하는 곳만/내일 저녁 7시에 영업하는 곳만'이면 requested_visit이다. 영업 조건이 아니면 null이다. current는 서버가 현재 시각을 연결하며, requested_visit는 이미 말한 방문 시각을 유지한다.
 예산은 원 숫자, 인원은 숫자 또는 범위, requireOpen/parking은 boolean, 나머지는 짧은 문자열. '혼자'는 companion='혼밥' 및 people=1. '더 저렴'은 금액을 추측하지 말고 clarificationReason=missing_budget, question.slot=budget로 금액 하나만 질문한다. 기존 예산보다 낮추려는 질문은 replaceExisting=true이다.
@@ -92,4 +117,4 @@ unknownConsent는 미확인 조건을 알고도 식당을 보겠다는 명시적
 9 '여의도역에서 1km 안으로 내일 저녁 먹을 곳 추천' -> location/반경/visit 모두 채우고 search. requireOpen은 설정하지 않는다.
 10 '지금 영업 중인 곳만' -> requireOpen=true, visit=지금, visitAt=localTime, task=change_conditions/action=update_search.
 informationRequest는 필요한 정보 기능이다: compare_places=식당 비교, place_details=상세 항목 조회, map=지도, service=서비스 FAQ, general=일반 설명. 정보 요청이 아니면 null이다. 모델이 맛의 우열을 모른다는 이유로 비교 질문을 answer로 우회하지 않는다. '첫 번째랑 두 번째 중 어디가 나아?'는 task=information, informationRequest=compare_places, referencePositions=[1,2], action=compare다. 사실 비교와 우열 판단 불가 설명은 조회 도구가 작성한다. '두 번째 집 전화번호'는 place_details/referencePositions=[2]/detailFields=[phone]이다. 이전 비교에서 두 곳을 보여준 후 '거기'라고만 하면 대상을 추측하지 말고 ambiguous_place로 확인한다.
-식당 정보는 직접 만들지 않는다. details/compare/map의 targetIds는 visibleCards/previousCards의 실제 ID만 쓰고 첫/두 번째는 직전 카드 순서다. referencePositions는 visibleCards의 1~3 순서 번호만 사용하고 서버가 실제 ID로 연결한다. 이름으로 가리킨 경우 실제 targetIds를 사용하고 referencePositions는 비운다. detailFields는 메뉴/영업시간/전화 등 요청 항목을 빠짐없이 담는다. 비교는 compare다. FAQ는 service와 실제 FAQ ID만 사용한다. answer로 검색 목록을 보여준다고 약속하지 않는다. 사용자에게 보이는 문장은 짧고 자연스러운 해요체다.`;
+식당 정보는 직접 만들지 않는다. details/compare/map의 targetIds는 visibleCards/previousCards의 실제 ID만 쓰고 첫/두 번째는 직전 카드 순서다. referencePositions는 식당 정보 요청에만 visibleCards의 1~3 순서 번호를 사용하고 서버가 실제 ID로 연결한다. 조건 변경·서비스·일반 검색에서는 반드시 빈 배열이다. 이전 식당이 없는데 '두 번째 집'이라 하면 오류를 만들거나 식당을 지어내지 말고 ambiguous_place로 확인한다. 이름으로 가리킨 경우 실제 targetIds를 사용하고 referencePositions는 비운다. detailFields는 메뉴/영업시간/전화 등 요청 항목을 빠짐없이 담는다. 비교는 compare다. FAQ는 service와 실제 FAQ ID만 사용한다. answer로 검색 목록을 보여준다고 약속하지 않는다. 사용자에게 보이는 문장은 짧고 자연스러운 해요체다.`;
