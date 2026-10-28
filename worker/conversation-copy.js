@@ -86,6 +86,16 @@ export function finalizeConversationCopy(response) {
   const safe = (value, fallback = '') => normalizeKoreanParticles(typeof value === 'string' && FORBIDDEN_COPY.test(value) ? fallback : value,words);
   // Fixed service FAQ is authoritative, not generated copy; never rewrite it.
   const fixedFAQ = result.meta?.variant === 'service';
+  // Code-owned facts can contain legitimate names/menu words that resemble a
+  // banned ending. Never replace a comparison, phone/hours or evidence notice
+  // with an unrelated generic recommendation sentence.
+  if(result.meta?.copySource==='program'){
+    // A clarification's question may still be model-written. Protect facts,
+    // but retain the conversational style boundary for the question itself.
+    const policy=result.meta?.turnPolicy;
+    if(policy?.questionText){policy.questionText=safe(policy.questionText,'어떤 조건을 말씀하시는지 알려주시겠어요?');if(policy.next_question)policy.next_question.text=policy.questionText;}
+    return result;
+  }
   if (!fixedFAQ) {
     const slots = result.meta?.responseModeState?.slots || {};
     const count = result.restaurants?.length || 0;

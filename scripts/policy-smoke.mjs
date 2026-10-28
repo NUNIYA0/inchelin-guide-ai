@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import './history-more-smoke.mjs';
 import './history-manager-smoke.mjs';
 import './composer-smoke.mjs';
+import './semantic-regression-smoke.mjs';
 import './place-links-smoke.mjs';
 import {contextSamples} from './context-planner-smoke.mjs';
 import {readFile,writeFile,rm} from 'node:fs/promises';

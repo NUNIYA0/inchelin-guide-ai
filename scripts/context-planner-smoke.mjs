@@ -5,7 +5,7 @@ import {applyPlan,validatePlan,isolateState,plannerInput} from '../worker/conver
 const faq=JSON.parse(await readFile(new URL('../data/service-faq.json',import.meta.url),'utf8'));
 const source=JSON.parse(await readFile(new URL('../data/private/restaurants-261026.json',import.meta.url),'utf8'));
 export const contextSamples=[];
-const base=()=>({action:'search',confidence:.95,changes:[],question:null,answer:null,faqId:null,targetIds:[],detailFields:[],unknownConsent:null,clearContext:false});
+const base=()=>({task:'recommend',clarificationReason:null,consentEvidence:null,action:'search',confidence:.95,changes:[],question:null,answer:null,faqId:null,targetIds:[],detailFields:[],unknownConsent:null,clearContext:false});
 const change=(slot,value)=>({slot,op:'set',value});
 const question=(slot,text)=>({slot,text,choices:[],replaceExisting:false});
 const env={OPENAI_API_KEY:'mock-not-a-real-key',NAVER_API_HUB_CLIENT_ID:'mock',NAVER_API_HUB_CLIENT_SECRET:'mock',CHAT_TIMING_LOGS:'false'};
@@ -30,6 +30,12 @@ globalThis.fetch=async(value,options)=>{
 };
 async function turn(text,next={},id='context-test'){
   plan={...base(),...next};calls=[];
+  const rawChanges=Object.fromEntries(Object.keys(api.parse('',{},{}).conditions).filter(k=>k!=='radiusConfirmed').map(k=>[k,null]));
+  for(const {slot,op,value} of plan.changes)rawChanges[slot]={op,value,evidence:text};
+  plan.changes=rawChanges;
+  if(plan.action==='clarify'&&!plan.clarificationReason)plan.clarificationReason=plan.question?.slot==='budget'?'missing_budget':plan.question?.slot==='clarify'?'ambiguous_condition':null;
+  if(plan.unknownConsent!==null)plan.consentEvidence=text;
+
   history.push({role:'user',content:text});
   const res=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:id,messages:history,context:{responseModeState:state,currentLocalDatetime:'2026-10-27T12:00:00+09:00'}})}),env,{});
   assert.equal(res.status,200);const body=await res.json();assert.ok(body.message||body.meta.turnPolicy.questionText);state=body.meta.responseModeState;history.push({role:'assistant',content:body.message});return body;
@@ -42,7 +48,7 @@ try{
   for(const card of searched.restaurants){assert.equal(card.mapLinkKind,'detail');assert.ok(card.distanceMeters<=1000);assert.ok(source.restaurants.some(row=>row.sourceId===card.registeredSourceId));}
   const details=await turn('거기는 연락할 수 있어?',{action:'details',targetIds:[searched.restaurants[1].id],detailFields:['hours','phone']});
   assert.equal(details.restaurants[0].id,searched.restaurants[1].id);assert.match(details.message,/연락처|전화번호/);assert.equal(calls.length,1,'detail interpretation comes only from model target/fields, not words');
-  const comparison=await turn('이 두 곳은 어때?',{action:'compare',targetIds:searched.restaurants.slice(0,2).map(c=>c.id)});assert.equal(comparison.restaurants.length,2);assert.equal(calls.length,1);
+  const comparison=await turn('이 두 곳은 어때?',{action:'compare',targetIds:searched.restaurants.slice(0,2).map(c=>c.id)});assert.equal(comparison.restaurants.length,2);assert.ok(comparison.restaurants.every(card=>comparison.message.includes(card.name)));assert.equal(calls.length,1);
   const before=structuredClone(state.phase1.conditions);
   const cheaper=await turn('더 저렴한 곳',{action:'clarify',question:question('budget','한 끼 예산은 어느 정도인가요?')});
   contextSamples.push(cheaper);assert.deepEqual(state.phase1.conditions,before);assert.equal(calls.filter(x=>x.includes('naver')).length,0);assert.match(cheaper.meta.turnPolicy.questionText,/예산/);
@@ -73,6 +79,11 @@ try{
   const cleared=await applyPlan({...base(),changes:[{slot:'budget',op:'clear',value:null}]},{phase1:{conditions:{...kept,budget:'10000원 이하'}}},{},()=>null);assert.equal(cleared.conditions.budget,null);assert.equal(cleared.conditions.location.label,'홍대입구역');
   state={conversationId:'context-test',phase1:{conditions:{...kept,budget:'10,000원 이하'}}};
   const lower=await turn('그보다 싼 곳',{action:'clarify',question:{...question('budget','예산을 얼마까지 낮춰볼까요?'),replaceExisting:true}});assert.equal(lower.meta.turnPolicy.next_question.slot,'budget');assert.equal(state.phase1.conditions.budget,'10,000원 이하');
+  state={conversationId:'context-test',phase1:{conditions:{...kept,location:point,companion:'혼밥'},pendingUnknowns:['companion'],acceptedUnknowns:[]}};
+  const consent=await turn('미확인 조건을 알고 후보도 보여줘',{task:'consent',action:'answer',unknownConsent:true});
+  assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(consent.meta.phase1Failure,false);
+  await turn('500m 안으로',{task:'change_conditions',changes:[change('radiusMeters',500)]});
+  assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(state.phase1.conditions.companion,'혼밥');assert.equal(state.phase1.conditions.radiusMeters,500);assert.ok(!state.phase1.pendingUnknowns?.includes('companion'));
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}
