@@ -51,7 +51,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
         function generateAnswer(...args){pending=performGeneration(...args);return pending;}
         ${html.match(/    \$\('#suggestions'\)\.addEventListener\('click'[^]*?\n    \}\);/)[0]}
         ${html.match(/    \$\('#welcomeForm'\)\.addEventListener[^\n]+/)[0]}
-        return {type(value){document.getElementById('welcomeInput').value=value;document.getElementById('welcomeForm').events.submit({preventDefault(){}});},clickRow(index){document.getElementById('suggestions').events.click({target:{closest:()=>({dataset:{index}})}});},send:routeQuestion,done:()=>pending,stop:stopGeneration,edit:openPhase1Condition,render:message=>renderMessage(normalizeMessage(message)),get messages(){return chatMessages;},get busy(){return generating;},request:()=>buildAIRequest(chatMessages),setFocus:setPhase1Focus};
+        return {type(value){document.getElementById('welcomeInput').value=value;document.getElementById('welcomeForm').events.submit({preventDefault(){}});},clickRow(index){document.getElementById('suggestions').events.click({target:{closest:()=>({dataset:{index}})}});},send:routeQuestion,done:()=>pending,stop:stopGeneration,edit:openPhase1Condition,render:message=>renderMessage(normalizeMessage(message)),restore:messages=>{for(const message of messages){const restored=normalizeMessage(message,{restored:true});chatMessages.push(restored);renderMessage(restored);}},get messages(){return chatMessages;},get busy(){return generating;},request:()=>buildAIRequest(chatMessages),setFocus:setPhase1Focus};
       `;
       const api=new Function('document','window','fetch','main','welcome','chatView','guidePanel','messagesEl','location','loadSheetModule','setTimeout','clearTimeout',source)(document,{innerWidth:360,matchMedia:()=>({matches:true}),open:(...args)=>opened.push(args)},fetch,elements.main,elements.welcome,elements.chatView,elements.guidePanel,elements.messages,{reload:()=>reloaded=true},()=>import('../dist/assets/phase1-sheets.js'),clock?(action,ms)=>{const id=++timerId;timers.set(id,{action,ms});return id;}:setTimeout,clock?id=>timers.delete(id):clearTimeout);
       return{api,elements,document,requests,opened,memory,timers,get reloaded(){return reloaded;}};
@@ -72,6 +72,15 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
       }
     }
     for(const sample of samples.contextSamples||[]){const ui=app();ui.api.render({role:'assistant',content:sample.message,restaurants:sample.restaurants,meta:sample.meta});assert.equal(cls(ui.elements.messages,'restaurant-card').length,sample.restaurants.length,'semantic planner -> actual client card renderer');assert.equal(cls(ui.elements.messages,'turn-question').length,sample.meta.answer_plan.includes('question')?1:0,'semantic clarify/radius -> actual client question renderer');}
+    for(const metaPatch of [{responseRulesVersion:'v100'},{generatedAt:Date.now()-2*60*60*1000}]){
+      const ui=app(),body=samples.bulk.body,archive={role:'assistant',content:body.message,restaurants:body.restaurants,meta:{...body.meta,...metaPatch,staleResponse:true}};
+      ui.api.restore([{role:'user',content:'강남역에서 추천해줘'},archive]);
+      assert.equal(cls(ui.elements.messages,'restaurant-card').length,3,'archive retains actual cards after version/TTL changes');
+      assert.ok(ui.elements.messages.textContent.includes(body.message),'archive retains original answer');
+      assert.equal(cls(ui.elements.messages,'retry-button').length,0,'archives do not ask users to rerun because of internal versions');
+      assert.equal(ui.requests.length,0,'restoring history never silently runs a search');
+      assert.ok(ui.api.request().messages.some(m=>m.role==='assistant'&&m.content===body.message),'past assistant context survives cache invalidation');
+    }
     for(let index=0;index<3;index++){const a=app();a.api.clickRow(index);await a.api.done();assert.equal(a.api.messages.length,2);assert.equal(cls(a.elements.messages,'turn-question').length,1);assert.equal(cls(a.elements.messages,'retry-button').length,0);}
     const gated=app({kind:'consent'});gated.api.type('강남역에서 한식, 만 원 이하로 혼자 먹을 거야');await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,0);assert.match(gated.elements.messages.textContent,/연결되지|미확인/);const consent=cls(gated.elements.messages,'quick-reply').find(n=>n.textContent==='미확인 후보 보기');assert.ok(consent);consent.click();await gated.api.done();assert.equal(cls(gated.elements.messages,'restaurant-card').length,3);assert.ok(cls(gated.elements.messages,'condition-evidence').length);assert.match(gated.elements.messages.textContent,/미확인/);assert.equal(gated.api.request().context.responseModeState.phase1.conditions.budget,'1만 원 이하');
     const a=app();a.api.type('강남역에서 한식, 만 원 이하로');await a.api.done();

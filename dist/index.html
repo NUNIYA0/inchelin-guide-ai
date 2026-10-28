@@ -1637,7 +1637,8 @@
     function compactPlannerState(state){const card=({registeredFacts,recommendationBundle,...value})=>value;return {...state,lastCards:(state.lastCards||[]).slice(0,3).map(card),shownPlaces:(state.shownPlaces||[]).slice(-12).map(card)};}
     function buildAIRequest(nextMessages) {
       const archivedStateMessage=[...nextMessages].reverse().find(message=>message.role==='assistant'&&message.meta?.responseModeState);
-      nextMessages=nextMessages.filter(message=>message.role==='user'||!message.meta?.staleResponse&&globalThis.InchelinResponseRules.isCurrent(message.meta));
+      // Saved messages are conversation context, not reusable response caches.
+      // Keep both sides of the conversation even after a policy update or TTL.
       const state = getLocalTimeState();
       const latestQuestion = [...nextMessages].reverse().find(message => message.role === 'user')?.content || '';
       const userSpecifiedTime = hasExplicitTimeCondition(latestQuestion);
@@ -2056,14 +2057,6 @@
       });
     }
     function renderMessage(message, extra = '', follow = false) {
-      if(message.role==='assistant'&&message.meta?.staleResponse){
-        const item=document.createElement('div');item.className='message ai stale-response';
-        const body=document.createElement('div');body.className='ai-bubble';
-        const note=document.createElement('p');note.textContent='이전 규칙으로 만든 답변이에요. 현재 기준으로 다시 찾아볼 수 있어요.';
-        const retry=document.createElement('button');retry.type='button';retry.className='retry-button';retry.textContent='현재 기준으로 다시 찾기';
-        retry.addEventListener('click',()=>{const index=chatMessages.indexOf(message),question=[...chatMessages.slice(0,index)].reverse().find(item=>item.role==='user')?.content;if(question)submitWelcomeQuestion(question);});
-        body.append(note,retry);item.appendChild(body);messagesEl.appendChild(item);return item;
-      }
       const answerPlan = new Set(Array.isArray(message.meta?.answer_plan) ? message.meta.answer_plan : ['text']);
       const allowed = block => answerPlan.has(block);
       if (message.role === 'user') retirePriorChoices(message.content);
