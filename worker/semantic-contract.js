@@ -8,6 +8,7 @@ export function actionSchema(faqIds,actions,slots){
     clarificationReason:{type:['string','null'],enum:[null,'missing_location','missing_radius','missing_budget','ambiguous_condition','ambiguous_place','ambiguous_location','other']},question,
     informationRequest:{type:['string','null'],enum:[null,'compare_places','place_details','map','service','general']},referencePositions:{type:'array',maxItems:3,items:{type:'integer',minimum:1,maximum:3}},openingTimeBasis:{type:['string','null'],enum:[null,'current','requested_visit']},
     locationReference:{type:['string','null'],enum:[null,'current','named']},budgetRelation:{type:['string','null'],enum:[null,'cheaper']},
+    resultRequest:{type:['string','null'],enum:[null,'new_results']},referenceKind:{type:['string','null'],enum:[null,'name','ordinal','focus','all','ambiguous']},
     answer:{type:['string','null']},faqId:{type:['string','null'],enum:[null,...faqIds]},targetIds:{type:'array',maxItems:3,items:{type:'string'}},detailFields:{type:'array',maxItems:6,items:{type:'string',enum:['menus','hours','phone','parking','seating','address']}},unknownConsent:{type:['boolean','null']},consentEvidence:{type:['string','null']},clearContext:{type:'boolean'}};
   return {type:'object',properties,required:Object.keys(properties),additionalProperties:false};
 }
@@ -18,6 +19,10 @@ export function distanceLiterals(text){
 export function readModelPlan(raw,messages,state={}){
   if(!raw||!tasks.includes(raw.task)||!raw.changes||Array.isArray(raw.changes))throw new Error('invalid_semantic_contract');
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'',literals=distanceLiterals(latest);
+  // A reply to a button we actually emitted is a typed action contract. It is
+  // not a global keyword classifier, and a free-text response still uses AI.
+  const choice=state.phase1?.pendingQuestion?.choices?.find(c=>normalized(c.message)===normalized(latest));
+  if(choice?.contract==='unknown_consent'&&state.phase1?.pendingUnknowns?.length)raw={...raw,task:'consent',action:'search',unknownConsent:true,consentEvidence:latest,clarificationReason:null,question:null,changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,null]))};
   const recommendation=['recommend','change_conditions'].includes(raw.task);
   // Validate explicitly supplied supported point literals only after the model
   // chooses a search task. This cannot route FAQ/quoted place names to search.
@@ -68,6 +73,7 @@ export function readModelPlan(raw,messages,state={}){
   let action=raw.action;
   const requested={compare_places:'compare',place_details:'details',map:'map',service:'service'}[raw.informationRequest];
   if(raw.task==='information'&&requested)action=requested;
+  if(['recommend','change_conditions'].includes(raw.task)&&raw.resultRequest==='new_results')action='search_more';
   let targetIds=['details','compare','map'].includes(action)?raw.targetIds||[]:[];
   if(['details','compare','map'].includes(action)&&raw.referencePositions?.length){
     const positions=[...new Set(raw.referencePositions)];
@@ -75,6 +81,13 @@ export function readModelPlan(raw,messages,state={}){
       targetIds=[];action='clarify';raw={...raw,task:'information',clarificationReason:'ambiguous_place',question:{slot:'clarify',text:'아직 어떤 식당인지 알 수 없어요. 식당 이름을 알려주시거나 먼저 먹을 곳을 찾아볼까요?',choices:[],replaceExisting:true}};
     }else targetIds=positions.map(index=>state.lastCards[index-1].id);
   }
+  // A singular deictic reference needs one established focus. Multiple IDs
+  // returned by the model are not permission to answer for all compared places.
+  if(['details','map'].includes(action)&&(['ambiguous'].includes(raw.referenceKind)||raw.referenceKind==='focus'&&!state.phase1?.focusCardId)){
+    targetIds=[];action='clarify';raw={...raw,task:'information',clarificationReason:'ambiguous_place',question:{slot:'clarify',text:'어느 식당을 말씀하시는지 이름을 알려주시겠어요?',choices:(state.lastCards||[]).slice(0,3).map(c=>({label:c.name.slice(0,24),message:c.name+' 자세히 알려줘'})),replaceExisting:true}};
+  }
+  if(['details','map'].includes(action)&&raw.referenceKind==='focus'&&state.phase1?.focusCardId)targetIds=[state.phase1.focusCardId];
+  if(action==='map')raw={...raw,detailFields:[]};
   if(raw.unknownConsent!==null)action='search';
   if(raw.clarificationReason==='missing_budget')action='clarify';
   if(['recommend','change_conditions'].includes(raw.task)&&action==='answer')action='search';
@@ -104,6 +117,10 @@ visit은 사용자가 말한 방문 날짜·식사 시간(예: 오늘 점심/내
 openingTimeBasis는 필수 영업 요청의 기준 시각이다. '지금 영업 중인 곳만'이면 current, '그 시간에 영업하는 곳만/내일 저녁 7시에 영업하는 곳만'이면 requested_visit이다. 영업 조건이 아니면 null이다. current는 서버가 현재 시각을 연결하며, requested_visit는 이미 말한 방문 시각을 유지한다.
 예산은 원 숫자, 인원은 숫자 또는 범위, requireOpen/parking은 boolean, 나머지는 짧은 문자열. '혼자'는 companion='혼밥' 및 people=1. '더 저렴'은 금액을 추측하지 말고 clarificationReason=missing_budget, question.slot=budget로 금액 하나만 질문한다. 기존 예산보다 낮추려는 질문은 replaceExisting=true이다.
 unknownConsent는 미확인 조건을 알고도 식당을 보겠다는 명시적 동의/거부에만 true/false이며 consentEvidence에 원문을 넣는다. 동의는 task=consent/action=search다. 동의는 조건 해제나 만족 보장이 아니다. 같은 동의 항목은 거리 변경으로 취소하지 않는다.
+pendingQuestion.choices는 서비스가 실제 제시한 답변 선택지다. 그 message와 같은 답은 해당 질문에 대한 답으로 이해한다. '미확인 조건을 알고 후보도 보여줘'는 pendingUnknowns에 대한 동의이며 새 추천 요청이나 조건 해제가 아니다.
+resultRequest는 이미 본 목록 외의 다른 결과를 원하는 경우 new_results다. 중간에 FAQ·상세·비교를 물었어도 previousCards/visibleCards가 있으면 '다른 곳도 보여줘'는 new_results/action=search_more이며 기존 위치·반경·음식을 유지한다. 같은 목록 재표시는 금지한다.
+referenceKind는 식당 대상의 근거다: name=현재 발화에 상호를 직접 명시, ordinal=첫/두 번째 순서, focus=단수 지시어(거기/그 식당), all=모두/두 곳 각각을 명시, ambiguous=대상이 불명확. 단수 지시어이고 focusCardId가 없으면 반드시 ambiguous로 묻고 두 식당을 모두 선택하지 않는다. 비교 직후 focusCardId=null이면 '거기 주차는?'은 ambiguous_place이다.
+식당 지도만 요청하면 informationRequest=map/action=map이다. '첫 번째 식당 지도 보여줘'에는 메뉴·전화·영업을 묻지 않았으므로 detailFields=[]이며 지도 안내만 짧게 한다. 자세히라는 단어 없이 지도 링크를 요청한 것을 place_details로 확대하지 않는다.
 모호한 취소는 clarificationReason=ambiguous_condition, question.slot=clarify로 어떤 조건인지 질문하고 삭제하지 않는다. 특정 식당의 대상이 모호하면 ambiguous_place다. reason=other는 실제 의미가 불명확할 때만 쓰며 짧다는 이유로 사용하지 않는다. confidence는 참고 정보이며 짧고 명확한 요청에 막연한 확인을 요구하지 않는다.
 예시(그대로 외울 키워드가 아닌 문맥 판단 예):
 1 '냉면 땡겨' -> task=recommend, food=set 냉면/evidence='냉면', action=search. 서버가 없는 위치만 질문한다.

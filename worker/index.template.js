@@ -2326,7 +2326,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const parsed=execution.prepared||api.parse(latest,old,context),c=parsed.conditions;
   const recommendationCatalog=registeredRecommendationCatalog;
   const registeredOnly=recommendationCatalog.exclusive||(directive?prior.registeredOnly===true:(/네이버.*(?:검색|찾)/.test(latest)?false:/등록.*(?:추천|식당)|추천인.*(?:있는|맛집)/.test(latest)||prior.registeredOnly===true));
-  const acceptedUnknowns=consentKeys(prior,c,directive?'':latest),scopes=unknownScopes(c),pendingScopes=scopes.filter(item=>!acceptedUnknowns.includes(item.key));
+  const acceptedUnknowns=consentKeys({...prior,conditions:execution.prepared?.priorConditions||prior.conditions},c,directive?'':latest),scopes=unknownScopes(c),pendingScopes=scopes.filter(item=>!acceptedUnknowns.includes(item.key));
   if(directive?.unknownConsent===true)acceptedUnknowns.push(...(prior.pendingUnknowns||[]));
   if(directive?.unknownConsent===false)acceptedUnknowns.length=0;
   const state={...emptyResponseState(),conversationId:previous.conversationId,slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{...prior,conditions:c,focusCardId:prior.focusCardId||null,acceptedUnknowns:[...new Set(acceptedUnknowns)],pendingUnknowns:[]},lastCards:(previous.lastCards||[]).filter(card=>!card.isDemo)};
@@ -2336,7 +2336,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
   const plan=(message,restaurants=[],{question='',questionHelp='',choices=[],notice='',intent='place_search',error=false}={})=>{
-    state.phase1.pendingQuestion=question?{slot:!c.location?'location':!c.radiusConfirmed?'radiusMeters':'clarify',text:question}:null;
+    state.phase1.pendingQuestion=question?{slot:!c.location?'location':!c.radiusConfirmed?'radiusMeters':'clarify',text:question,choices:choices.map(({label,message,contract})=>({label,message,...(contract?{contract}:{})}))}:null;
     if(question)state.phase1.askedQuestions=[...(prior.askedQuestions||[]),state.phase1.pendingQuestion].slice(-8);
     const currentLinks=({naverPlaceCandidateUrl,...card})=>({...card,...globalThis.InchelinMapLinks.linkFields(card)});
     restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...currentLinks(card),photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
@@ -2349,7 +2349,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const dataLookup=directive&&['details','compare','map'].includes(directive.action);
   if(!dataLookup&&(!c.location||parsed.ambiguous||parsed.unknownStation)){
     state.lastCards=[];
-    const question=parsed.ambiguous?'어느 역을 기준으로 찾을까요?':parsed.unknownStation?'어느 지역의 역인지 알려주시겠어요? 지금 선택 가능한 역도 아래에서 골라주세요.':'어디에서 드실 예정이세요?';
+    const question=execution.prepared?.currentLocationMissing?'현재 위치를 확인하지 못했어요. 지역·역을 선택하거나 직접 입력해 주시겠어요?':parsed.ambiguous?'어느 역을 기준으로 찾을까요?':parsed.unknownStation?'어느 지역의 역인지 알려주시겠어요? 지금 선택 가능한 역도 아래에서 골라주세요.':'어디에서 드실 예정이세요?';
     const questionHelp=!parsed.ambiguous&&!parsed.unknownStation?'동네나 역 이름을 알려주시거나, 현재 위치로 찾아보세요.':'';
     return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,questionHelp,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
   }
@@ -2431,7 +2431,7 @@ async function phase1ChatResponse(latest,context,env,execution){
     const newChecks=withheld.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown'&&check.blocking!==false&&!acceptedUnknowns.includes(check.key)));
     const missing=[...new Set(newChecks.map(check=>check.label))];if(!missing.length)missing.push(...unsupported);
     state.phase1.pendingUnknowns=[...new Set([...newChecks.map(check=>check.key),...(deferredExternal?pendingScopes.map(item=>item.key):[])])];
-    return plan(selected.length?`조건을 확인한 ${selected.length}곳을 먼저 보여드려요. 다른 식당의 ${missing.join('·')} 확인은 필요해요.`:`${missing.join('·')} 조건을 충족하는 식당은 아직 확인되지 않았어요. 조건은 바꾸지 않았어요.`,selected,{question:'미확인 항목을 표시하고 다른 식당도 찾아볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
+    return plan(selected.length?`조건을 확인한 ${selected.length}곳을 먼저 보여드려요. 다른 식당의 ${missing.join('·')} 확인은 필요해요.`:`${missing.join('·')} 조건을 충족하는 식당은 아직 확인되지 않았어요. 조건은 바꾸지 않았어요.`,selected,{question:'미확인 항목을 표시하고 다른 식당도 찾아볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘',contract:'unknown_consent'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
   }
   const unknownLabels=[...new Set(selected.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown').map(check=>check.key==='budget'?'가격':check.label)))];
   const notice=unknownLabels.length?unknownLabels.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'';
@@ -2450,7 +2450,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   const state={...emptyResponseState(),...previous,conversationId:id,phase1:{...(previous.phase1||{})}};
   const textResponse=(message,{question=null,error=false,intent='general'}={})=>{
     message=message||(question?'한 가지만 더 알려주세요.':'말씀을 조금 더 알려주세요.');
-    if(question)state.phase1.pendingQuestion={slot:question.slot,text:question.text};
+    state.phase1.pendingQuestion=question?{slot:question.slot,text:question.text,choices:question.choices||[]}:null;
     if(question)state.phase1.askedQuestions=[...(state.phase1.askedQuestions||[]),state.phase1.pendingQuestion].slice(-8);
     const choices=question?.choices||[];
     return chatResponse(message,choices.map(c=>c.label),[],{phase1:true,copySource:directive?.action==='answer'?'model':'program',mode:question?'B':'GENERAL',intent,...(intent==='service'?{variant:'service'}:{}),responseModeState:state,recoverable:error,phase1Failure:error,
@@ -2460,12 +2460,12 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   let directive;
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}
   catch(error){if(env.CHAT_TIMING_LOGS!=='false')console.warn(JSON.stringify({event:'conversation_plan_failed',code:/^[a-z_]+$/.test(error.message)?error.message:error.name}));return textResponse('말씀을 이해하는 중 문제가 생겼어요. 조건은 그대로 두었으니 다시 시도해 주세요.',{error:true});}
-  if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason}));
+  if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason,unknownConsent:directive.unknownConsent,targetCount:directive.targetIds.length}));
   let applied;
   try{applied=await applyPlan(directive,state,safeContext,(query,ctx)=>resolveLocation(query,ctx,env));}
   catch{return textResponse('조건을 적용하지 못했어요. 다시 시도해 주세요.',{error:true});}
   if(directive.clearContext||directive.action==='reset'){
-    Object.assign(state,emptyResponseState(),{conversationId:id});state.phase1={};
+    Object.assign(state,emptyResponseState(),{conversationId:id});state.phase1={resetBoundary:latest};
   }
   state.phase1={...state.phase1,conditions:applied.conditions,conditionOrigins:applied.conditionOrigins};
   if(directive.action==='reset')return textResponse('좋아요, 새로 시작해볼게요.',{question:{slot:'location',text:'어디에서 드실 예정이세요?',choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]}});
@@ -2484,7 +2484,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
     return textResponse('',{question:q});
   }
   const intents=directive.action==='compare'?['compare']:directive.action==='map'?['map']:directive.action==='details'?['detail']:[];
-  const nextExecution={...execution,directive,prepared:{conditions:applied.conditions,intents,unknownStation:Boolean(applied.locationError),visitExplicitThisTurn:directive.changes.some(c=>['visit','visitAt'].includes(c.slot))}};
+  const nextExecution={...execution,directive,prepared:{conditions:applied.conditions,priorConditions:previous.phase1?.conditions,intents,unknownStation:Boolean(applied.locationError),currentLocationMissing:!applied.conditions.location&&directive.changes.some(c=>c.slot==='location'&&c.value==='current'),visitExplicitThisTurn:directive.changes.some(c=>['visit','visitAt'].includes(c.slot))}};
   const result=await phase1ChatResponse(latest,{...safeContext,responseModeState:state},env,nextExecution);
   if(['search','search_more','update_search'].includes(directive.action)&&directive.detailFields.length&&directive.targetIds.length){
     const details=await phase1ChatResponse(latest,{...safeContext,responseModeState:state},env,{...nextExecution,directive:{...directive,action:'details'},prepared:{...nextExecution.prepared,intents:['detail']}});

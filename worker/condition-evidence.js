@@ -5,7 +5,7 @@ export function unknownScopes(c){return [c.food&&!broadFood(c.food)&&{key:'menu'
 export function consentKeys(prior,c,latest){
   const allowed=new Set(['food_category','menu','budget','companion','vibe','parking','visit']);
   let accepted=Array.isArray(prior.acceptedUnknowns)?prior.acceptedUnknowns.filter(key=>allowed.has(key)):[];
-  const scopeValue=(key,value={})=>JSON.stringify(key==='menu'?value.food:key==='budget'?[value.budget,value.food]:key==='companion'?[value.companion,value.people,value.purpose]:key==='visit'?[value.visit,value.visitAt,value.requireOpen]:value[key]);
+  const scopeValue=(key,value={})=>JSON.stringify(['menu','food_category'].includes(key)?value.food:key==='budget'?[value.budget,value.food]:key==='companion'?[value.companion,value.people,value.purpose]:key==='visit'?[value.visit,value.visitAt,value.requireOpen]:value[key]);
   // Moving/radius changes keep consent; a different unknown criterion does not.
   if(prior.conditions)accepted=accepted.filter(key=>scopeValue(key,prior.conditions)===scopeValue(key,c));
   if(!accepted.length&&prior.consentSignature===conditionSignature(prior.conditions))accepted=unknownScopes(prior.conditions||{}).map(item=>item.key);

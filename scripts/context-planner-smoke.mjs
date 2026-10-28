@@ -32,7 +32,7 @@ globalThis.fetch=async(value,options)=>{
 async function turn(text,next={},id='context-test'){
   plan={...base(),...next};calls=[];
   const rawChanges=Object.fromEntries(Object.keys(api.parse('',{},{}).conditions).filter(k=>k!=='radiusConfirmed').map(k=>[k,null]));
-  for(const {slot,op,value} of plan.changes)rawChanges[slot]={op,value,evidence:text};
+  for(const {slot,op,value,evidence=text} of plan.changes)rawChanges[slot]={op,value,evidence};
   plan.changes=rawChanges;
   if(plan.action==='clarify'&&!plan.clarificationReason)plan.clarificationReason=plan.question?.slot==='budget'?'missing_budget':plan.question?.slot==='clarify'?'ambiguous_condition':null;
   if(plan.unknownConsent!==null)plan.consentEvidence=text;
@@ -102,6 +102,23 @@ try{
   journey=await turn('역삼역 1km 맛집 찾아줘');assert.equal(journey.restaurants.length,3,'missing target must be recoverable into a fresh search');
   journey=await turn('현재 위치로 찾아줘',{task:'change_conditions',locationReference:'current'});assert.equal(state.phase1.conditions.location,null);assert.equal(journey.restaurants.length,0);assert.ok(journey.meta.turnPolicy.questionText);
   journey=await turn('역삼역에서 찾아줘');assert.equal(journey.restaurants.length,3,'manual location recovers without repeating a confirmed radius');
+  // v172: regressions observed only across a full real conversation.
+  state=null;history=[];coords=api.centers.find(c=>c.label==='강남역');
+  const beforeFAQ=await turn('강남역 1km 맛집 찾아줘');assert.equal(beforeFAQ.restaurants.length,3);
+  await turn('등록 안 된 식당도 나와?',{task:'information',action:'service',faqId:'data_basis.registered_only'});
+  const afterFAQ=await turn('다른 곳도 보여줘',{resultRequest:'new_results'});assert.equal(afterFAQ.restaurants.length,3);assert.ok(afterFAQ.restaurants.every(card=>!beforeFAQ.restaurants.some(old=>old.id===card.id)),'FAQ cannot reset search-more context');
+  await turn('첫 번째와 두 번째 비교해줘',{task:'information',action:'compare',referencePositions:[1,2],referenceKind:'ordinal'});
+  const unclearFocus=await turn('거기 주차는?',{task:'information',action:'details',referenceKind:'focus',targetIds:afterFAQ.restaurants.slice(0,2).map(c=>c.id),detailFields:['parking']});assert.equal(unclearFocus.restaurants.length,0);assert.ok(unclearFocus.meta.turnPolicy.questionText);
+  const mapOnly=await turn('첫 번째 식당 지도 보여줘',{task:'information',action:'details',informationRequest:'map',referencePositions:[1],detailFields:['menus','hours','phone']});assert.ok(mapOnly.meta.phase1Intents.includes('map'));assert.ok(mapOnly.message.length<360);assert.ok(!/라스트오더|연락처/.test(mapOnly.message));
+  await turn('오늘 점심으로',{task:'change_conditions',changes:[change('visit','오늘 점심')]});
+  await turn('처음부터 다시 시작할게',{task:'reset',action:'reset',clearContext:true});
+  const resetRecovery=await turn('홍대입구역 1km 추천',{changes:[{...change('visit','오늘 점심'),evidence:'오늘 점심으로'}]});assert.equal(state.phase1.conditions.visit,null,'pre-reset evidence cannot restore cleared visit');assert.ok(!inputs.at(-1).untrustedConversation.some(m=>m.content==='오늘 점심으로'));assert.ok(resetRecovery.restaurants.length);
+  state=null;history=[];coords=point;
+  await turn('광화문역 1km 혼자 먹을 곳',{changes:[change('location','광화문역'),change('companion','혼밥'),change('people',1)]});
+  assert.ok(state.phase1.pendingUnknowns.includes('companion'));assert.equal(state.phase1.pendingQuestion.choices[0].contract,'unknown_consent');
+  const exactConsent=await turn('미확인 조건을 알고 후보도 보여줘');assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(exactConsent.restaurants.length,3,'emitted consent reply must progress even if model omits consent');
+  const keptConsent=await turn('500m 안으로',{task:'change_conditions'});assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(keptConsent.restaurants.length,3);
+  const changedPurpose=await turn('가족이랑 먹을래',{task:'change_conditions',changes:[change('companion','가족')]});assert.ok(!state.phase1.acceptedUnknowns.includes('companion'),'new unknown scope needs separate consent');assert.ok(changedPurpose.meta.turnPolicy.questionText);
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}
