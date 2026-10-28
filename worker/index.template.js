@@ -1,7 +1,7 @@
 import { chooseExecution } from './semantic-contract.js';
 import { analyzePlan, applyPlan, isolateState } from './conversation-planner.js';
 import { resolveLocation } from './location-resolver.js';
-import {searchRegionStations} from './region-catalog.js';
+import {searchRegionStations,findRegisteredRegion} from './region-catalog.js';
 const registeredRegions=__REGION_CATALOG__;
 const stationDiscoveries=new Map();
 async function discoveredStations(regionId,query,env){
@@ -40,7 +40,7 @@ import {evaluateConditions,unknownScopes,consentKeys} from './condition-evidence
 const recommendationData = __RECOMMENDATION_DATA__;
 const photoSource = __PHOTO_SOURCE__;
 const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
-import {resolveRegisteredCards} from './registered-search.js';
+import {resolveRegisteredCards,registeredRegionCards} from './registered-search.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2345,7 +2345,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
   const plan=(message,restaurants=[],{question='',questionHelp='',choices=[],notice='',intent='place_search',error=false}={})=>{
-    state.phase1.pendingQuestion=question?{slot:!c.location?'location':!c.radiusConfirmed?'radiusMeters':'clarify',text:question,choices:choices.map(({label,message,contract})=>({label,message,...(contract?{contract}:{})}))}:null;
+    state.phase1.pendingQuestion=question?{slot:!c.location?'location':c.location?.kind!=='region'&&!c.radiusConfirmed?'radiusMeters':'clarify',text:question,choices:choices.map(({label,message,contract})=>({label,message,...(contract?{contract}:{})}))}:null;
     if(question)state.phase1.askedQuestions=[...(prior.askedQuestions||[]),state.phase1.pendingQuestion].slice(-8);
     const currentLinks=({naverPlaceCandidateUrl,...card})=>({...card,...globalThis.InchelinMapLinks.linkFields(card)});
     restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...currentLinks(card),photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
@@ -2353,20 +2353,20 @@ async function phase1ChatResponse(latest,context,env,execution){
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c).map(currentLinks);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,copySource:'program',mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:directive?.confidence??1,slots:state.slots},responseModeState:state,
     answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,...(state.phase1.searchDiagnostics?{searchDiagnostics:state.phase1.searchDiagnostics}:{}),dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',...(recommendationCatalog.exclusive?{registeredData:{count:recommendationCatalog.entries().length,sourceDate:recommendationData.sourceDate,sourceHash:recommendationData.sourceHash,exclusive:true}}:{}),conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
-    turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':!c.radiusConfirmed?'radiusMeters':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
+    turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':c.location?.kind!=='region'&&!c.radiusConfirmed?'radiusMeters':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   const dataLookup=directive&&['details','compare','map'].includes(directive.action);
   if(!dataLookup&&(!c.location||parsed.ambiguous||parsed.unknownStation)){
     state.lastCards=[];
     const question=execution.prepared?.currentLocationMissing?'현재 위치를 확인하지 못했어요. 지역·역을 선택하거나 직접 입력해 주시겠어요?':parsed.ambiguous?'어느 역을 기준으로 찾을까요?':parsed.unknownStation?'어느 지역의 역인지 알려주시겠어요? 지금 선택 가능한 역도 아래에서 골라주세요.':'어디에서 드실 예정이세요?';
     const questionHelp=!parsed.ambiguous&&!parsed.unknownStation?'동네나 역 이름을 알려주시거나, 현재 위치로 찾아보세요.':'';
-    return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,questionHelp,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
+    return plan(parsed.unknownStation?'아직 기준점을 정하지 못했어요.':'먹을 곳을 함께 찾아볼게요.',[],{question,questionHelp,choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역 선택',message:'지역·역 선택'}]});
   }
   if(parsed.invalidRadius)return plan('거리를 임의로 바꾸지 않고 기다릴게요.',[],{question:'0보다 큰 직선거리를 m나 km로 알려주시겠어요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'2km 이내',message:'2km 이내로 찾아줘'}]});
-  if(!dataLookup&&!c.radiusConfirmed){state.stage='radius_asked';return plan(withParticle(c.location.label,'을/를')+' 기준으로 찾아볼게요.',[],{question:'어느 정도 거리까지 찾아볼까요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'3km 이내',message:'3km 이내로 찾아줘'}]});}
+  if(!dataLookup&&c.location.kind!=='region'&&!c.radiusConfirmed){state.stage='radius_asked';return plan(withParticle(c.location.label,'을/를')+' 기준으로 찾아볼게요.',[],{question:'어느 정도 거리까지 찾아볼까요?',choices:[{label:'500m 이내',message:'500m 이내로 찾아줘'},{label:'1km 이내',message:'1km 이내로 찾아줘'},{label:'3km 이내',message:'3km 이내로 찾아줘'}]});}
   if(!directive&&/^(?:음식 종류 변경|음식 바꾸기|메뉴 바꾸기|다른 메뉴로)$/.test(latest))return plan('먹고 싶은 음식으로 바꿔볼게요.',[],{question:'어떤 음식이 끌리세요?',choices:['한식','냉면','국밥','파스타'].map(food=>({label:food,message:food+' 먹을 곳 찾아줘'}))});
   if(!directive&&/^예산 변경$/.test(latest))return plan('원하는 예산을 말씀해 주세요.',[],{question:'한 끼 예산은 어느 정도인가요?',choices:[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'2만 원 이하',message:'2만 원 이하로 찾아줘'},{label:'제한 없음',message:'예산 제한 없애줘'}]});
-  if(registeredOnly&&!recommendationCatalog.active)return plan('등록된 추천 정보를 현재 불러올 수 없어요. 추천인·추천 이유가 있는 등록 맛집 대신 외부 검색을 사용하려면 아래에서 선택해 주세요.',[],{choices:[{label:'네이버 검색으로 찾기',message:'네이버 검색으로 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]});
+  if(registeredOnly&&!recommendationCatalog.active)return plan('등록된 추천 정보를 현재 불러올 수 없어요. 추천인·추천 이유가 있는 등록 맛집 대신 외부 검색을 사용하려면 아래에서 선택해 주세요.',[],{choices:[{label:'네이버 검색으로 찾기',message:'네이버 검색으로 찾아줘'},{label:'지역 선택',message:'지역·역 선택'}]});
   let targets=[],detailed;
   if(directive){targets=directive.targetIds.map(id=>catalog.find(card=>card.id===id)).filter(Boolean);detailed=dataLookup;}else{
 
@@ -2402,8 +2402,9 @@ async function phase1ChatResponse(latest,context,env,execution){
     return plan(`${unsupported.join('·')} 정보는 현재 확인할 수 없어요. 이 항목이 미확인인 식당도 볼지 선택해 주세요.`,[],{question:'미확인 항목을 표시하고 지역·음식으로 검색해볼까요?',choices:[{label:'미확인 후보 보기',message:'미확인 조건을 알고 후보도 보여줘'},{label:'조건 바꾸기',message:'조건 바꾸기'}]});
   }
   let places=[],error=false,searchDiagnostics=null;
-  let registered=recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
-  if(recommendationCatalog.exclusive){
+  let registered=c.location.kind==='region'?registeredRegionCards(recommendationCatalog,c,api):recommendationCatalog.search().map(card=>({...card,distanceMeters:api.distance(c.location,card),distanceKind:'straight',originLabel:c.location.label,regionLabel:c.location.label})).filter(card=>card.distanceMeters!==null&&card.distanceMeters<=c.radiusMeters).sort((a,b)=>a.distanceMeters-b.distanceMeters).map(card=>({...card,distanceMeters:Math.round(card.distanceMeters)}));
+  if(c.location.kind==='region'){searchDiagnostics={searchMode:'address_region',registeredTotal:recommendationCatalog.entries().length,menuRegionCandidates:registered.length,lookedUp:0};}
+  else if(recommendationCatalog.exclusive){
     const provider=new NaverRestaurantProvider(env);
     const resolved=await execution.measure('registered_coordinates',()=>resolveRegisteredCards(recommendationCatalog,c,api,async row=>{
       const area=String(row.roadAddress||'').split(/\s+/).slice(0,2).join(' ');
@@ -2416,7 +2417,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   }
   const deferredExternal=!registeredOnly&&unsupported.length>0&&registered.length<3;
   try{
-    if(registered.length<3&&!registeredOnly&&!deferredExternal){
+    if(c.location.kind!=='region'&&registered.length<3&&!registeredOnly&&!deferredExternal){
     const provider=new NaverRestaurantProvider(env),result=await execution.measure('search',()=>provider.searchRestaurants({messages:[{role:'user',content:latest}],locationName:c.location.query||c.location.label,intentAnalysis:{phase1:true,location:c.location.query||c.location.label,foodCategory:c.food||'',needsRestaurantSearch:true}}));
     if(!result.configured||result.errorCode)throw new Error('search_unavailable');
     const measured=result.places.map(place=>({place,meters:api.distance(c.location,place.registered_data)}));
@@ -2444,7 +2445,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   }
   const unknownLabels=[...new Set(selected.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown').map(check=>check.key==='budget'?'가격':check.label)))];
   const notice=unknownLabels.length?unknownLabels.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'';
-  const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.${selected.some(card=>card.conditionVerification.status==='unconfirmed')?' 아직 확인되지 않은 조건은 카드에 따로 적었어요.':''}`:directive&&searchDiagnostics?.menuRegionCandidates===0&&c.food?`등록된 메뉴 정보에서 ${c.food} 조건에 맞는 곳을 확인하지 못했어요. 다른 음식이나 지역을 골라볼까요?`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
+  const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':selected.length&&c.location.kind==='region'?`${c.location.label}에 등록된 식당 ${selected.length}곳을 골라봤어요.`:selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.${selected.some(card=>card.conditionVerification.status==='unconfirmed')?' 아직 확인되지 않은 조건은 카드에 따로 적었어요.':''}`:directive&&searchDiagnostics?.menuRegionCandidates===0&&c.food?`등록된 메뉴 정보에서 ${c.food} 조건에 맞는 곳을 확인하지 못했어요. 다른 음식이나 지역을 골라볼까요?`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
   return plan(message,selected,{choices:api.followups(c,{empty:!selected.length}),notice:selected.length?notice:'',error});
 }
 
@@ -2452,9 +2453,12 @@ async function phase1ChatResponse(latest,context,env,execution){
 // contract, never infer an intent from user keywords. Kept in the worker bundle.
 async function contextualChatResponse(messages,context,env,execution,conversationId){
   const id=typeof conversationId==='string'?conversationId.slice(0,120):'';
-  const previous=isolateState(context.responseModeState,id,messages.length);
+  const previous=isolateState(context.responseModeState,id,messages.length,registeredRegions);
   const mismatched=Boolean(context.responseModeState?.conversationId&&context.responseModeState.conversationId!==id);
   const safeContext={...context,responseModeState:previous,...(mismatched?{currentLocation:null,locationSelection:null}:{})};
+  safeContext.registeredRegions=registeredRegions;
+  safeContext.verifiedAdministrativeRegion=safeContext.locationSelection?.id?.startsWith('admin:')?findRegisteredRegion(registeredRegions,safeContext.locationSelection.id):null;
+  if(safeContext.locationSelection?.id?.startsWith('admin:')&&!safeContext.verifiedAdministrativeRegion)safeContext.locationSelection=null;
   safeContext.verifiedRegionSelection=null;
   if(safeContext.locationSelection?.id?.startsWith('discovered:')){
     const selected=safeContext.locationSelection;
@@ -2478,7 +2482,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   let directive;
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}
   catch(error){if(env.CHAT_TIMING_LOGS!=='false')console.warn(JSON.stringify({event:'conversation_plan_failed',code:/^[a-z_]+$/.test(error.message)?error.message:error.name}));return textResponse('말씀을 이해하는 중 문제가 생겼어요. 조건은 그대로 두었으니 다시 시도해 주세요.',{error:true});}
-  if(safeContext.verifiedRegionSelection&&['recommend','change_conditions'].includes(directive.task))directive={...directive,action:'search',clarificationReason:null,question:null,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:safeContext.verifiedRegionSelection.label}]};
+  if((safeContext.verifiedRegionSelection||safeContext.verifiedAdministrativeRegion)&&['recommend','change_conditions'].includes(directive.task))directive={...directive,action:'search',clarificationReason:null,question:null,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:(safeContext.verifiedAdministrativeRegion||safeContext.verifiedRegionSelection).label}]};
   if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason,unknownConsent:directive.unknownConsent,targetCount:directive.targetIds.length}));
   let applied;
   try{applied=await applyPlan(directive,state,safeContext,(query,ctx)=>resolveLocation(query,ctx,env));}
@@ -2487,7 +2491,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
     Object.assign(state,emptyResponseState(),{conversationId:id});state.phase1={resetBoundary:latest};
   }
   state.phase1={...state.phase1,conditions:applied.conditions,conditionOrigins:applied.conditionOrigins};
-  if(directive.action==='reset')return textResponse('좋아요, 새로 시작해볼게요.',{question:{slot:'location',text:'어디에서 드실 예정이세요?',choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역·역 선택',message:'지역·역 선택'}]}});
+  if(directive.action==='reset')return textResponse('좋아요, 새로 시작해볼게요.',{question:{slot:'location',text:'어디에서 드실 예정이세요?',choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역 선택',message:'지역·역 선택'}]}});
   if(directive.action==='service'){
     const row=SERVICE_FAQ.items.find(row=>row.id===directive.faqId),answer=row?.answer;
     return textResponse(typeof answer==='string'?answer:answer?.registered||answer?.naver||answer?.default||SERVICE_FAQ.fallback_answer,{intent:'service'});

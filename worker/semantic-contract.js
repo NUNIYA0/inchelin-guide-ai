@@ -109,6 +109,7 @@ export const PLANNER_INSTRUCTIONS=`너는 인슐랭가이드의 대화 이해기
 radiusConfirmed=false인 1000은 아직 선택하지 않은 기본값이다. 사용자가 '1km'라고 답하면 숫자가 같아도 radiusMeters=1000 set을 반드시 반환한다. 금액을 모르는 예산 질문에서는 changes.budget 전체를 null로 둔다(op=set/value=null 금지).
 task: recommend=먹을 곳을 찾는 요청/필수 조건 답변, change_conditions=조건 변경·취소, information=특정 식당·비교·지도·서비스 설명, consent=미확인 식당 표시 동의/거부, reset=명시적 새 시작, conversation=검색과 무관한 음식 이야기·잡담.
 action: search=실제 식당 검색, search_more=이미 본 곳 제외하고 같은 조건 검색, update_search=변경 후 검색, clarify=딱 하나 모호한 정보 확인, details/compare/map=실제 보여준 ID 조회, service=FAQ ID 선택, answer=사실을 지어내지 않는 짧은 대화, reset=초기화.
+행정 지역(시·도와 시·군·구)을 선택한 location.kind=region은 해당 등록 주소 전체에서 찾는다. 이 경우 반경·거리·역을 추가로 묻지 않으며 임의의 중심점·역으로 바꾸지 않는다. locationSelection.name의 행정 지역 전체 이름을 그대로 location에 반영한다. 반경은 현재 위치나 사용자가 직접 지정한 역 기준 검색에만 적용된다.
 위치만 검색 필수다. 반경 미확정이면 서버가 반경 선택을 물으므로 임의로 1000을 changes에 넣지 않는다. 반경은 단위가 포함된 원문 숫자만 미터로 변환한다. 음식·인원·시간·예산을 필수로 묻지 않는다. 위치/반경이 준비되면 search로 진행하고 같은 질문을 반복하지 않는다. 음식이 없다고 종류를 질문하지 않는다.
 location은 장소 이름/current만, 좌표를 만들지 않는다. 새 위치는 새 이름만 보내며 나머지 조건은 유지한다. 기기 위치가 없으면 사용 허용/좌표 확인이 끝났다고 말하지 않는다.
 locationReference는 이번 요청의 위치 대상이다. 현재 위치·내 주변으로 옮기는 요청이면 current와 changes.location=current를 반드시 함께 반환한다. 기기 좌표가 없더라도 이전 역 좌표를 유지하지 않는다. 장소 이름을 명시하면 named와 그 위치 변경을 반환하며, 위치를 언급하지 않았으면 null이다. '역삼역 1km 맛집', '강남역에서 한식 1km'처럼 조사 생략·복합 요청에서도 장소를 빠뜨리지 않는다.

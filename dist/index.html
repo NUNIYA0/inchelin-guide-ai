@@ -1045,7 +1045,7 @@
     .location-choice-help {font-size:14px!important;}
     .restaurant-group + .turn-notice {margin:12px 0 0;color:#7c8491;}
   </style>
-  <link rel="stylesheet" href="/assets/location-picker.css?v=177" />
+  <link rel="stylesheet" href="/assets/location-picker.css?v=178" />
   <link rel="stylesheet" href="/assets/restaurant-ui.css?v=168" />
   <link rel="stylesheet" href="/assets/history-manager.css?v=160" />
 </head>
@@ -1242,7 +1242,7 @@
     const PLUGINS = [
       ['메뉴 탐색', '오늘 뭐 먹을지 후보를 좁혀드려요', 'explore', 'utensils'],
       ['상황별 추천', '회식·데이트·혼밥 등 상황에 맞춰 골라드려요', 'recommend', 'people'],
-      ['지역별 찾기', '동네나 역 주변 맛집을 찾아드려요', 'explore', 'pin'],
+      ['지역별 찾기', '등록 맛집이 있는 지역을 골라 찾아요', 'explore', 'pin'],
       ['등록 맛집 비교', '고른 식당들의 확인된 정보를 나란히 비교해요', 'recommend', 'compare'],
       ['추천 기준·데이터 안내', '지금 연결된 검색 결과와 추천 기준을 알려드려요', 'data', 'search']
     ].map((p, i) => ({ id: i + 1, name: p[0], desc: p[1], type: p[2], icon: p[3] }));
@@ -2132,7 +2132,7 @@
             const title = document.createElement('span');
             title.className = 'quick-reply-title';
             title.textContent = card.title;
-            if(/^(?:현재 위치로 찾기|현재 위치 연결|지역·역 선택)$/.test(card.title))button.appendChild(uiIcon(card.title==='지역·역 선택'?'search':'location'));
+            if(/^(?:현재 위치로 찾기|현재 위치 연결|지역 선택|지역·역 선택)$/.test(card.title))button.appendChild(uiIcon(['지역 선택','지역·역 선택'].includes(card.title)?'search':'location'));
             button.appendChild(title);
             if (card.description && !actionReply) {
               const description = document.createElement('span');
@@ -2491,7 +2491,7 @@
       return '**현재 위치를 확인하지 못했어요.**\n\n**어느 지역에서 찾고 계세요?** 지역명을 편하게 입력해 주세요.';
     }
     function appendLocationFallback(reason) {
-      const choices=[{label:'지역·역 선택',message:'지역·역 선택'},{label:'직접 입력',message:'직접 입력'},{label:'현재 위치 재시도',message:'지금 내 주변에서 찾아줘'}];
+      const choices=[{label:'지역 선택',message:'지역·역 선택'},{label:'직접 입력',message:'직접 입력'},{label:'현재 위치 재시도',message:'지금 내 주변에서 찾아줘'}];
       const reasonText={denied:'위치 권한이 허용되지 않았어요.',timeout:'위치 조회 시간이 초과됐어요.',unavailable:'기기에서 위치를 전달하지 못했어요.',unsupported:'이 브라우저는 위치 조회를 지원하지 않아요.',insecure:'보안 연결에서 위치를 사용할 수 있어요.'}[reason]||'현재 위치를 확인하지 못했어요.';
       appendMessage('assistant', reasonText+' 조건은 유지했어요. 지역·역을 선택하거나 직접 입력해 주세요.', {
         quickReplies: choices.map(c=>c.label), meta:{phase1:true,answer_plan:['text','chips'],responseModeState:pluginState(),turnPolicy:{answerChoices:choices}}
@@ -2609,7 +2609,7 @@
       }
     }
     function routeQuestion(question) {
-      if(['지역·역 선택','지역·역 선택하기'].includes(question)){openPhase1Condition('location');return;}
+      if(['지역 선택','지역·역 선택','지역·역 선택하기'].includes(question)){openPhase1Condition('location');return;}
       if(['예산 변경','음식 종류 변경','다른 메뉴로','방문 시간 변경','인원 변경','음식 바꾸기','메뉴 바꾸기'].includes(question)){ask(question);return;}
       if(question==='지역 바꾸기'){openPhase1Condition('location');return;}
       if(question==='조건 바꾸기'){pluginReply('바꾸고 싶은 위치·거리·음식·예산을 대화로 말씀해 주세요.');return;}

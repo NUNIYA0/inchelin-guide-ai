@@ -22,7 +22,7 @@
   function findCenters(text){const matches=centers.flatMap(c=>c.aliases.flatMap(alias=>[...text.matchAll(new RegExp(alias+'(?=$|[\\s,.!?]|에서|으로|로|이나|이랑|랑|과|와|하고|또는|말고|역(?![가-힣])|쪽|근처|주변|맛집|음식|추천|냉면|삼겹살|파스타)','g'))].map(m=>({center:c,index:m.index,length:alias.length}))));return matches.sort((a,b)=>a.index-b.index||a.length-b.length);}
   function parse(text,previous={},context={}){
     text=clean(text);const c={location:null,radiusMeters:1000,radiusConfirmed:false,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,requireOpen:false,visitAt:null,vibe:null,parking:null,...JSON.parse(JSON.stringify(previous||{}))};
-    if(c.location&&!coords(c.location))c.location=null;
+    if(c.location&&c.location.kind!=='region'&&!coords(c.location))c.location=null;
     c.radiusMeters=Number.isFinite(Number(c.radiusMeters))&&Number(c.radiusMeters)>0?Number(c.radiusMeters):1000;
     const matches=findCenters(text),unique=[...new Set(matches.map(m=>m.center.label))];
     let ambiguous=/이나|또는|어디(?:로|가)/.test(text)&&unique.length>1;
@@ -69,12 +69,13 @@
     return {conditions:c,ambiguous,unknownStation,invalidRadius,visitExplicitThisTurn,intents:[/비교|어디가\s*나아/.test(text)&&'compare',/지도/.test(text)&&'map',/영업|전화|메뉴\s*알려|가격|주차|주소|자세|상세/.test(text)&&'detail',/다시\s*추천|다른\s*곳/.test(text)&&'retry'].filter(Boolean)};
   }
   const mapUrl=address=>{const full=String(address||'').replace(/<[^>]*>/g,'').trim();return full?'https://map.naver.com/p/search/'+encodeURIComponent(full):'';};
-  function conditionChips(c){if(!c.location)return [];return [{key:'location',label:c.location.label}, {key:'radiusMeters',label:c.radiusMeters<1000?c.radiusMeters+'m 이내':c.radiusMeters/1000+'km 이내'},...['visit','food','budget','companion','people','purpose','vibe','parking'].filter(k=>c[k]!=null&&!(k==='people'&&c[k]===1)).map(key=>({key,label:key==='parking'?'주차 필요':String(c[key]),removable:true}))].filter(Boolean);}
+  function conditionChips(c){if(!c.location)return [];return [{key:'location',label:c.location.label}, ...(c.location.kind==='region'?[]:[{key:'radiusMeters',label:c.radiusMeters<1000?c.radiusMeters+'m 이내':c.radiusMeters/1000+'km 이내'}]),...['visit','food','budget','companion','people','purpose','vibe','parking'].filter(k=>c[k]!=null&&!(k==='people'&&c[k]===1)).map(key=>({key,label:key==='parking'?'주차 필요':String(c[key]),removable:true}))].filter(Boolean);}
   function conditionNotice(c,visitExplicitThisTurn=false){
     const missing=[c.food&&'메뉴 판매 여부',c.budget&&'가격',(c.companion||c.people||c.purpose)&&'좌석',c.vibe&&'분위기',c.parking&&'주차'].filter(Boolean);
     return [missing.length?missing.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'',c.visit&&visitExplicitThisTurn?'말씀하신 시간의 영업 여부는 확인되지 않았어요.':''].filter(Boolean).join(' ');
   }
   function followups(c,{empty=false,detail=false}={}){
+    if(c.location?.kind==='region')return [empty?{label:'지역 선택',message:'지역·역 선택'}:!c.food?{label:'한식으로',message:'한식으로 찾아줘'}:{label:'음식 종류 변경',message:'음식 종류 변경'},!c.budget?{label:'1만 원 이하로',message:'1만 원 이하로 찾아줘'}:{label:'예산 변경',message:'예산 변경'},empty?{label:'음식 종류 변경',message:'음식 종류 변경'}:{label:'다른 곳 보기',message:'다른 곳도 보여줘'}].filter((x,i,a)=>a.findIndex(y=>y.message===x.message)===i);
     if(detail)return[{label:'네이버지도 보기',message:'네이버지도 보기'}];
     if(empty)return[{label:'2km로 확대',message:'2km 이내로 찾아줘'},...(c.food?[{label:'음식 변경',message:'음식 종류 변경'}]:[]),...(c.budget?[{label:'예산 변경',message:'예산 변경'}]:[]),{label:'지역·역 선택',message:'지역·역 선택'}].filter(x=>!(c.radiusMeters>=2000&&x.label==='2km로 확대')).slice(0,3);
     if(c.radiusMeters<=500)return[{label:'1km로 확대',message:'1km 이내로 찾아줘'},{label:'예산 변경',message:'예산 변경'},{label:'음식 종류 변경',message:'음식 종류 변경'}];

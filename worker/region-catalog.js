@@ -15,6 +15,16 @@ export function buildRegionCatalog(rows){
 }
 export function belongsToRegion(address,region){const found=addressRegion(address);return Boolean(found&&found.id===region.id);}
 
+// An administrative area is an address boundary, never an invented map point.
+export function regionalLocation(region){return {id:'admin:'+region.id,regionId:region.id,kind:'region',type:'region',label:region.label,province:region.province,district:region.district};}
+export function findRegisteredRegion(catalog,value){
+ const key=String(value||'').trim().replace(/^admin:/,'');
+ const parsed=addressRegion(key),canonical=parsed?.id;
+ if(canonical&&catalog?.regions?.some(r=>r.id===canonical))return regionalLocation(catalog.regions.find(r=>r.id===canonical));
+ const rows=(catalog?.regions||[]).filter(r=>r.id===key||r.label===key||r.district===key);
+ return rows.length===1?regionalLocation(rows[0]):null;
+}
+
 // Naver local search is a discovery source, not a complete rail directory.
 // Only station-category results with matching administrative addresses pass.
 export async function searchRegionStations(catalog,regionId,query,env,fetcher=fetch){

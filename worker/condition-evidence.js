@@ -21,7 +21,8 @@ function openingStatus(facts,c){
 }
 export function evaluateConditions(card,c) {
   const checks=[];const put=(key,label,status,basis,blocking=true)=>checks.push({key,label,status,basis,blocking});
-  put('distance','직선거리',Number.isFinite(card.distanceMeters)&&card.distanceMeters<=c.radiusMeters?'confirmed':'failed',card.originLabel+' 기준 좌표 계산');
+  if(c.location?.kind==='region')put('region','지역',card.registeredRegionId===c.location.regionId?'confirmed':'failed','앱 등록 주소의 시·군·구');
+  else put('distance','직선거리',Number.isFinite(card.distanceMeters)&&card.distanceMeters<=c.radiusMeters?'confirmed':'failed',card.originLabel+' 기준 좌표 계산');
   const facts=card.registeredFacts||{},menus=Array.isArray(facts.menus)?facts.menus:[];
   if(c.food){if(broadFood(c.food)){const category=String(facts.category||card.rawCategory||card.category||'');put('food_category','업종',category.includes(c.food)?'confirmed':'unknown',category.includes(c.food)?(facts.category?'앱 등록 업종':'네이버 업종 정보'):'요청 업종 여부 미확인');}else{const exact=menus.some(menu=>menuMatches(c.food,menu.name));put('menu','특정 메뉴 판매',exact?'confirmed':'unknown',exact?'앱 등록 판매 메뉴':'해당 메뉴 판매 여부는 확인되지 않았어요');}}
   if(c.budget){

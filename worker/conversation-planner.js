@@ -1,4 +1,5 @@
 import {actionSchema,readModelPlan,PLANNER_INSTRUCTIONS} from './semantic-contract.js';
+import {findRegisteredRegion} from './region-catalog.js';
 // Model chooses meaning/action. This module validates tools and condition deltas.
 const actions=['answer','clarify','search','search_more','update_search','details','compare','map','service','reset'];
 const slots=['location','radiusMeters','food','budget','companion','people','purpose','visit','visitAt','requireOpen','vibe','parking'];
@@ -6,12 +7,13 @@ const nullableString={type:['string','null']};
 const choices={type:'array',maxItems:6,items:{type:'object',properties:{label:{type:'string'},message:{type:'string'}},required:['label','message'],additionalProperties:false}};
 export function planSchema(faqIds){return actionSchema(faqIds,actions,slots);}
 export const defaults=()=>({location:null,radiusMeters:1000,radiusConfirmed:false,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,visitAt:null,requireOpen:false,vibe:null,parking:null});
-export function isolateState(state,id,messageCount){
+export function isolateState(state,id,messageCount,regions=null){
   if(!id||state?.conversationId&&state.conversationId!==id||!state?.conversationId&&messageCount<=1)return {};
   const result=state&&typeof state==='object'?structuredClone(state):{};
   const raw=result.phase1?.conditions||{},conditions=defaults();
   for(const key of slots){
     const value=raw[key];
+    if(key==='location'&&value?.kind==='region'){conditions.location=findRegisteredRegion(regions,value.regionId);continue;}
     if(key==='location'){const point=globalThis.InchelinPhase1.coords(value);conditions.location=point&&typeof value.label==='string'?{...point,label:value.label.slice(0,100),kind:value.kind==='current'?'current':'station',query:String(value.query||value.label).slice(0,100),district:typeof value.district==='string'?value.district.slice(0,30):null,...(typeof value.regionId==='string'?{regionId:value.regionId.slice(0,80)}:{}),...(typeof value.id==='string'?{id:value.id.slice(0,160)}:{})}:null;}
     else if(key==='radiusMeters')conditions[key]=Number.isFinite(value)&&value>0&&value<=100000?value:1000;
     else if(['parking','requireOpen'].includes(key))conditions[key]=typeof value==='boolean'?value:conditions[key];

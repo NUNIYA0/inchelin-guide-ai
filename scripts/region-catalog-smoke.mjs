@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {buildRegionCatalog,addressRegion,searchRegionStations} from '../worker/region-catalog.js';
+import {buildRegionCatalog,addressRegion,searchRegionStations,findRegisteredRegion} from '../worker/region-catalog.js';
 import {resolveLocation} from '../worker/location-resolver.js';
-import {registeredShortlist} from '../worker/registered-search.js';
+import {createRecommendationCatalog} from '../worker/recommendations.js';
+import {evaluateConditions} from '../worker/condition-evidence.js';
+import {registeredRegionCards,registeredShortlist} from '../worker/registered-search.js';
 const source=JSON.parse(await readFile(new URL('../data/private/restaurants-261026.json',import.meta.url),'utf8'));
 const catalog=buildRegionCatalog(source.restaurants);
 assert.equal(catalog.total,1099);assert.equal(catalog.unassigned,8);assert.equal(catalog.provinces.length,17);assert.equal(catalog.regions.length,182);
@@ -19,3 +21,15 @@ await assert.rejects(()=>searchRegionStations(catalog,'없는:지역','',env,moc
 const selected=stations[0],resolved=await resolveLocation('역삼역',{verifiedRegionSelection:selected},env,mock);assert.equal(resolved.regionId,'서울:강남구');assert.equal(resolved.latitude,37.50062);
 const scoped=registeredShortlist(source.restaurants,{location:{...resolved},food:null},[],1099);assert.ok(scoped.length);assert.ok(scoped.every(r=>addressRegion(r.originalAddress)?.id==='서울:강남구'),'same district name in another province cannot leak into shortlist');
 console.log('Region catalogue smoke passed: real 1099 address grouping, 17 provinces/182 groups + 8 ambiguous exclusions; scoped station discovery/category/address/coordinate validation; selected point and same-region candidates. Station provider mocked.');
+
+// Every data-backed administrative area can recommend without a rail station or coordinate.
+const registered=createRecommendationCatalog({...source,enabled:true,connected:true});
+let grouped=0;
+for(const region of catalog.regions){
+ const location=findRegisteredRegion(catalog,region.id),c={location,radiusMeters:1,food:null};
+ assert.equal(location.latitude,undefined);assert.equal(location.longitude,undefined);
+ const cards=registeredRegionCards(registered,c,globalThis.InchelinPhase1);assert.equal(cards.length,region.count);grouped+=cards.length;
+ assert.ok(cards.every(card=>card.registeredRegionId===region.id&&card.distanceMeters===null&&evaluateConditions(card,c).status==='confirmed'));
+}
+assert.equal(grouped,1091);assert.equal(findRegisteredRegion(catalog,'중구'),null,'homonymous districts require province');assert.equal(findRegisteredRegion(catalog,'서울특별시 강남구').regionId,'서울:강남구');assert.equal(findRegisteredRegion(catalog,'없는구'),null);
+console.log('Administrative region smoke passed: 182 groups/1091 actual registered rows, no station/center/radius dependency, ambiguous districts rejected.');

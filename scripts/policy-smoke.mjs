@@ -49,7 +49,7 @@ await testCardsV155(requestCase,productionWorker);
 for(const [h,m,p] of [[9,59,'morning'],[10,0,'lunch'],[13,59,'lunch'],[14,0,'afternoon'],[16,59,'afternoon'],[17,0,'evening'],[20,59,'evening'],[21,0,'lateNight'],[23,59,'lateNight'],[0,0,'lateNight'],[4,59,'lateNight'],[5,0,'morning']]){
   assert.equal(api.period(h+m/60),p);for(const generated of [undefined,[],null,['영업 중인 식당 찾아줘','홍대에서 냉면 먹을래'],['점심으로 가볍게 먹을 곳 찾아줘']]){const rows=api.welcome(h+m/60,generated);assert.equal(rows.length,3);assert.equal(new Set(rows.map(q=>q.prompt)).size,3);assert.ok(rows.every(q=>!/영업|홍대|강남|디저트/.test(q.prompt)));}
 }
-const noLocation=await runCase('오늘 점심 추천해줘');assert.equal(noLocation.calls.length,0);assert.equal(noLocation.body.restaurants.length,0);assert.equal(noLocation.body.meta.turnPolicy.next_question.slot,'region');assert.deepEqual(noLocation.body.suggestions,['현재 위치로 찾기','지역·역 선택']);
+const noLocation=await runCase('오늘 점심 추천해줘');assert.equal(noLocation.calls.length,0);assert.equal(noLocation.body.restaurants.length,0);assert.equal(noLocation.body.meta.turnPolicy.next_question.slot,'region');assert.deepEqual(noLocation.body.suggestions,['현재 위치로 찾기','지역 선택']);
 const foodOnly=await runCase('냉면 먹고 싶어');assert.equal(c(foodOnly).food,'냉면');assert.equal(foodOnly.body.meta.turnPolicy.next_question.slot,'region');
 const regionOnly=await runCase('홍대 맛집 추천해줘');assert.equal(regionOnly.body.restaurants.length,3);assert.equal(regionOnly.body.meta.turnPolicy.next_question,null);assert.equal(c(regionOnly).food,null);assert.equal(c(regionOnly).location.label,'홍대입구역');
 const direct=await runCase('합정역');assert.equal(c(direct).location.label,'합정역');assert.equal(direct.body.restaurants.length,3);

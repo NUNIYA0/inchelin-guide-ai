@@ -22,6 +22,13 @@ export function registeredShortlist(rows,c,centers,limit=8){
     .map((row,index)=>({row,index,score:row.name.includes(label)?10:0}))
     .sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,limit).map(v=>v.row);
 }
+export function registeredRegionCards(catalog,c,api){
+ const rows=registeredShortlist(catalog.entries(),c,api.centers,Infinity);
+ return catalog.enrich(rows.map(row=>({id:'registered:'+(row.sourceId||row.name+'|'+row.roadAddress),registeredSourceId:row.sourceId,name:row.name,restaurantName:row.name,
+  address:row.roadAddress||row.parcelAddress,roadAddress:row.roadAddress,parcelAddress:row.parcelAddress,category:row.category||'음식점',rawCategory:row.category||'음식점',
+  registeredRegionId:c.location.regionId,dataSource:'inchelin',isRegisteredInInchelin:true,distanceMeters:null,distanceKind:null,originLabel:c.location.label,regionLabel:c.location.label,
+  naverPlaceId:row.naverPlaceId||null,naverPlaceUrl:row.naverPlaceUrl||null,naverPlaceVerification:row.naverPlaceVerification||null,validationVersion:2})),c);
+}
 export async function resolveRegisteredCards(catalog,c,api,lookup,options={}){
   const rows=catalog.entries(),pool=registeredShortlist(rows,c,api.centers,rows.length);
   const shortlist=pool.slice(0,options.progressive?24:8);let failures=0,attempted=0,matched=0,outside=0;

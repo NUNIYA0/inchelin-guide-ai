@@ -119,3 +119,7 @@
  .location-region-count{font-size:13px;}
  .location-picker-hierarchical .location-scope{position:static;clip-path:none;width:auto;height:auto;overflow:visible;}
 }
+
+.location-region[aria-checked="true"]{background:#f1f2f3;border-color:#222}.location-region[aria-checked="true"] .location-result-name{font-weight:600}
+
+.location-picker .location-region[aria-checked="true"]{background:#f1f2f3;border-color:#222}.location-picker .location-region[aria-checked="true"] .location-result-name{font-weight:600}

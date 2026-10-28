@@ -66,7 +66,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
         assert.equal(cls(a.elements.messages,'turn-question')[0].textContent,'어디에서 드실 예정이세요?');
         assert.match(cls(a.elements.messages,'location-choice-help')[0].textContent,/동네나 역 이름/);
         const actions=cls(a.elements.messages,'question-location-choice')[0];assert.equal(actions.children.length,2);
-        assert.deepEqual(actions.children.map(n=>n.attributes['aria-label']),['현재 위치로 찾기','지역·역 선택']);
+        assert.deepEqual(actions.children.map(n=>n.attributes['aria-label']),['현재 위치로 찾기','지역 선택']);
         assert.equal(cls(actions,'supplied-icon').length,2);
         assert.equal(cls(a.elements.messages,'answer-results')[0].children.length,0,'no duplicated intro above location question');
       }
@@ -150,10 +150,10 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
       cls(hierarchy.dialog,'location-province').find(n=>n.attributes['aria-label'].startsWith('서울 ')).click();await flush();
       assert.ok(cls(hierarchy.dialog,'location-region').length>7);assert.ok(cls(hierarchy.dialog,'location-region').every(n=>!n.attributes['aria-label'].includes('부산')));
       cls(hierarchy.dialog,'location-region').find(n=>cls(n,'location-result-name')[0].textContent==='강남구').click();await flush();
-      assert.equal(stationCalls.at(-1),'서울:강남구');assert.equal(cls(hierarchy.dialog,'location-region').length,0);assert.equal(cls(hierarchy.dialog,'location-result').length,1);
-      cls(hierarchy.dialog,'location-back')[0].click();await flush();assert.equal(cls(hierarchy.dialog,'location-region').length,22);assert.equal(cls(hierarchy.dialog,'location-apply')[0].disabled,true);
-      const direct=flatten(hierarchy.dialog).find(n=>n.tagName==='INPUT');direct.value='역삼';direct.events.input();await flush();assert.equal(cls(hierarchy.dialog,'location-result').length,1);assert.ok(cls(hierarchy.dialog,'location-browser')[0].classList.contains('location-searching'),'direct station search does not require province or district steps');
-      cls(hierarchy.dialog,'location-result')[0].click();cls(hierarchy.dialog,'location-apply')[0].click();assert.equal(hierarchySent[0][1].locationSelection.regionId,'서울:강남구');assert.equal(hierarchySent[0][0],'역삼역에서 추천해줘');
+      assert.equal(stationCalls.length,0,'district selection never searches stations');assert.equal(cls(hierarchy.dialog,'location-region').length,22);assert.equal(cls(hierarchy.dialog,'location-apply')[0].disabled,false);
+      assert.equal(cls(hierarchy.dialog,'location-region').filter(n=>n.attributes['aria-checked']==='true').length,1);
+      cls(hierarchy.dialog,'location-apply')[0].click();assert.equal(hierarchySent[0][1].locationSelection.id,'admin:서울:강남구');assert.equal(hierarchySent[0][0],'서울 강남구에서 추천해줘');assert.equal(hierarchySent[0][1].locationSelection.latitude,undefined);
+      hierarchy.open();await flush();const direct=flatten(hierarchy.dialog).find(n=>n.tagName==='INPUT');direct.value='제주시';direct.events.input();await flush();assert.equal(cls(hierarchy.dialog,'location-result').length,1);cls(hierarchy.dialog,'location-result')[0].click();assert.equal(cls(hierarchy.dialog,'location-apply')[0].disabled,false);cls(hierarchy.dialog,'location-cancel')[0].click();assert.equal(hierarchySent.length,1,'cancel keeps applied region');assert.equal(stationCalls.length,0);
       let resolveSearch;const delayed=createLocationPicker({send:()=>{},search:()=>new Promise(resolve=>resolveSearch=resolve)});delayed.open();assert.match(cls(delayed.dialog,'location-status')[0].textContent,/검색 중/);resolveSearch([]);await flush();assert.match(cls(delayed.dialog,'location-status')[0].textContent,/결과가 없어요/);delayed.dialog.close();
       const failed=createLocationPicker({send:()=>{},search:async()=>{throw new Error('test');}});failed.open();await flush();assert.match(cls(failed.dialog,'location-status')[0].textContent,/불러오지 못/);assert.equal(cls(failed.dialog,'location-retry').length,1);failed.dialog.close();
       const oldWidth=globalThis.innerWidth,oldHeight=globalThis.innerHeight,oldViewport=globalThis.visualViewport;
@@ -210,7 +210,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
       `)(navigator,{isSecureContext:variant!=='insecure'},{createElement:tag=>new Node(tag)},host,async()=>Response.json({locationName:'강남역'},{status:variant==='reverse-failed'?503:200}),(role,content,options)=>messages.push({role,content,options}),request=>sent.push(request));
       await locate('지금 내 주변에서 찾아줘');
       if(['granted','prompt','reverse-failed'].includes(variant)){assert.equal(sent.length,1,variant);assert.equal(sent[0].context.currentLocation.latitude,position.latitude);assert.equal(sent[0].context.responseModeState.phase1.conditions.food,'냉면');assert.equal(geoCalls,1);}
-      else{assert.equal(sent.length,0,variant);assert.ok(messages.at(-1).options.quickReplies.includes('지역·역 선택'));if(['denied','insecure','unsupported'].includes(variant))assert.equal(geoCalls,0);}
+      else{assert.equal(sent.length,0,variant);assert.ok(messages.at(-1).options.quickReplies.includes('지역 선택'));if(['denied','insecure','unsupported'].includes(variant))assert.equal(geoCalls,0);}
     }
     const script=html.match(/<script>\s*([^]*?)<\/script>/g).at(-1)?.replace(/^<script>|<\/script>$/g,'');if(script)new Function(script);
     assert.match(html,/white-space:nowrap/);assert.match(html,/flex-wrap:wrap/);assert.match(html,/45000/);assert.match(html,/20000/);assert.match(html,/pointer: fine/);assert.match(html,/prefers-reduced-motion/);

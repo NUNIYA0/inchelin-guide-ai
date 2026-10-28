@@ -1,6 +1,9 @@
-// The model supplies a name, never coordinates. Only trusted points/API results resolve it.
+import {findRegisteredRegion} from './region-catalog.js';
+// The model supplies a name, never coordinates. Administrative boundaries have no center.
 export async function resolveLocation(query,context,env,fetcher=fetch){
   const api=globalThis.InchelinPhase1;
+  const area=findRegisteredRegion(context.registeredRegions,query);
+  if(area)return area;
   const scoped=context.verifiedRegionSelection;
   if(scoped&&[scoped.label,scoped.centerLabel].includes(query))return {latitude:scoped.latitude,longitude:scoped.longitude,label:scoped.label,kind:'station',query:scoped.province+' '+scoped.district+' '+scoped.label,district:scoped.district,regionId:scoped.regionId,id:scoped.id};
   if(query==='current'){const point=api.coords(context.currentLocation);return point?{...point,label:'현재 위치',kind:'current',query:context.currentLocationName||'현재 위치'}:null;}
