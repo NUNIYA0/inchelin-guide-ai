@@ -4,6 +4,7 @@ import './history-manager-smoke.mjs';
 import './composer-smoke.mjs';
 import './semantic-regression-smoke.mjs';
 import './place-links-smoke.mjs';
+import './region-catalog-smoke.mjs';
 import {contextSamples} from './context-planner-smoke.mjs';
 import {readFile,writeFile,rm} from 'node:fs/promises';
 import productionWorker from '../build/dist/server/index.js';

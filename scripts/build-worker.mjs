@@ -2,6 +2,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { dirname, extname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import {loadRecommendationSource} from './recommendation-source.mjs';
+import {buildRegionCatalog} from '../worker/region-catalog.js';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outputRoot = resolve(root, "build");
@@ -12,6 +13,7 @@ if (!hostingOutputRoot.startsWith(`${root}${sep}`)) throw new Error("Invalid hos
 const mimeTypes = {
   ".css": "text/css; charset=utf-8",
   ".js": "text/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
   ".png": "image/png",
   ".ttf": "font/ttf",
   ".woff2": "font/woff2",
@@ -57,6 +59,10 @@ const registeredSearch=await readFile(join(root,'worker','registered-search.js')
 const conditionEvidence=await readFile(join(root,'worker','condition-evidence.js'),'utf8');
 const recommendationConfig=JSON.parse(await readFile(join(root,'data','recommendation-source.json'),'utf8'));
 const recommendationData=await loadRecommendationSource(root,recommendationConfig);
+const regionCatalog=buildRegionCatalog(recommendationData.restaurants);
+const regionCatalogCode=await readFile(join(root,'worker','region-catalog.js'),'utf8');
+await writeFile(join(root,'dist','assets','location-regions.js'),'globalThis.InchelinLocationRegions='+JSON.stringify(regionCatalog)+';');
+await writeFile(join(root,'dist','assets','location-regions.json'),JSON.stringify(regionCatalog));
 await writeFile(join(root,'dist','assets','recommendation-flags.js'),'globalThis.InchelinRecommendationFlags='+JSON.stringify({enabled:recommendationData.enabled,connected:recommendationData.connected})+';');
 await writeFile(join(root,'dist','assets','phase1-core.js'),phase1Core);
 await writeFile(join(root,'dist','assets','response-rules.js'),responseRules);
@@ -85,6 +91,7 @@ const worker = template
   .replace("__INDEX_HTML__", JSON.stringify(html))
   .replace("__ASSETS__", JSON.stringify(assets))
   .replace("__RECOMMENDATION_DATA__", JSON.stringify(recommendationData))
+  .replace('__REGION_CATALOG__',JSON.stringify(regionCatalog))
   .replace("__PHOTO_SOURCE__", JSON.stringify(photoSource))
   .replace("__SERVICE_FAQ__", JSON.stringify(serviceFaq));
 
@@ -94,6 +101,8 @@ await Promise.all([
     const server=directory===outputRoot?join(directory,'dist','server'):join(directory,'server');
     return [writeFile(join(server,'menu-matching.js'),menuMatching),writeFile(join(server,'semantic-contract.js'),semanticContract),writeFile(join(server,'conversation-planner.js'),conversationPlanner),writeFile(join(server,'location-resolver.js'),locationResolver),writeFile(join(server,'phase1-core.js'),phase1Core),writeFile(join(server,'main-dishes.js'),mainDishes),writeFile(join(server,'related-questions.js'),relatedQuestions),writeFile(join(server,'naver-map.js'),naverMap),writeFile(join(server,'request-timing.js'),requestTiming),writeFile(join(server,'response-rules.js'),responseRules)];
   }),
+  writeFile(join(outputRoot,'dist','server','region-catalog.js'),regionCatalogCode),
+  writeFile(join(hostingOutputRoot,'server','region-catalog.js'),regionCatalogCode),
   writeFile(join(outputRoot, 'dist', 'server', 'answer-plan.js'), answerPlan),
   writeFile(join(outputRoot, 'dist', 'server', 'recommendations.js'), recommendations),
   writeFile(join(outputRoot,'dist','server','restaurant-photos.js'),restaurantPhotos),

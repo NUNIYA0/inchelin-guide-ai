@@ -1,6 +1,8 @@
 // The model supplies a name, never coordinates. Only trusted points/API results resolve it.
 export async function resolveLocation(query,context,env,fetcher=fetch){
   const api=globalThis.InchelinPhase1;
+  const scoped=context.verifiedRegionSelection;
+  if(scoped&&[scoped.label,scoped.centerLabel].includes(query))return {latitude:scoped.latitude,longitude:scoped.longitude,label:scoped.label,kind:'station',query:scoped.province+' '+scoped.district+' '+scoped.label,district:scoped.district,regionId:scoped.regionId,id:scoped.id};
   if(query==='current'){const point=api.coords(context.currentLocation);return point?{...point,label:'현재 위치',kind:'current',query:context.currentLocationName||'현재 위치'}:null;}
   const picked=api.locationOptions().find(row=>row.id===context.locationSelection?.id&&row.latitude===context.locationSelection.latitude&&row.longitude===context.locationSelection.longitude);
   if(picked&&[picked.label,picked.centerLabel].includes(query)){const center=api.centers.find(c=>c.label===picked.centerLabel);return {...center,kind:'station',id:picked.id,selectionLabel:picked.label};}

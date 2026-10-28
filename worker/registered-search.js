@@ -1,6 +1,7 @@
 // Coordinate/category enrichment is bounded and never adds an unregistered restaurant.
 import {menuMatches} from './menu-matching.js';
 import {evaluateConditions} from './condition-evidence.js';
+import {addressRegion} from './region-catalog.js';
 const cache=new Map(),TTL=3600000;
 const nameKey=v=>String(v||'').normalize('NFKC').toLowerCase().replace(/[^가-힣a-z0-9]/g,'');
 const streetKey=v=>{const m=String(v||'').match(/([가-힣0-9·]+(?:대로|로|길))\s+(\d+(?:-\d+)?)/);return m?nameKey(m[1])+':'+m[2]:'';};
@@ -17,7 +18,7 @@ export function registeredShortlist(rows,c,centers,limit=8){
   const closest=c.location.kind==='current'?[...centers].sort((a,b)=>Math.hypot(a.latitude-c.location.latitude,a.longitude-c.location.longitude)-Math.hypot(b.latitude-c.location.latitude,b.longitude-c.location.longitude))[0]:c.location;
   const label=closest?.label||c.location.label,pattern=regionPatterns[label]||(c.location.district?new RegExp(c.location.district):null);
   const food=c.food||'',broad=/^(한식|중식|일식|양식|분식|카페|고기)$/.test(food);
-  return rows.filter(row=>(!pattern||pattern.test(row.roadAddress||row.parcelAddress||''))&&(!food||broad||row.menus.some(m=>menuMatches(food,m.name))))
+  return rows.filter(row=>(c.location.regionId?(addressRegion(row.originalAddress)||addressRegion(row.roadAddress))?.id===c.location.regionId:!pattern||pattern.test(row.roadAddress||row.parcelAddress||''))&&(!food||broad||row.menus.some(m=>menuMatches(food,m.name))))
     .map((row,index)=>({row,index,score:row.name.includes(label)?10:0}))
     .sort((a,b)=>b.score-a.score||a.index-b.index).slice(0,limit).map(v=>v.row);
 }

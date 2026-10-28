@@ -1,6 +1,15 @@
 import { chooseExecution } from './semantic-contract.js';
 import { analyzePlan, applyPlan, isolateState } from './conversation-planner.js';
 import { resolveLocation } from './location-resolver.js';
+import {searchRegionStations} from './region-catalog.js';
+const registeredRegions=__REGION_CATALOG__;
+const stationDiscoveries=new Map();
+async function discoveredStations(regionId,query,env){
+ const key=regionId+'|'+query,old=stationDiscoveries.get(key);if(old&&old.expires>Date.now())return old.rows;
+ const rows=await searchRegionStations(registeredRegions,regionId,query,env);
+ if(stationDiscoveries.size>300)stationDiscoveries.delete(stationDiscoveries.keys().next().value);
+ stationDiscoveries.set(key,{expires:Date.now()+3600000,rows});return rows;
+}
 import {
   applyAnalysisToState,
   buildIntentAnalysisInstructions,
@@ -2446,6 +2455,12 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   const previous=isolateState(context.responseModeState,id,messages.length);
   const mismatched=Boolean(context.responseModeState?.conversationId&&context.responseModeState.conversationId!==id);
   const safeContext={...context,responseModeState:previous,...(mismatched?{currentLocation:null,locationSelection:null}:{})};
+  safeContext.verifiedRegionSelection=null;
+  if(safeContext.locationSelection?.id?.startsWith('discovered:')){
+    const selected=safeContext.locationSelection;
+    try{safeContext.verifiedRegionSelection=(await discoveredStations(String(selected.regionId||''),String(selected.label||''),env)).find(row=>row.id===selected.id&&row.latitude===selected.latitude&&row.longitude===selected.longitude)||null;}catch{}
+    if(!safeContext.verifiedRegionSelection)safeContext.locationSelection=null;
+  }
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'';
   const state={...emptyResponseState(),...previous,conversationId:id,phase1:{...(previous.phase1||{})}};
   const textResponse=(message,{question=null,error=false,intent='general'}={})=>{
@@ -2460,6 +2475,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   let directive;
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}
   catch(error){if(env.CHAT_TIMING_LOGS!=='false')console.warn(JSON.stringify({event:'conversation_plan_failed',code:/^[a-z_]+$/.test(error.message)?error.message:error.name}));return textResponse('말씀을 이해하는 중 문제가 생겼어요. 조건은 그대로 두었으니 다시 시도해 주세요.',{error:true});}
+  if(safeContext.verifiedRegionSelection&&['recommend','change_conditions'].includes(directive.task))directive={...directive,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:safeContext.verifiedRegionSelection.label}]};
   if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason,unknownConsent:directive.unknownConsent,targetCount:directive.targetIds.length}));
   let applied;
   try{applied=await applyPlan(directive,state,safeContext,(query,ctx)=>resolveLocation(query,ctx,env));}
@@ -2571,6 +2587,11 @@ export default {
       return json({ message: item?.answer?.[source] || item?.answer?.default || SERVICE_FAQ.fallback_answer, source });
     }
 
+    if(url.pathname==='/api/location-stations'){
+      if(request.method!=='GET')return json({error:'method_not_allowed'},405);
+      try{return json({stations:await discoveredStations(String(url.searchParams.get('region')||''),String(url.searchParams.get('q')||'').slice(0,50),env),complete:false});}
+      catch(error){return json({error:error.message==='unknown_region'?'지역을 다시 선택해 주세요.':'역 정보를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.'},error.message==='unknown_region'?400:503);}
+    }
     if (url.pathname === "/api/chat") {
       if (request.method === "OPTIONS") return new Response(null, { status: 204 });
       if (request.method !== "POST") return json({ error: "Method not allowed" }, 405);

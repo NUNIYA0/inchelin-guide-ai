@@ -141,6 +141,15 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
       cls(dialog,'location-result')[1].click();assert.equal(cls(dialog,'location-result').filter(n=>n.attributes['aria-checked']==='true').length,1);
       find('location-cancel').click();assert.equal(sent.length,1,'cancel leaves applied location unchanged');
       picker.open();await flush();dialog.events.cancel({preventDefault(){}});assert.equal(dialog.open,false);assert.equal(sent.length,1,'Esc does not apply');
+      const regionData=JSON.parse(await readFile(new URL('../dist/assets/location-regions.json',import.meta.url),'utf8')),hierarchySent=[],stationCalls=[];
+      const scopedStation={id:'discovered:서울:강남구:역삼역',label:'역삼역',type:'station',centerLabel:'역삼역',regionId:'서울:강남구',province:'서울',district:'강남구',latitude:37.50062,longitude:127.03645,detail:'서울 강남구'};
+      const hierarchy=createLocationPicker({regionData,send:(...args)=>hierarchySent.push(args),loadStations:async(region)=>{stationCalls.push(region);return region==='서울:강남구'?[scopedStation]:[];}});hierarchy.open();await flush();
+      assert.equal(cls(hierarchy.dialog,'location-region').length,17);assert.equal(cls(hierarchy.dialog,'location-apply')[0].disabled,true);
+      cls(hierarchy.dialog,'location-region').find(n=>n.attributes['aria-label'].startsWith('서울 ')).click();await flush();
+      assert.ok(cls(hierarchy.dialog,'location-region').length>7);assert.ok(cls(hierarchy.dialog,'location-region').every(n=>!n.attributes['aria-label'].includes('부산')));
+      cls(hierarchy.dialog,'location-region').find(n=>cls(n,'location-result-name')[0].textContent==='강남구').click();await flush();
+      assert.equal(stationCalls.at(-1),'서울:강남구');assert.equal(cls(hierarchy.dialog,'location-region').length,0);assert.equal(cls(hierarchy.dialog,'location-result').length,1);
+      cls(hierarchy.dialog,'location-result')[0].click();cls(hierarchy.dialog,'location-apply')[0].click();assert.equal(hierarchySent[0][1].locationSelection.regionId,'서울:강남구');assert.equal(hierarchySent[0][0],'역삼역에서 추천해줘');
       let resolveSearch;const delayed=createLocationPicker({send:()=>{},search:()=>new Promise(resolve=>resolveSearch=resolve)});delayed.open();assert.match(cls(delayed.dialog,'location-status')[0].textContent,/검색 중/);resolveSearch([]);await flush();assert.match(cls(delayed.dialog,'location-status')[0].textContent,/결과가 없어요/);delayed.dialog.close();
       const failed=createLocationPicker({send:()=>{},search:async()=>{throw new Error('test');}});failed.open();await flush();assert.match(cls(failed.dialog,'location-status')[0].textContent,/불러오지 못/);assert.equal(cls(failed.dialog,'location-retry').length,1);failed.dialog.close();
       const oldWidth=globalThis.innerWidth,oldHeight=globalThis.innerHeight,oldViewport=globalThis.visualViewport;

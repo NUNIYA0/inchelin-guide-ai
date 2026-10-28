@@ -12,7 +12,7 @@ export function isolateState(state,id,messageCount){
   const raw=result.phase1?.conditions||{},conditions=defaults();
   for(const key of slots){
     const value=raw[key];
-    if(key==='location'){const point=globalThis.InchelinPhase1.coords(value);conditions.location=point&&typeof value.label==='string'?{...point,label:value.label.slice(0,100),kind:value.kind==='current'?'current':'station',query:String(value.query||value.label).slice(0,100),district:typeof value.district==='string'?value.district.slice(0,30):null}:null;}
+    if(key==='location'){const point=globalThis.InchelinPhase1.coords(value);conditions.location=point&&typeof value.label==='string'?{...point,label:value.label.slice(0,100),kind:value.kind==='current'?'current':'station',query:String(value.query||value.label).slice(0,100),district:typeof value.district==='string'?value.district.slice(0,30):null,...(typeof value.regionId==='string'?{regionId:value.regionId.slice(0,80)}:{}),...(typeof value.id==='string'?{id:value.id.slice(0,160)}:{})}:null;}
     else if(key==='radiusMeters')conditions[key]=Number.isFinite(value)&&value>0&&value<=100000?value:1000;
     else if(['parking','requireOpen'].includes(key))conditions[key]=typeof value==='boolean'?value:conditions[key];
     else conditions[key]=typeof value==='string'?value.slice(0,160):key==='people'&&Number.isInteger(value)?value:null;
