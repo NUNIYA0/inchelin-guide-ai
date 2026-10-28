@@ -22,7 +22,8 @@ export async function searchRegionStations(catalog,regionId,query,env,fetcher=fe
  const clean=String(query||'').trim().slice(0,50);
  if(!region&&clean.length<2)return [];
  if(!env.NAVER_API_HUB_CLIENT_ID||!env.NAVER_API_HUB_CLIENT_SECRET)throw new Error('station_search_unavailable');
- const queries=clean?[(region?region.label+' ':'')+clean]:[region.label+' 지하철역',region.label+' 전철역'];
+ const prefix=region?region.label+' ':'';
+ const queries=clean?[prefix+clean+' 지하철역',prefix+(clean.endsWith('역')?clean:clean+'역')]:[region.label+' 지하철역',region.label+' 전철역'];
  const result=await Promise.all(queries.map(async query=>{
   const url=new URL('https://naverapihub.apigw.ntruss.com/search/v1/local');url.search=new URLSearchParams({query,display:'5',format:'json'});
   const response=await fetcher(url,{headers:{'X-NCP-APIGW-API-KEY-ID':env.NAVER_API_HUB_CLIENT_ID,'X-NCP-APIGW-API-KEY':env.NAVER_API_HUB_CLIENT_SECRET},signal:AbortSignal.timeout(4000)});if(!response.ok)throw new Error('station_search_failed');return (await response.json()).items||[];

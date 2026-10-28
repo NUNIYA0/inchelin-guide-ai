@@ -23,15 +23,23 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
     else if(!event.shiftKey&&(active===last||!controls.includes(active))){event.preventDefault();first.focus();}
   });
   const make=(tag,cls='',text='')=>{const node=document.createElement(tag);node.className=cls;node.textContent=text;return node;};
-  let input,clear,list,status,apply,filters,scope,province=null,region=null;
+  let input,clear,list,status,apply,filters,scope,provinceList,browser,province=null,region=null;
   const hierarchy=Boolean(regionData?.regions?.length);
   if(hierarchy)sheet.dialog.classList.add('location-picker-hierarchical');
+  const browse=()=>refresh().then(()=>{if(sheet.dialog.open&&document.activeElement!==input)list.children[0]?.focus();});
   function breadcrumbs(){
     if(!hierarchy)return;
     scope.replaceChildren();
-    const back=make('button','location-breadcrumb',province?'전체 지역':'등록 맛집 지역');back.type='button';back.addEventListener('click',()=>{province=null;region=null;refresh();});scope.append(back);
-    if(province){const up=make('button','location-breadcrumb',province);up.type='button';up.addEventListener('click',()=>{region=null;refresh();});scope.append(up);}
-    if(region)scope.append(make('span','location-breadcrumb-current',region.district));
+    scope.append(make('span','location-heading',query.trim()?'검색 결과':region?province+' · '+region.district:province+' 지역'));
+    if(region||query.trim()){
+      const back=make('button','location-back',query.trim()?'지역 목록':'지역 바꾸기');back.type='button';back.addEventListener('click',()=>{region=null;query='';input.value='';browse();});scope.append(back);
+    }
+    provinceList.replaceChildren();
+    regionData.provinces.forEach(row=>{
+      const button=make('button','location-province',row.label);button.type='button';button.setAttribute('aria-pressed',String(row.id===province));button.setAttribute('aria-label',row.label+' 등록 맛집 '+row.count+'곳');
+      button.addEventListener('click',()=>{province=row.id;region=null;query='';input.value='';filter='all';browse();});provinceList.append(button);
+    });
+    browser.classList[query.trim()?'add':'remove']('location-searching');
   }
   const syncViewport=()=>{
     const viewport=globalThis.visualViewport,height=viewport?.height||globalThis.innerHeight||800,offset=viewport?.offsetTop||0;
@@ -42,33 +50,34 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
     sheet.dialog.style.height=box+'px';sheet.dialog.style.top=(offset+(mobile?height-box:(height-box)/2))+'px';
   };
   async function refresh(){
-    const token=++version;selected=null;apply.disabled=true;clear.hidden=!input.value;list.replaceChildren();status.textContent='검색 중…';list.setAttribute('aria-busy','true');
+    const token=++version;selected=null;apply.disabled=true;clear.hidden=!input.value;list.replaceChildren();list.scrollTop=0;status.textContent='검색 중…';list.setAttribute('aria-busy','true');
     for(const b of filters.children){b.setAttribute('aria-pressed',String(b.dataset.filter===filter));b.disabled=hierarchy&&!region&&!query.trim()&&b.dataset.filter==='station';}
     breadcrumbs();
     try{
       let rows;
       if(!hierarchy)rows=await search(query,filter);
-      else if(region){rows=filter==='region'?[]:await loadStations(region.id,query);}
       else if(query.trim()){
         const key=query.replace(/\s/g,'');
-        const areas=regionData.regions.filter(r=>(!province||r.province===province)&&r.label.replace(/\s/g,'').includes(key)).map(r=>({...r,type:'district',detail:'등록 맛집 '+r.count+'곳 · 지역을 고르면 역을 찾아요'}));
+        const areas=regionData.regions.filter(r=>r.label.replace(/\s/g,'').includes(key)).map(r=>({...r,type:'district',detail:'등록 맛집 '+r.count+'곳'}));
         let stations=[];if(filter!=='region'){try{stations=await loadStations('',query);}catch{if(!areas.length)throw new Error('station_search_failed');}}
-        rows=[...(filter==='station'?[]:areas),...stations.filter(s=>!province||s.province===province)];
-      }else if(province)rows=regionData.regions.filter(r=>r.province===province).map(r=>({...r,type:'district',label:r.district,detail:'등록 맛집 '+r.count+'곳 · 지하철역 선택'}));
+        rows=[...areas,...stations];
+      }else if(region)rows=await loadStations(region.id,'');
+      else if(province)rows=regionData.regions.filter(r=>r.province===province).map(r=>({...r,type:'district',label:r.district,detail:r.count+'곳'}));
       else rows=regionData.provinces.map(r=>({...r,type:'province',detail:'등록 맛집 '+r.count+'곳'}));
       if(token!==version||!sheet.dialog.open)return;
-      status.textContent=rows.length?(hierarchy&&!query&&!region?'지역 '+rows.length:'검색 결과 '+rows.length):region?'이 지역에서 확인된 역이 없어요. 역 이름을 직접 검색하거나 다른 지역을 골라주세요.':'검색 결과가 없어요. 지원하는 동네·역 이름으로 다시 검색해 주세요.';
+      status.textContent=rows.length?(hierarchy?(query.trim()?rows.length+'개 결과':region?rows.length+'개 역':rows.length+'개 지역'):'검색 결과 '+rows.length):region?'확인된 역이 없어요. 역 이름으로 검색하거나 다른 지역을 골라주세요.':'검색 결과가 없어요. 다른 이름으로 검색해 주세요.';
       list.setAttribute('role',hierarchy&&!region&&!query?'group':'radiogroup');
+      if(hierarchy)list.className='location-results'+(!region&&!query?' location-district-grid':'');
       rows.forEach(row=>{
         if(['province','district'].includes(row.type)){
-          const navigation=make('button','location-result location-region');navigation.type='button';navigation.setAttribute('aria-label',row.label+' 등록 맛집 '+row.count+'곳');navigation.append(sheetIcon('pin'));
-          const copy=make('span','location-result-copy');copy.append(make('span','location-result-name',row.label),make('span','location-result-detail',row.detail));navigation.append(copy,make('span','location-region-next','›'));
-          navigation.addEventListener('click',()=>{if(row.type==='province'){province=row.id;region=null;}else{region=row;province=row.province;}query='';input.value='';filter='all';refresh();});list.append(navigation);return;
+          const navigation=make('button','location-result location-region');navigation.type='button';navigation.setAttribute('aria-label',row.label+' 등록 맛집 '+row.count+'곳');
+          navigation.append(make('span','location-result-name',row.label),make('span','location-region-count',row.count+'곳'));
+          navigation.addEventListener('click',()=>{if(row.type==='province'){province=row.id;region=null;}else{region=row;province=row.province;}query='';input.value='';filter='all';browse();});list.append(navigation);return;
         }
         const choice=make('button','location-result');choice.type='button';choice.setAttribute('role','radio');choice.setAttribute('aria-checked','false');choice.setAttribute('aria-label',row.label+' '+(row.type==='station'?'지하철역':'지역'));
         choice.append(sheetIcon('pin'));
         const copy=make('span','location-result-copy'),head=make('span','location-result-head');
-        head.append(make('span','location-result-name',row.label),make('span','location-type',row.type==='station'?'지하철역':'지역'));
+        head.append(make('span','location-result-name',row.label));if(!hierarchy)head.append(make('span','location-type',row.type==='station'?'지하철역':'지역'));
         copy.append(head,make('span','location-result-detail',row.detail));
         choice.append(copy);
         choice.addEventListener('click',()=>{selected=row;apply.disabled=false;for(const item of list.children)item.setAttribute('aria-checked',String(item===choice));});
@@ -84,9 +93,9 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
   function open(){
     if(isBusy())return;
     if(sheet.dialog.open){input.focus();return;}
-    opener=document.activeElement;previousOverflow=document.body.style.overflow;previousRootOverflow=document.documentElement?.style.overflow||'';document.body.style.overflow='hidden';if(document.documentElement)document.documentElement.style.overflow='hidden';selected=null;query='';filter='all';province=null;region=null;
+    opener=document.activeElement;previousOverflow=document.body.style.overflow;previousRootOverflow=document.documentElement?.style.overflow||'';document.body.style.overflow='hidden';if(document.documentElement)document.documentElement.style.overflow='hidden';selected=null;query='';filter='all';province=hierarchy?[...regionData.provinces].sort((a,b)=>b.count-a.count)[0]?.id:null;region=null;
     sheet.open('어디에서 찾을까요?');
-    const description=make('p','location-picker-description',hierarchy?'등록 맛집이 있는 지역을 고른 뒤, 지하철역을 선택해 주세요.':'동네나 역 이름을 검색해 주세요.');
+    const description=make('p','location-picker-description',hierarchy?'지역을 고르거나 역 이름을 바로 검색하세요.':'동네나 역 이름을 검색해 주세요.');
     const searchBox=make('div','location-search');input=make('input');input.type='search';input.value='';input.maxLength=60;input.placeholder='동네·역 이름 검색';input.autocomplete='off';input.setAttribute('aria-label','동네나 역 이름 검색');
     clear=make('button','location-clear');clear.type='button';clear.setAttribute('aria-label','검색어 지우기');clear.append(sheetIcon('close'));clear.hidden=true;
     clear.addEventListener('click',()=>{input.value='';query='';refresh();input.focus();});input.addEventListener('input',()=>{query=input.value;refresh();});
@@ -97,8 +106,12 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
     status=make('p','location-status');status.setAttribute('aria-live','polite');status.setAttribute('role','status');
     scope=make('div','location-scope',hierarchy?'':'현재 등록된 7개 역과 연결된 지역을 검색해요. 주소·노선 정보는 제공되지 않아요.');
     list=make('div','location-results');list.setAttribute('role','radiogroup');list.setAttribute('aria-label','위치 검색 결과');
-    const hint=make('p','location-picker-hint',hierarchy?'매장 수는 등록 주소 기준이며, 역 주변 반경의 결과 수와는 달라요. 역이 보이지 않으면 이름으로 검색해 주세요.'+(regionData.unassigned?' 주소 분류 확인 중 '+regionData.unassigned+'곳은 지역 목록에서 제외했어요.':''):'선택한 위치를 기준으로 주변 맛집을 찾아드려요.');
-    sheet.body.append(description,searchBox,filters,scope,status,list,hint);
+    const hint=make('p','location-picker-hint',hierarchy?'역을 선택하면 그 주변 맛집을 찾아드려요.':'선택한 위치를 기준으로 주변 맛집을 찾아드려요.');
+    if(hierarchy){
+      const navigation=make('div','location-navigation');navigation.append(scope,status);
+      browser=make('div','location-browser');provinceList=make('div','location-provinces');provinceList.setAttribute('role','group');provinceList.setAttribute('aria-label','시·도 선택');browser.append(provinceList,list);
+      sheet.body.append(description,searchBox,navigation,browser,hint);
+    }else sheet.body.append(description,searchBox,filters,scope,status,list,hint);
     const cancel=make('button','location-cancel','취소');cancel.type='button';cancel.addEventListener('click',()=>sheet.dialog.close());
     apply=make('button','location-apply','선택하기');apply.type='button';apply.disabled=true;
     apply.addEventListener('click',()=>{if(!selected||isBusy())return;const chosen={...selected};sheet.dialog.close();send(chosen.label+'에서 추천해줘',{locationSelection:chosen});});
