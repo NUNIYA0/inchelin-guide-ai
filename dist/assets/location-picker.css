@@ -101,7 +101,7 @@
 .location-picker .location-region{min-height:52px;gap:8px;justify-content:space-between;padding:12px;border:1px solid #ececec;border-radius:10px;background:white;}
 .location-picker .location-region:hover{border-color:#aaa;background:#fafafa;}
 .location-picker .location-region .location-result-name{font-size:14px;font-weight:500;}
-.location-region-count{color:#888;font-size:12px;white-space:nowrap;}
+.location-region-count{color:#777;font-size:13px;white-space:nowrap;}
 .location-picker-hierarchical .location-result:not(.location-region){min-height:64px;padding:10px 12px;gap:12px;}
 .location-picker-hierarchical .location-result-name{font-size:15px;}
 .location-picker-hierarchical .location-result-detail{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
