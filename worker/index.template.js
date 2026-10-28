@@ -2458,7 +2458,10 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   safeContext.verifiedRegionSelection=null;
   if(safeContext.locationSelection?.id?.startsWith('discovered:')){
     const selected=safeContext.locationSelection;
-    try{safeContext.verifiedRegionSelection=(await discoveredStations(String(selected.regionId||''),String(selected.label||''),env)).find(row=>row.id===selected.id&&row.latitude===selected.latitude&&row.longitude===selected.longitude)||null;}catch{}
+    // Re-resolve identity within the selected administrative region. Use the
+    // authoritative returned point, not client coordinates; interchange-line
+    // results may legitimately differ slightly between provider queries.
+    try{safeContext.verifiedRegionSelection=(await discoveredStations(String(selected.regionId||''),String(selected.label||''),env)).find(row=>row.id===selected.id)||null;}catch{}
     if(!safeContext.verifiedRegionSelection)safeContext.locationSelection=null;
   }
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'';
@@ -2475,7 +2478,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   let directive;
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}
   catch(error){if(env.CHAT_TIMING_LOGS!=='false')console.warn(JSON.stringify({event:'conversation_plan_failed',code:/^[a-z_]+$/.test(error.message)?error.message:error.name}));return textResponse('말씀을 이해하는 중 문제가 생겼어요. 조건은 그대로 두었으니 다시 시도해 주세요.',{error:true});}
-  if(safeContext.verifiedRegionSelection&&['recommend','change_conditions'].includes(directive.task))directive={...directive,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:safeContext.verifiedRegionSelection.label}]};
+  if(safeContext.verifiedRegionSelection&&['recommend','change_conditions'].includes(directive.task))directive={...directive,action:'search',clarificationReason:null,question:null,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:safeContext.verifiedRegionSelection.label}]};
   if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason,unknownConsent:directive.unknownConsent,targetCount:directive.targetIds.length}));
   let applied;
   try{applied=await applyPlan(directive,state,safeContext,(query,ctx)=>resolveLocation(query,ctx,env));}

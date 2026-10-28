@@ -25,11 +25,12 @@ globalThis.fetch=async(value,options)=>{
   }
   assert.equal(url.hostname,'naverapihub.apigw.ntruss.com','only mocked planner and actual tool contract');
   const query=url.searchParams.get('query');
+  if(query==='서울 강남구 삼성역')return Response.json({items:[{title:'삼성역 2호선',category:'교통>지하철역',roadAddress:'서울 강남구 테헤란로 538',mapx:'1270276200',mapy:'374979500'}]});
   if(query==='광화문역')return Response.json({items:[{title:'광화문역',category:'교통>지하철역',roadAddress:'서울특별시 종로구 세종대로',mapx:'1269764000',mapy:'375716000'}]});
   const row=source.restaurants.find(row=>query.startsWith(row.name+' '));
   return Response.json({items:row?[{title:row.name,category:'음식점>한식',roadAddress:row.roadAddress,address:row.parcelAddress||row.roadAddress,mapx:String(Math.round(coords.longitude*1e7)),mapy:String(Math.round(coords.latitude*1e7))}]:[]});
 };
-async function turn(text,next={},id='context-test'){
+async function turn(text,next={},id='context-test',extraContext={}){
   plan={...base(),...next};calls=[];
   const rawChanges=Object.fromEntries(Object.keys(api.parse('',{},{}).conditions).filter(k=>k!=='radiusConfirmed').map(k=>[k,null]));
   for(const {slot,op,value,evidence=text} of plan.changes)rawChanges[slot]={op,value,evidence};
@@ -38,7 +39,7 @@ async function turn(text,next={},id='context-test'){
   if(plan.unknownConsent!==null)plan.consentEvidence=text;
 
   history.push({role:'user',content:text});
-  const res=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:id,messages:history,context:{responseModeState:state,currentLocalDatetime:'2026-10-27T12:00:00+09:00'}})}),env,{});
+  const res=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:id,messages:history,context:{responseModeState:state,currentLocalDatetime:'2026-10-27T12:00:00+09:00',...extraContext}})}),env,{});
   assert.equal(res.status,200);const body=await res.json();assert.ok(body.message||body.meta.turnPolicy.questionText);state=body.meta.responseModeState;history.push({role:'assistant',content:body.message});return body;
 }
 try{
@@ -119,6 +120,11 @@ try{
   const exactConsent=await turn('미확인 조건을 알고 후보도 보여줘');assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(exactConsent.restaurants.length,3,'emitted consent reply must progress even if model omits consent');
   const keptConsent=await turn('500m 안으로',{task:'change_conditions'});assert.ok(state.phase1.acceptedUnknowns.includes('companion'));assert.equal(keptConsent.restaurants.length,3);
   const changedPurpose=await turn('가족이랑 먹을래',{task:'change_conditions',changes:[change('companion','가족')]});assert.ok(!state.phase1.acceptedUnknowns.includes('companion'),'new unknown scope needs separate consent');assert.ok(changedPurpose.meta.turnPolicy.questionText);
+  state=null;history=[];coords=api.centers.find(c=>c.label==='강남역');
+  const scopedSelection={id:'discovered:서울:강남구:삼성역',regionId:'서울:강남구',label:'삼성역',latitude:0,longitude:0};
+  const scopedPick=await turn('삼성역에서 추천해줘',{task:'recommend',action:'clarify',clarificationReason:'ambiguous_location',question:question('location','어느 지역인가요?')},'context-test',{locationSelection:scopedSelection});
+  assert.equal(state.phase1.conditions.location.label,'삼성역');assert.equal(state.phase1.conditions.location.regionId,'서울:강남구');assert.equal(state.phase1.conditions.location.latitude,37.49795,'client point ignored; provider mock is authoritative');assert.equal(scopedPick.meta.turnPolicy.next_question.slot,'radiusMeters','verified scoped selection cannot be blocked by old seven-station planner hints');
+  const scopedCards=await turn('1km');assert.equal(scopedCards.restaurants.length,3);assert.equal(state.phase1.conditions.location.regionId,'서울:강남구');
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}
