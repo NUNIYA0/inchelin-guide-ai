@@ -139,6 +139,12 @@ try{
   const gps=await turn('1km');assert.equal(gps.restaurants.length,3);assert.ok(gps.restaurants.every(c=>c.distanceMeters<=1000&&c.distanceKind==='straight'));
   const intoRegion=await turn('서울 마포구로 바꿔줘',{task:'change_conditions',changes:[change('location','서울 마포구')]});assert.equal(intoRegion.restaurants.length,3);assert.equal(state.phase1.conditions.location.latitude,undefined);assert.ok(intoRegion.restaurants.every(c=>c.distanceMeters===null));assert.ok(!intoRegion.meta.conditionChips.some(c=>c.key==='radiusMeters'));
   const unrelated=await turn('추천해줘',{},'fresh-regional-session');assert.equal(unrelated.restaurants.length,0);assert.equal(state.phase1.conditions.location,null);
+  state=null;history=[];
+  const compound179=await turn('서울 강남구에서 한식으로 만 원 이하 혼자 먹을 곳 찾아줘',{peopleBasis:'solo',changes:[change('food','한식'),{...change('budget',10000),evidence:'1만원'},change('companion','혼밥'),change('people',1)]});
+  assert.equal(state.phase1.conditions.location.regionId,'서울:강남구');assert.equal(state.phase1.conditions.budget,'10,000원 이하');assert.equal(state.phase1.conditionOrigins.people,'derived:companion');assert.equal(compound179.meta.executionAudit.task,'recommend');assert.ok(!JSON.stringify(compound179.meta.executionAudit).includes('reasoning'));
+  await turn('미확인 조건을 알고 후보도 보여줘');
+  await turn('혼밥 조건 빼줘',{task:'change_conditions',changes:[{slot:'companion',op:'clear',value:null}]});assert.equal(state.phase1.conditions.people,null);assert.equal(state.phase1.conditions.companion,null);
+  const noCurrent179=await turn('현재 위치로 바꿔줘',{task:'change_conditions',locationReference:'current'});assert.equal(state.phase1.conditions.location,null);assert.equal(noCurrent179.restaurants.length,0);
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

@@ -2483,6 +2483,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}
   catch(error){if(env.CHAT_TIMING_LOGS!=='false')console.warn(JSON.stringify({event:'conversation_plan_failed',code:/^[a-z_]+$/.test(error.message)?error.message:error.name}));return textResponse('말씀을 이해하는 중 문제가 생겼어요. 조건은 그대로 두었으니 다시 시도해 주세요.',{error:true});}
   if((safeContext.verifiedRegionSelection||safeContext.verifiedAdministrativeRegion)&&['recommend','change_conditions'].includes(directive.task))directive={...directive,action:'search',clarificationReason:null,question:null,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:(safeContext.verifiedAdministrativeRegion||safeContext.verifiedRegionSelection).label}]};
+  execution.audit={task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),rejectedSlots:directive.rejectedSlots||[],clarificationReason:directive.clarificationReason,targetCount:directive.targetIds.length};
   if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason,unknownConsent:directive.unknownConsent,targetCount:directive.targetIds.length}));
   let applied;
   try{applied=await applyPlan(directive,state,safeContext,(query,ctx)=>resolveLocation(query,ctx,env));}
@@ -2497,6 +2498,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
     return textResponse(typeof answer==='string'?answer:answer?.registered||answer?.naver||answer?.default||SERVICE_FAQ.fallback_answer,{intent:'service'});
   }
   directive={...directive,action:chooseExecution(directive,applied.conditions)};
+  Object.assign(execution.audit,{finalAction:directive.action,resolvedLocationKind:applied.conditions.location?.kind||null});
   if(directive.action==='answer')return textResponse(directive.answer||'어떤 점이 궁금하신지 조금 더 알려주시겠어요?');
   if(directive.action==='clarify'){
     const reason=directive.clarificationReason;
@@ -2629,7 +2631,7 @@ export default {
         const report=timing.finish();
         if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'chat_timing',status:response.status,...report}));
         const current=finalizeConversationCopy(completed);
-        current.meta={...current.meta,responseRulesVersion:globalThis.InchelinResponseRules.VERSION,generatedAt:Date.now()};
+        current.meta={...current.meta,...(execution.audit?{executionAudit:execution.audit}:{}),responseRulesVersion:globalThis.InchelinResponseRules.VERSION,generatedAt:Date.now()};
         if(current.meta.responseModeState)Object.assign(current.meta.responseModeState,{responseRulesVersion:current.meta.responseRulesVersion,generatedAt:current.meta.generatedAt});
         const output=json(current,response.status);
         output.headers.set('X-Response-Rules-Version',globalThis.InchelinResponseRules.VERSION);

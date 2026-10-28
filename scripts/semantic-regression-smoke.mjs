@@ -53,3 +53,15 @@ const irrelevantRef=read(raw({task:'change_conditions',referencePositions:[2],ch
 const relative=read(raw({task:'change_conditions',budgetRelation:'cheaper'}),'좀 더 싼 곳은?');assert.equal(relative.action,'clarify');assert.equal(relative.question.slot,'budget');
 const device=read(raw({task:'change_conditions',locationReference:'current'}),'그럼 현재 위치로 찾아줘');const missingDevice=await applyPlan(device,{phase1:applied},{},async()=>null);assert.equal(missingDevice.conditions.location,null,'current location failure cannot reuse an old station');
 console.log('Semantic regressions passed: partial facts, supported literal validation, scoped references, ambiguity safety, current point reset, relative budget, actual menu concepts and progressive candidates. All upstream calls mocked.');
+
+// v179 feedback: validated literals repair compound input, not information routing.
+const facts179={regions:[{name:'서울 강남구',regionId:'서울:강남구',evidence:'서울 강남구'}]};
+const compound=readModelPlan(raw({changes:{...raw().changes,food:{op:'set',value:'한식',evidence:'한식'},budget:{op:'set',value:10000,evidence:'1만원'}}}),[{role:'user',content:'서울 강남구에서 한식으로 만 원 이하 혼자 먹을 곳 찾아줘'}],{},facts179);
+assert.equal(compound.changes.find(c=>c.slot==='location').value,'서울 강남구');assert.equal(compound.changes.find(c=>c.slot==='budget').value,10000);
+assert.equal(readModelPlan(raw({task:'information',action:'answer'}),[{role:'user',content:'서울 강남구에서 1만 원이란 무슨 뜻이야?'}],{},facts179).changes.length,0);
+const alternative=readModelPlan(raw({locationCardinality:'alternatives',changes:{...raw().changes,location:{op:'set',value:'서울 강남구',evidence:'서울 강남구'}}}),[{role:'user',content:'서울 강남구나 서초구 중에서 추천해줘'}],{},facts179);assert.equal(alternative.action,'clarify');assert.equal(alternative.clarificationReason,'ambiguous_location');assert.ok(!alternative.changes.some(c=>c.slot==='location'));
+const singular=readModelPlan(raw({task:'information',action:'compare',informationRequest:'compare_places',referenceKind:'all',referenceCardinality:'single',targetIds:['a','b']}),[{role:'user',content:'거기 주차돼?'}],{phase1:{focusCardId:null},lastCards:[{id:'a',name:'A'},{id:'b',name:'B'}]});assert.equal(singular.action,'clarify');assert.equal(singular.targetIds.length,0);
+const solo=await applyPlan({changes:[{slot:'companion',op:'set',value:'혼밥'},{slot:'people',op:'set',value:1}],peopleBasis:'solo'},{},{},resolver);assert.equal(solo.conditionOrigins.people,'derived:companion');
+const clearedSolo=await applyPlan({changes:[{slot:'companion',op:'clear',value:null}]},{phase1:solo},{},resolver);assert.equal(clearedSolo.conditions.people,null);assert.equal(clearedSolo.conditions.companion,null);
+const explicitOne=await applyPlan({changes:[{slot:'companion',op:'clear',value:null}]},{phase1:{conditions:{...solo.conditions},conditionOrigins:{people:'explicit'}}},{},resolver);assert.equal(explicitOne.conditions.people,1,'explicit head count survives companion clear');
+console.log('v179 feedback unit checks passed: compound regional/money literals, multiple-region clarification, single deictic target, derived vs explicit people.');

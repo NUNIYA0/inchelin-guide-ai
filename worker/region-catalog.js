@@ -24,6 +24,15 @@ export function findRegisteredRegion(catalog,value){
  const rows=(catalog?.regions||[]).filter(r=>r.id===key||r.label===key||r.district===key);
  return rows.length===1?regionalLocation(rows[0]):null;
 }
+export function registeredRegionMentions(catalog,text){
+ const value=String(text||'').normalize('NFKC');
+ return (catalog?.regions||[]).filter(r=>{
+  const aliases=provinces[r.province]||[r.province],qualified=aliases.some(p=>value.includes(p+' '+r.district));
+  if(qualified)return true;
+  const same=(catalog?.regions||[]).filter(other=>other.district===r.district);
+  return same.length===1&&new RegExp('(?:^|[\\s,])'+r.district+'(?=$|[\\s,.!?]|에서|으로|로|나|말고)').test(value);
+ }).map(r=>({name:r.label,regionId:r.id,evidence:(provinces[r.province]||[]).map(p=>p+' '+r.district).find(p=>value.includes(p))||r.district}));
+}
 
 // Naver local search is a discovery source, not a complete rail directory.
 // Only station-category results with matching administrative addresses pass.
