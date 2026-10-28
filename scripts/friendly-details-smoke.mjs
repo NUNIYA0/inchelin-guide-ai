@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {friendlyAcknowledgement,registeredDetailCopy,finalizeConversationCopy} from '../worker/conversation-copy.js';
+assert.equal(friendlyAcknowledgement({acknowledgement:'예산 부담을 줄이고 싶으시군요.'}),'예산 부담을 줄이고 싶으시군요.');
+assert.ok(!friendlyAcknowledgement({acknowledgement:'주차가 가능해요.',detailFields:['parking']}).includes('가능해요'));
+assert.ok(!friendlyAcknowledgement({acknowledgement:'분석 완료.'}).includes('분석'));
+assert.ok(!friendlyAcknowledgement({acknowledgement:'어느 쪽이 좋으세요?'}).includes('어느 쪽'));
+assert.ok(!friendlyAcknowledgement({acknowledgement:'영업시간을 확인'}).includes('영업시간을 확인'));
+const card={name:'테스트 전용 매장',address:'테스트 전용 주소',mapLinkKind:'detail',registeredFacts:{openingHoursText:'월 11:00–20:00',collectedAt:'2026-10-26T09:00:00+09:00',phone:'테스트 전용 번호'}};
+const hours=registeredDetailCopy(card,['hours']);assert.ok(hours.includes(card.registeredFacts.openingHoursText));assert.match(hours,/2026-10-26/);assert.match(hours,/실시간 정보는 아니/);assert.match(hours,/네이버 플레이스/);assert.ok(!hours.includes(card.address));assert.ok(!hours.includes(card.registeredFacts.phone));
+const missing=registeredDetailCopy({...card,registeredFacts:{},mapLinkKind:'search'},['hours','phone','parking','seating']);for(const name of ['영업시간','전화번호','주차','좌석'])assert.ok(missing.includes(name));assert.match(missing,/정확한 플레이스 링크가 없어/);assert.ok(!missing.includes('방금 확인'));
+const faq='고정된 FAQ 원문이에요.';assert.equal(finalizeConversationCopy({message:faq,meta:{variant:'service',copySource:'program',turnPolicy:{acknowledgement:'궁금하셨군요.',intro:faq}}}).message,faq);
+console.log('Friendly/details smoke passed: grounded acknowledgement, requested-fields-only copy, snapshot provenance/date, missing data, verified-place vs search distinction and unchanged FAQ. No live Place scraping or AI calls.');

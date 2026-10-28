@@ -3,6 +3,7 @@ import './history-more-smoke.mjs';
 import './history-manager-smoke.mjs';
 import './composer-smoke.mjs';
 import './semantic-regression-smoke.mjs';
+import './friendly-details-smoke.mjs';
 import './place-links-smoke.mjs';
 import './region-catalog-smoke.mjs';
 import {contextSamples} from './context-planner-smoke.mjs';
@@ -80,7 +81,7 @@ for(const address of ['서울특별시 강남구 강남대로78길 25 지상1층
 const noAddress=await runCase('강남역에서 추천해줘',{data:{items:[item(api.centers[0],100,1,{roadAddress:'',address:''})]}});assert.equal(noAddress.body.restaurants.length,1);assert.equal(noAddress.body.restaurants[0].naverPlaceUrl,null);assert.equal(noAddress.body.restaurants[0].mapUrl,'');
 const compare=await runCase('첫 번째랑 두 번째 식당 비교하고 지도도 보여줘',{state:s(bulk)});assert.equal(compare.calls.length,0);assert.equal(compare.body.restaurants.length,2);assert.match(compare.body.message,/테스트 식당 0/);assert.match(compare.body.message,/테스트 식당 1/);assert.match(compare.body.message,/주소/);
 assert.ok(compare.body.meta.phase1Intents.includes('compare'));assert.ok(compare.body.meta.phase1Intents.includes('map'));assert.ok((move.initial||move).body.meta.phase1Intents.includes('condition_change'));
-const detail=await runCase('두 번째 집 영업시간이랑 전화번호 알려줘',{state:s(bulk)});assert.equal(detail.calls.length,0);assert.match(detail.body.message,/영업시간.*전화/);assert.equal(detail.body.restaurants[0].id,bulk.body.restaurants[1].id);
+const detail=await runCase('두 번째 집 영업시간이랑 전화번호 알려줘',{state:s(bulk)});assert.equal(detail.calls.length,0);assert.match(detail.body.message,/영업시간[\s\S]*전화/);assert.equal(detail.body.restaurants[0].id,bulk.body.restaurants[1].id);
 const vague=await runCase('여기 지도 보여줘',{state:s(bulk)});assert.equal(vague.calls.length,0);assert.ok(vague.body.meta.turnPolicy.questionText);
 const focusedState=s(bulk);focusedState.phase1.focusCardId=bulk.body.restaurants[1].id;const focused=await runCase('여기 지도 보여줘',{state:focusedState});assert.equal(focused.body.restaurants[0].id,bulk.body.restaurants[1].id);
 for(const r of [bulk,seongsu,noAddress])for(const card of r.body.restaurants){for(const key of ['imageUrl','menus','prices','recommenderName','otherRecommendations','openingHours'])assert.equal(card[key],null);assert.equal(card.recommendedBy,'');assert.equal(card.recommendationReason,'');}

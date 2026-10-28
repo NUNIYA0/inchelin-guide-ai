@@ -25,7 +25,7 @@ import {
 } from "./response-modes.js";
 import { withParticle } from "./korean.js";
 import { applyTurnPolicy, planTurn, IMMEDIATE_REQUEST, withTurnDeadline } from "./turn-policy.js";
-import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy, compactMenuCopy } from "./conversation-copy.js";
+import { STYLE_RULES, generateFriendly, groundedCardReason, cardReasonOptions, applyCardReasons, finalizeConversationCopy, compactMenuCopy, friendlyAcknowledgement, registeredDetailCopy } from "./conversation-copy.js";
 import { placeMatchesRegion, cardArea, normalizeFoodAxis, normalizeSearchRegion, mentionedSearchRegion, SEARCH_REGIONS, REGION_NORMALIZATION, ADJACENT_REGIONS } from "./search-axes.js";
 import { answerPlanFor, applyAnswerPlan, MENU_CATEGORIES, CATEGORY_ANSWERS, REGION_ANSWERS, AUTO_MENU } from './answer-plan.js';
 import { isSideRequest, MAIN_DISHES, SIDE_FOOD } from './main-dishes.js';
@@ -2341,6 +2341,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const state={...emptyResponseState(),conversationId:previous.conversationId,slots:{...emptyResponseState().slots,region:c.location?.label||null,use_current_location:c.location?.kind==='current',menu:c.food,companion:c.companion},phase1:{...prior,conditions:c,focusCardId:prior.focusCardId||null,acceptedUnknowns:[...new Set(acceptedUnknowns)],pendingUnknowns:[]},lastCards:(previous.lastCards||[]).filter(card=>!card.isDemo)};
   const cards=state.lastCards.slice(0,3),catalog=[...new Map([...(previous.shownPlaces||[]),...cards].filter(card=>card?.id&&!card.isDemo).map(card=>[card.id,card])).values()].slice(-50);
   state.phase1.registeredOnly=registeredOnly;
+  state.phase1.searchDiagnostics=null;
   state.shownPlaces=catalog;
   const changed=prior.conditions&&Object.keys(c).some(key=>JSON.stringify(c[key])!==JSON.stringify(prior.conditions[key]));
   const phase1Intents=[...new Set([changed?'condition_change':'new_recommendation',...parsed.intents])];
@@ -2353,7 +2354,7 @@ async function phase1ChatResponse(latest,context,env,execution){
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c).map(currentLinks);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,copySource:'program',mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:directive?.confidence??1,slots:state.slots},responseModeState:state,
     answer_plan:['text',...(restaurants.length?['place_cards','source']:[]),...(question?['question']:[]),...(notice?['notice']:[]),...(choices.length?['chips']:[])],phase1Intents,...(state.phase1.searchDiagnostics?{searchDiagnostics:state.phase1.searchDiagnostics}:{}),dataConnectionStatus:recommendationCatalog.active?'connected_snapshot':'not_connected',...(recommendationCatalog.exclusive?{registeredData:{count:recommendationCatalog.entries().length,sourceDate:recommendationData.sourceDate,sourceHash:recommendationData.sourceHash,exclusive:true}}:{}),conditionChips:api.conditionChips(c),notice,phase1Failure:error,recoverable:error||state.noResults,
-    turnPolicy:{intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':c.location?.kind!=='region'&&!c.radiusConfirmed?'radiusMeters':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
+    turnPolicy:{acknowledgement:directive?friendlyAcknowledgement(directive):'',intro:message,questionText:question,questionHelp,next_question:question?{slot:!c.location?'region':c.location?.kind!=='region'&&!c.radiusConfirmed?'radiusMeters':'clarify',text:question,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   const dataLookup=directive&&['details','compare','map'].includes(directive.action);
   if(!dataLookup&&(!c.location||parsed.ambiguous||parsed.unknownStation)){
@@ -2382,16 +2383,9 @@ async function phase1ChatResponse(latest,context,env,execution){
     state.phase1.focusCardId=targets.length===1?targets[0].id:null;
     for(const card of targets){Object.assign(card,recommendationCatalog.enrich([card],c)[0]);Object.assign(card,globalThis.InchelinMapLinks.linkFields(card));}
     const info=targets.map(card=>`${card.name}: ${card.category||'음식 종류는 확인되지 않았어요'}, ${card.address||'주소 정보가 없어요'}${Number.isFinite(card.distanceMeters)?`, ${card.originLabel||c.location?.label||'기준 위치'}에서 직선 ${Math.round(card.distanceMeters)}m`:''}`).join('\n');
-    const details=targets.map(card=>{
-      const menus=card.registeredFacts?.menus||[],parts=[],missing=[];
-      if(directive?directive.detailFields.includes('menus'):/메뉴|가격/.test(latest)){if(menus.length)parts.push(menus.map(m=>m.name+' '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(', '));else missing.push('메뉴·가격');}
-      if(directive?directive.detailFields.includes('hours'):/영업/.test(latest)){if(card.registeredFacts?.openingHoursText)parts.push('엑셀에 수집된 영업시간: '+card.registeredFacts.openingHoursText+' (방문 전 재확인해 주세요)');else missing.push('영업시간');}
-      if(directive?directive.detailFields.includes('phone'):/전화/.test(latest)){if(card.registeredFacts?.phone)parts.push('연락처: '+card.registeredFacts.phone);else missing.push('전화번호');}
-      if(directive?directive.detailFields.includes('parking'):/주차/.test(latest))missing.push('주차');if(directive?directive.detailFields.includes('seating'):/좌석/.test(latest))missing.push('좌석');
-      if(missing.length)parts.push(missing.join('·')+'는 지금 확인된 정보가 없어요. 방문 전 식당에 확인해 주세요.');
-      return parts.length?card.name+': '+parts.join(' '):'';
-    }).filter(Boolean).join('\n');
-    return plan([(!parsed.intents.includes('map')||parsed.intents.includes('compare'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&(targets.every(card=>card.mapLinkKind==='detail')?'지도 보기에서 해당 매장 상세 정보를 열 수 있어요.':'상세 링크가 없는 매장은 이름과 주소로 네이버지도에서 검색할 수 있어요.'),details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1?[{label:targets[0].mapLinkLabel,message:targets[0].name+' 네이버지도 보기',url:targets[0].mapUrl||'',disabled:!targets[0].mapUrl}]:[]});
+    const detailFields=directive?.detailFields?.length?directive.detailFields:(!parsed.intents.includes('map')&&!parsed.intents.includes('compare')?['menus','hours','phone']:[]);
+    const details=detailFields.length?targets.map(card=>registeredDetailCopy(card,detailFields)).join('\n\n'):'';
+    return plan([(parsed.intents.includes('compare')||detailFields.length===0&&!parsed.intents.includes('map'))&&info,parsed.intents.includes('compare')&&'맛이나 평점은 알 수 없어 우열을 정하기는 어려워요.',parsed.intents.includes('map')&&(targets.every(card=>card.mapLinkKind==='detail')?'지도 보기에서 해당 매장 상세 정보를 열 수 있어요.':'상세 링크가 없는 매장은 이름과 주소로 네이버지도에서 검색할 수 있어요.'),!parsed.intents.includes('map')&&details].filter(Boolean).join('\n'),targets.slice(0,3),{intent:parsed.intents.includes('compare')?'compare':'specific_place',choices:targets.length===1?[{label:targets[0].mapLinkKind==='detail'&&detailFields.some(f=>['hours','phone','parking','seating'].includes(f))?'네이버 플레이스에서 확인':targets[0].mapLinkLabel,message:targets[0].name+' 네이버지도 보기',url:targets[0].mapUrl||'',disabled:!targets[0].mapUrl}]:[]});
   }
   const editing=/^(?:음식\s*종류\s*변경|다른\s*메뉴로|예산\s*변경|방문\s*시간\s*변경|인원\s*변경)$/;
   if(!directive&&editing.test(latest))return plan('바꾸고 싶은 조건을 골라주세요.',[],{question:/예산/.test(latest)?'예산을 어떻게 바꿀까요?':'어떤 음식으로 바꿀까요?',choices:/예산/.test(latest)?[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'예산 해제',message:'예산 제한 없애줘'}]:['한식','파스타','냉면'].map(label=>({label,message:label+'로 찾아줘'}))});
@@ -2477,7 +2471,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
     const choices=question?.choices||[];
     return chatResponse(message,choices.map(c=>c.label),[],{phase1:true,copySource:directive?.action==='answer'?'model':'program',mode:question?'B':'GENERAL',intent,...(intent==='service'?{variant:'service'}:{}),responseModeState:state,recoverable:error,phase1Failure:error,
       answer_plan:['text',...(question?['question']:[]),...(choices.length?['chips']:[])],conditionChips:globalThis.InchelinPhase1.conditionChips(state.phase1.conditions||{}),
-      turnPolicy:{intro:message,questionText:question?.text||'',next_question:question?{slot:question.slot==='location'?'region':question.slot,text:question.text,chips:choices}:null,answerChoices:choices,actionChips:[]}});
+      turnPolicy:{acknowledgement:friendlyAcknowledgement(directive),intro:message,questionText:question?.text||'',next_question:question?{slot:question.slot==='location'?'region':question.slot,text:question.text,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   let directive;
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}

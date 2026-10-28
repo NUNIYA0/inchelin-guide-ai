@@ -1044,7 +1044,8 @@
     .registered-menu,.registered-recommendation .recommender-name,.authored-reason,.recommendation-label,.recommendation-value,.recommendations-empty,.plugin-copy,.plugin-description {font-size:14px!important;font-weight:400!important;}
     .location-choice-help {font-size:14px!important;}
     .restaurant-group + .turn-notice {margin:12px 0 0;color:#7c8491;}
-  </style>
+  .answer-results>.answer-acknowledgement{font-size:16px;font-weight:400;line-height:1.65;margin:0 0 8px;color:inherit}
+</style>
   <link rel="stylesheet" href="/assets/location-picker.css?v=178" />
   <link rel="stylesheet" href="/assets/restaurant-ui.css?v=168" />
   <link rel="stylesheet" href="/assets/history-manager.css?v=160" />
@@ -1791,7 +1792,7 @@
     async function copyAnswer(message, button = null) {
       const cards=(message.restaurants||[]).map(card=>[card.name,card.category,card.address].filter(Boolean).join(' · '));
       const menus=(message.meta?.menuCards||[]).map(card=>[card.name,card.description,card.reason].filter(Boolean).join(' · '));
-      const text=[message.content,...menus,...cards].filter(Boolean).join('\n');
+      const text=[message.meta?.turnPolicy?.acknowledgement,message.content,...menus,...cards].filter(Boolean).join('\n');
       try { await navigator.clipboard.writeText(text); showToast('답변을 복사했어요');
         if(button){button.textContent='';button.appendChild(uiIcon('check'));button.setAttribute('aria-label','복사됨');clearTimeout(button.copyTimer);button.copyTimer=setTimeout(()=>{button.textContent='';button.appendChild(uiIcon('copy'));button.setAttribute('aria-label','복사');},1500);}
       }
@@ -2080,6 +2081,7 @@
         const hasQuestion=allowed('question')&&Boolean(message.meta?.turnPolicy?.questionText);
         const locationChoice=hasQuestion&&message.meta?.phase1&&message.meta.turnPolicy?.next_question?.slot==='region'&&Boolean(message.meta.turnPolicy.questionHelp);
         if(locationChoice)item.classList.add('location-choice-response');
+        if(allowed('text')&&message.meta?.turnPolicy?.acknowledgement){const acknowledgement=document.createElement('p');acknowledgement.className='answer-acknowledgement';acknowledgement.textContent=message.meta.turnPolicy.acknowledgement;resultSection.appendChild(acknowledgement);}
         if(message.meta?.phase1&&message.meta.conditionChips?.length)resultSection.appendChild(renderPhase1Conditions(message.meta.conditionChips,message.meta.responseModeState?.phase1?.conditions));
         const conditionKey=message.meta?.searchConditions?JSON.stringify(message.meta.searchConditions):'';
         const priorAI=[...messagesEl.children].filter(node=>node.chatRole==='assistant');

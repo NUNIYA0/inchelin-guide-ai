@@ -40,7 +40,7 @@ export async function testRegisteredData(request,workerOverride){
   const mapAnswer=await request('첫 번째 집 네이버지도 보여줘',{workerOverride,state:legacyState,data});assert.equal(mapAnswer.body.restaurants[0].naverPlaceUrl,savedLink.naverPlaceUrl);assert.equal(mapAnswer.body.meta.turnPolicy.answerChoices[0].label,'지도 보기');
   const change=await request('500m 안으로',{workerOverride,state,data});assert.equal(change.calls.length,0,'coordinate cache reused');assert.equal(change.body.restaurants.length,3);
   const detail=await request('첫 번째 집 영업시간이랑 전화번호 알려줘',{workerOverride,state,data});
-  assert.match(detail.body.message,/엑셀에 수집된 영업시간/);assert.match(detail.body.message,/연락처:/);
+  assert.match(detail.body.message,/등록 자료의 영업시간/);assert.match(detail.body.message,/전화번호:/);
   const faq=await request('등록 안 된 식당도 나와?',{workerOverride,data});assert.match(faq.body.message,/1,099/);assert.ok(!/전환 중/.test(faq.body.message));
   const first=rows[0],place={name:first.name,address:first.roadAddress,registered_data:{roadAddress:first.roadAddress}};
   assert.equal(matchesRegisteredPlace(first,place),true);

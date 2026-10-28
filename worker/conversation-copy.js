@@ -62,6 +62,40 @@ export async function generateFriendly(call) {
   return hasForbiddenCopy(result) ? null : result;
 }
 
+// Acknowledgement is display copy, never a source of restaurant facts or slots.
+export function friendlyAcknowledgement(plan){
+ const copy=typeof plan?.acknowledgement==='string'?plan.acknowledgement.trim():'';
+ // This is a short acknowledgement, not a second question or a partially
+ // streamed model fragment. Keep it grounded in the request and complete.
+ if(copy&&copy.length<=120&&!FORBIDDEN_COPY.test(copy)
+   &&!/[\n<>?？]|https?:|영업\s*중이에요|주차.*가능해요|평점.*높|예약.*완료/.test(copy)
+   &&/(?:요|죠|군요|볼게요|드릴게요)[.!。]?$/u.test(copy))return copy;
+ if(plan?.action==='service')return '궁금하신 부분부터 설명해드릴게요.';
+ if(plan?.detailFields?.includes('hours'))return '영업시간이 궁금하셨군요.';
+ if(plan?.detailFields?.includes('parking'))return '차를 가져갈 수 있는지 궁금하셨군요.';
+ if(plan?.task==='change_conditions')return '좋아요, 말씀하신 부분만 바꿔서 살펴볼게요.';
+ if(plan?.action==='compare')return '두 곳을 고르기 고민되시는군요.';
+ return '말씀하신 내용을 함께 살펴볼게요.';
+}
+
+export function registeredDetailCopy(card,fields=[]){
+ const facts=card.registeredFacts||{},lines=[];
+ if(fields.includes('menus'))lines.push(facts.menus?.length?'메뉴·가격: '+facts.menus.map(m=>m.name+' '+(Number.isFinite(m.priceKRW)?m.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음')).join(', '):'메뉴·가격은 현재 확인된 정보가 없어요.');
+ if(fields.includes('hours')){
+  if(facts.openingHoursText){
+   const date=/^\d{4}-\d{2}-\d{2}/.exec(facts.collectedAt||'')?.[0];
+   lines.push('등록 자료의 영업시간: '+facts.openingHoursText+(date?' ('+date+' 수집 자료)':''));
+   lines.push('지금 확인한 실시간 정보는 아니니 방문 전 최신 영업시간을 확인해 주세요.');
+  }else lines.push('영업시간은 현재 확인된 정보가 없어요.');
+ }
+ if(fields.includes('phone'))lines.push(facts.phone?'전화번호: '+facts.phone:'전화번호는 현재 확인된 정보가 없어요.');
+ if(fields.includes('address'))lines.push(card.address?'주소: '+card.address:'주소는 현재 확인된 정보가 없어요.');
+ if(fields.includes('parking'))lines.push('주차 가능 여부는 현재 확인된 정보가 없어요.');
+ if(fields.includes('seating'))lines.push('좌석·인원 수용 정보는 현재 확인된 정보가 없어요.');
+ if(fields.some(f=>['hours','phone','parking','seating'].includes(f)))lines.push(card.mapLinkKind==='detail'?'아래 네이버 플레이스에서 매장 안내를 확인할 수 있어요.':'정확한 플레이스 링크가 없어, 아래 네이버지도 검색에서 매장을 찾아 확인해 주세요.');
+ return card.name+'\n'+lines.join('\n');
+}
+
 // Last server boundary: routing metadata is not display copy. Strip model-private
 // fields even on deterministic/early-return paths; never send them to the browser.
 export function stripAnalysisFields(value, inAnalysis = false, path = []) {
