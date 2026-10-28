@@ -33,5 +33,11 @@
    related questions, card actions and recommendation toggles. Menu cards retain
    their card silhouette; icon-only controls remain circular. */
 .message.ai button:not(.menu-choice), .message.ai a.restaurant-map-button {border-radius:999px;}
+/* Answer choices size to their labels, not equal-width region/category tiles. */
+.message.ai .answer-chips,
+.message.ai .answer-chips .answer-tiles,
+.message.ai .answer-chips .answer-full-row {display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:8px;min-width:0;}
+.message.ai .answer-chips .quick-reply.quick-reply-chip {display:inline-flex;flex:0 0 auto;width:auto;max-width:100%;min-width:0;min-height:44px;height:auto;padding:8px 14px;gap:6px;align-items:center;justify-content:center;box-shadow:none;}
+.message.ai .answer-chips .quick-reply.quick-reply-chip .quick-reply-title {min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:14px;line-height:1.4;font-weight:500;}
 @media(max-width:767px){.restaurant-group .restaurant-list{grid-auto-columns:88%;}.restaurant-group .restaurant-list[data-single=true]{max-width:100%;}.restaurant-card .restaurant-card-body{padding:14px 14px 0;}.restaurant-card .registered-recommendations{margin-inline:14px;}.restaurant-card .restaurant-detail-area{padding:14px;}.restaurant-carousel-header{margin-top:14px;}}
 @media(prefers-reduced-motion:reduce){.restaurant-list{scroll-behavior:auto;}}
