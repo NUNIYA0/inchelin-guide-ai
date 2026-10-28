@@ -143,7 +143,7 @@ export async function testPhase1Client(runCase,samples,requestCase=runCase,rawRe
       picker.open();await flush();dialog.events.cancel({preventDefault(){}});assert.equal(dialog.open,false);assert.equal(sent.length,1,'Esc does not apply');
       const regionData=JSON.parse(await readFile(new URL('../dist/assets/location-regions.json',import.meta.url),'utf8')),hierarchySent=[],stationCalls=[];
       const scopedStation={id:'discovered:서울:강남구:역삼역',label:'역삼역',type:'station',centerLabel:'역삼역',regionId:'서울:강남구',province:'서울',district:'강남구',latitude:37.50062,longitude:127.03645,detail:'서울 강남구'};
-      const hierarchy=createLocationPicker({regionData,send:(...args)=>hierarchySent.push(args),loadStations:async(region,q)=>{stationCalls.push(region);return region==='서울:강남구'||q==='역삼'?[scopedStation]:[];}});hierarchy.open();await flush();
+      const hierarchy=createLocationPicker({regionData,send:(...args)=>hierarchySent.push(args),loadStations:async(region,q)=>{stationCalls.push(region);return q==='역삼'?[{...scopedStation,label:'강남역'},scopedStation]:region==='서울:강남구'?[scopedStation]:[];}});hierarchy.open();await flush();
       assert.equal(cls(hierarchy.dialog,'location-province').length,17);assert.equal(cls(hierarchy.dialog,'location-region').length,22);assert.equal(cls(hierarchy.dialog,'location-apply')[0].disabled,true);assert.equal(hierarchySent.length,0,'initial browsing province never applies a search location');
       assert.equal(cls(hierarchy.dialog,'location-filter').length,0,'redundant type filters are absent in the data-driven picker');
       cls(hierarchy.dialog,'location-province').find(n=>n.attributes['aria-label'].startsWith('부산 ')).click();await flush();assert.equal(cls(hierarchy.dialog,'location-region').length,12);

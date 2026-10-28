@@ -60,7 +60,8 @@ export function createLocationPicker({send,isBusy=()=>false,search=searchSupport
         const key=query.replace(/\s/g,'');
         const areas=regionData.regions.filter(r=>r.label.replace(/\s/g,'').includes(key)).map(r=>({...r,type:'district',detail:'등록 맛집 '+r.count+'곳'}));
         let stations=[];if(filter!=='region'){try{stations=await loadStations('',query);}catch{if(!areas.length)throw new Error('station_search_failed');}}
-        rows=[...areas,...stations];
+        const named=stations.filter(s=>{const term=query.replace(/\s/g,''),name=s.label.replace(/\s/g,'');return name.includes(term)||term.includes(name)||term.includes(name.replace(/역$/,''));});
+        rows=[...areas,...named];
       }else if(region)rows=await loadStations(region.id,'');
       else if(province)rows=regionData.regions.filter(r=>r.province===province).map(r=>({...r,type:'district',label:r.district,detail:r.count+'곳'}));
       else rows=regionData.provinces.map(r=>({...r,type:'province',detail:'등록 맛집 '+r.count+'곳'}));
