@@ -3,6 +3,7 @@ import {readFile} from 'node:fs/promises';
 // Isolate mocked coordinate cache from other suites' actual-catalogue assertions.
 const worker=(await import(new URL('../build/dist/server/index.js',import.meta.url).href+'?context-smoke-isolated')).default;
 import {applyPlan,validatePlan,isolateState,plannerInput} from '../worker/conversation-planner.js';
+import {cardDirectionScore} from '../worker/food-preferences.js';
 const faq=JSON.parse(await readFile(new URL('../data/service-faq.json',import.meta.url),'utf8'));
 const source=JSON.parse(await readFile(new URL('../data/private/restaurants-261026.json',import.meta.url),'utf8'));
 export const contextSamples=[];
@@ -195,6 +196,14 @@ try{
   assert.equal(state.phase1.conditions.location.label,'을지로입구역');assert.equal(state.phase1.conditions.radiusMeters,1000);
   state=null;history=[];
   const empty187=await turn('아무데나');assert.equal(state.phase1.conditions.location,null);assert.equal(empty187.restaurants.length,0);assert.equal(empty187.meta.turnPolicy.next_question.slot,'region');
+  state=null;history=[];coords=api.centers.find(c=>c.label==='강남역');
+  await turn('혼밥하기 좋은 점심 맛집 찾아줘',{changes:[change('companion','혼밥'),change('visit','오늘 점심')]});
+  const warm188=await turn('강남에서 먹을거같은데? 맛있는 집 추천해줄 수 있어? 오늘 날씨도 춥고 따끈한 음식들로 먹고싶어.',{changes:[change('location','강남역'),{...change('foodDirection','warm'),evidence:'따끈한 음식들'}]});
+  assert.equal(state.phase1.conditions.foodDirection,'warm');assert.match(warm188.message,/따뜻한/);assert.equal(warm188.meta.turnPolicy.next_question.slot,'radiusMeters');
+  const warmConsent188=await turn('아무데나');assert.equal(state.phase1.conditions.foodDirection,'warm');assert.match(warmConsent188.message,/국물|따뜻한/);assert.match(warmConsent188.message,/혼자 이용|혼밥/);assert.doesNotMatch(warmConsent188.message,/조건을 충족하는 식당은 아직/);assert.match(warmConsent188.meta.turnPolicy.questionText,/표시해서/);
+  const accepted188=await turn('미확인 조건을 알고 후보도 보여줘');assert.ok(accepted188.restaurants.length);assert.ok(accepted188.restaurants.every(card=>cardDirectionScore(card,state.phase1.conditions)>0),'warm request reaches only grounded matching menus');assert.match(accepted188.message,/국물|따뜻한/);assert.equal(accepted188.meta.turnPolicy.acknowledgement,'');
+  await turn('500m 안으로');assert.equal(state.phase1.conditions.foodDirection,'warm');assert.ok(state.phase1.acceptedUnknowns.includes('companion'));
+  await turn('따뜻한 음식 조건은 빼줘',{task:'change_conditions',changes:[{slot:'foodDirection',op:'clear',value:null}]});assert.equal(state.phase1.conditions.foodDirection,null);assert.equal(state.phase1.conditions.companion,'혼밥');
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

@@ -2,11 +2,11 @@ import {actionSchema,readModelPlan,PLANNER_INSTRUCTIONS} from './semantic-contra
 import {findRegisteredRegion,registeredRegionMentions} from './region-catalog.js';
 // Model chooses meaning/action. This module validates tools and condition deltas.
 const actions=['answer','clarify','search','search_more','update_search','details','compare','map','service','reset'];
-const slots=['location','radiusMeters','food','budget','companion','people','purpose','visit','visitAt','requireOpen','vibe','parking'];
+const slots=['location','radiusMeters','food','foodDirection','budget','companion','people','purpose','visit','visitAt','requireOpen','vibe','parking'];
 const nullableString={type:['string','null']};
 const choices={type:'array',maxItems:6,items:{type:'object',properties:{label:{type:'string'},message:{type:'string'}},required:['label','message'],additionalProperties:false}};
 export function planSchema(faqIds){return actionSchema(faqIds,actions,slots);}
-export const defaults=()=>({location:null,radiusMeters:1000,radiusConfirmed:false,food:null,budget:null,companion:null,people:null,purpose:null,visit:null,visitAt:null,requireOpen:false,vibe:null,parking:null});
+export const defaults=()=>({location:null,radiusMeters:1000,radiusConfirmed:false,food:null,foodDirection:null,budget:null,companion:null,people:null,purpose:null,visit:null,visitAt:null,requireOpen:false,vibe:null,parking:null});
 export function isolateState(state,id,messageCount,regions=null){
   if(!id||state?.conversationId&&state.conversationId!==id||!state?.conversationId&&messageCount<=1)return {};
   const result=state&&typeof state==='object'?structuredClone(state):{};
@@ -57,6 +57,7 @@ export function validatePlan(plan,state,faq){
     if(!slots.includes(change.slot)||seen.has(change.slot)||!['set','clear'].includes(change.op))throw new Error('invalid_change');seen.add(change.slot);
     if(change.op==='clear'){if(change.value!==null)throw new Error('invalid_clear');continue;}
     const value=change.value;
+    if(change.slot==='foodDirection'&&!['warm','cold','broth'].includes(value))throw new Error('invalid_food_direction');
     if(['radiusMeters','budget'].includes(change.slot)){if(typeof value!=='number'||!Number.isFinite(value)||value<=0||value>(change.slot==='radiusMeters'?100000:10000000))throw new Error('invalid_number');}
     else if(['requireOpen','parking'].includes(change.slot)){if(typeof value!=='boolean')throw new Error('invalid_boolean');}
     else if(change.slot==='people'){if(!(typeof value==='number'&&Number.isInteger(value)&&value>0&&value<=10000)&&!(typeof value==='string'&&/^\d+\s*[~-]\s*\d+$/.test(value)))throw new Error('invalid_people');}

@@ -58,6 +58,7 @@ const restaurantPhotos=await readFile(join(root,'worker','restaurant-photos.js')
 const photoSource=JSON.parse(await readFile(join(root,'data','photo-source.json'),'utf8'));
 const registeredSearch=await readFile(join(root,'worker','registered-search.js'),'utf8');
 const foodChange=await readFile(join(root,'worker','food-change.js'),'utf8');
+const foodPreferences=await readFile(join(root,'worker','food-preferences.js'),'utf8');
 const conditionEvidence=await readFile(join(root,'worker','condition-evidence.js'),'utf8');
 const recommendationConfig=JSON.parse(await readFile(join(root,'data','recommendation-source.json'),'utf8'));
 const recommendationData=await loadRecommendationSource(root,recommendationConfig);
@@ -115,6 +116,8 @@ await Promise.all([
   writeFile(join(hostingOutputRoot, 'server', 'food-change.js'), foodChange),
   writeFile(join(outputRoot, 'dist', 'server', 'choice-delegation.js'), choiceDelegation),
   writeFile(join(hostingOutputRoot, 'server', 'choice-delegation.js'), choiceDelegation),
+  writeFile(join(outputRoot, 'dist', 'server', 'food-preferences.js'), foodPreferences),
+  writeFile(join(hostingOutputRoot, 'server', 'food-preferences.js'), foodPreferences),
   writeFile(join(outputRoot, 'dist', 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'recommendations.js'), recommendations),

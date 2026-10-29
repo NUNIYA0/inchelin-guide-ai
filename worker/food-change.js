@@ -1,5 +1,6 @@
 import {registeredShortlist} from './registered-search.js';
 import {menuMatches} from './menu-matching.js';
+import {foodDirectionScore} from './food-preferences.js';
 
 // Menu directions come from authored records. Choosing a direction still runs
 // the normal evidence checks; this list never promises seats/hours/budget fit.
@@ -16,7 +17,7 @@ export function foodChangeOptions(catalog,conditions,api,cards=[]){
   }
   const options=[],seen=new Set();
   for(const row of rows){
-    const menu=row.menus.find(menu=>menu.mainDish&&menu.name.trim().length<=24&&!seen.has(menu.name)&&!menuMatches(conditions.food,menu.name)&&(!c.budget||Number.isFinite(menu.priceKRW)&&menu.priceKRW<=Number(String(c.budget).replace(/[^\d]/g,''))));
+    const menu=row.menus.find(menu=>menu.mainDish&&(!c.foodDirection||foodDirectionScore(c.foodDirection,menu.name)>0)&&menu.name.trim().length<=24&&!seen.has(menu.name)&&!menuMatches(conditions.food,menu.name)&&(!c.budget||Number.isFinite(menu.priceKRW)&&menu.priceKRW<=Number(String(c.budget).replace(/[^\d]/g,''))));
     if(!menu)continue;
     seen.add(menu.name);options.push({label:menu.name,message:menu.name+' 먹을 곳으로 바꿔줘',contract:'food_selection',foodValue:menu.name});
     if(options.length===3)break;
