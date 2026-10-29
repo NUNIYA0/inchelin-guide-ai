@@ -81,7 +81,10 @@ export async function applyPlan(plan,previous,context,resolveLocation){
     }else if(slot==='budget')conditions.budget=op==='clear'?null:value.toLocaleString('ko-KR')+'원 이하';
     else conditions[slot]=op==='clear'?(slot==='requireOpen'?false:null):slot==='people'&&typeof value==='string'?value+'명':value;
     if((slot==='visit'||slot==='visitAt')&&(op==='clear'||!plan.changes.some(c=>c.slot==='visitAt')))conditions.visitAt=null;
-    if(slot==='visitAt'&&op==='clear')conditions.visit=null;
+    // Clearing a stale exact time must not erase a meal/date supplied in the
+    // same plan. Visit updates are a batch, regardless of property order.
+    if(slot==='visitAt'&&op==='clear'&&!plan.changes.some(c=>c.slot==='visit'&&c.op==='set')){conditions.visit=null;origins.visit='unset';}
+    if(slot==='visit'&&op==='clear'&&!plan.changes.some(c=>c.slot==='visitAt'&&c.op==='set'))origins.visitAt='unset';
     if(op==='clear'&&slot!=='radiusMeters')origins[slot]='unset';
   }
   const soloSet=plan.changes.some(c=>c.slot==='companion'&&c.op==='set'&&c.value==='혼밥'),peopleSet=plan.changes.find(c=>c.slot==='people');

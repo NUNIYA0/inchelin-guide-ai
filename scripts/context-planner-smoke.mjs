@@ -145,6 +145,20 @@ try{
   await turn('미확인 조건을 알고 후보도 보여줘');
   await turn('혼밥 조건 빼줘',{task:'change_conditions',changes:[{slot:'companion',op:'clear',value:null}]});assert.equal(state.phase1.conditions.people,null);assert.equal(state.phase1.conditions.companion,null);
   const noCurrent179=await turn('현재 위치로 바꿔줘',{task:'change_conditions',locationReference:'current'});assert.equal(state.phase1.conditions.location,null);assert.equal(noCurrent179.restaurants.length,0);
+  state=null;history=[];
+  await turn('전남 여수시에서 추천해줘');
+  await turn('내일 저녁 7시에 갈래',{task:'change_conditions',visitPrecision:'exact',changes:[change('visit','내일 저녁'),change('visitAt','2026-10-29T19:00:00+09:00')]});
+  const lunch182=await turn('그럼 오늘 점심으로',{task:'change_conditions',visitPrecision:'meal',changes:[change('visit','오늘 점심'),{slot:'visitAt',op:'clear',value:null}]});
+  assert.equal(state.phase1.conditions.visit,'오늘 점심');assert.equal(state.phase1.conditions.visitAt,null);assert.ok(lunch182.restaurants.length);
+  for(const [text,slot,value] of [['한식으로','food','한식'],['1만5천 원 이하로','budget',15000],['혼자 갈래','companion','혼밥']])await turn(text,{task:'change_conditions',changes:[change(slot,value)]});
+  if(state.phase1.pendingUnknowns?.length)await turn('미확인 조건을 알고 후보도 보여줘');
+  for(const [text,slot] of [['음식 종류 제한은 빼줘','food'],['예산도 빼줘','budget'],['혼밥 조건까지 빼줘','companion']]){
+    const removal182=await turn(text,{task:'change_conditions',action:'search_more',resultRequest:'new_results',resultEvidence:text,changes:[{slot,op:'clear',value:null}]});
+    assert.equal(removal182.meta.executionAudit.finalAction,'search');assert.equal(state.phase1.conditions[slot],null);
+  }
+  assert.equal(state.lastCards.length,3,'clearing conditions reuses eligible cards instead of exhausting the pool');
+  const noGps182=await turn('그럼 현재 위치로 찾아줘',{task:'conversation',action:'clarify',clarificationReason:'other',question:question('clarify','그럼이 무슨 뜻인가요?')});
+  assert.equal(state.phase1.conditions.location,null);assert.equal(noGps182.meta.turnPolicy.next_question.slot,'region');assert.equal(noGps182.meta.phase1Failure,false);
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

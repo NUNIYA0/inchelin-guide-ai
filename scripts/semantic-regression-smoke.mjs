@@ -81,3 +81,26 @@ const clearVisit=await applyPlan({changes:[{slot:'visit',op:'clear',value:null}]
 const keepPeople=read(raw({task:'change_conditions',changes:{...raw().changes,food:{op:'clear',value:null,evidence:'음식 조건 빼줘'},people:{op:'clear',value:null,evidence:'음식 조건 빼줘'}}}),'음식 조건 빼줘');assert.ok(!keepPeople.changes.some(c=>c.slot==='people'),'food-only edits cannot erase party size');
 const soloAlias=read(raw({task:'change_conditions',changes:{...raw().changes,companion:{op:'set',value:'혼자',evidence:'혼자'}}}),'혼자 갈래');assert.equal(soloAlias.changes.find(c=>c.slot==='companion').value,'혼밥');
 console.log('v181 feedback semantic checks passed: explicit-hours guarding, paired visit clearing, protected party context, solo normalization and deictic target safety.');
+
+// v181 live failures: execute the conflicting model deltas, rather than only
+// checking a prompt string. No upstream calls are made by these regressions.
+const mealChanges=[{slot:'visit',op:'set',value:'오늘 점심'},{slot:'visitAt',op:'clear',value:null}];
+for(const deltas of [mealChanges,[...mealChanges].reverse()]){
+ const meal=await applyPlan({changes:deltas},prior,{},resolver);
+ assert.equal(meal.conditions.visit,'오늘 점심');assert.equal(meal.conditions.visitAt,null);
+ assert.equal(meal.conditionOrigins.visit,'explicit');assert.equal(meal.conditionOrigins.visitAt,'unset');
+ assert.deepEqual(meal.conditions.location,prior.phase1.conditions.location);
+}
+const wrongCurrent=readModelPlan(raw({task:'conversation',action:'clarify',clarificationReason:'other',question:{slot:'clarify',text:'그럼이 무슨 뜻인가요?',choices:[]}}),[{role:'user',content:'그럼 현재 위치로 찾아줘'}],{phase1:{conditions:conditions}});
+assert.equal(wrongCurrent.task,'change_conditions');assert.equal(wrongCurrent.action,'update_search');assert.equal(wrongCurrent.question,null);
+const currentWithoutCoords=await applyPlan(wrongCurrent,{phase1:{conditions}}, {},async()=>null);
+assert.equal(currentWithoutCoords.conditions.location,null);assert.equal(currentWithoutCoords.conditions.radiusMeters,1000);
+assert.ok(currentWithoutCoords.locationError,'missing device coordinates must reach location recovery');
+const currentWithCoords=await applyPlan(wrongCurrent,{phase1:{conditions}}, {},async()=>({...center,kind:'current'}));assert.equal(currentWithCoords.conditions.location.kind,'current');
+assert.equal(read(raw({task:'information',action:'service'}),'현재 위치로 찾는 건 뭐야?').action,'service','location explanation cannot mutate location');
+for(const [text,slot] of [['음식 종류 제한은 빼줘','food'],['예산도 빼줘','budget'],['혼밥 조건까지 빼줘','companion']]){
+ const removal=read(raw({task:'change_conditions',action:'search_more',resultRequest:'new_results',resultEvidence:text,changes:{...raw().changes,[slot]:{op:'clear',value:null,evidence:text}}}),text);
+ assert.equal(removal.action,'search');assert.equal(chooseExecution(removal,conditions),'search');
+}
+const clearAndMore=read(raw({task:'change_conditions',resultRequest:'new_results',resultEvidence:'다른 곳도 보여줘',changes:{...raw().changes,food:{op:'clear',value:null,evidence:'음식 조건 빼고'}}}),'음식 조건 빼고 다른 곳도 보여줘');assert.equal(clearAndMore.action,'search_more','explicit new-place request still excludes previous cards');
+console.log('v182 feedback regressions passed: current-location recovery, order-independent meal change, removal without stale exclusions and explicit search-more preserved.');
