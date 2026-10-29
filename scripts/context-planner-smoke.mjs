@@ -26,6 +26,7 @@ globalThis.fetch=async(value,options)=>{
   assert.equal(url.hostname,'naverapihub.apigw.ntruss.com','only mocked planner and actual tool contract');
   const query=url.searchParams.get('query');
   if(query==='을지로3가역')return Response.json({items:[{title:'을지로3가역 2호선',category:'교통>지하철역',roadAddress:'서울 중구 을지로',mapx:'1269925000',mapy:'375665000'},{title:'을지로3가역 3호선',category:'교통>지하철역',roadAddress:'서울 중구 을지로',mapx:'1269926000',mapy:'375666000'}]});
+  if(query==='을지로입구역')return Response.json({items:[{title:'을지로입구역 2호선',category:'교통>지하철역',roadAddress:'서울 중구 을지로',mapx:'1269825000',mapy:'375661000'}]});
   if(query==='서울 강남구 삼성역')return Response.json({items:[{title:'삼성역 2호선',category:'교통>지하철역',roadAddress:'서울 강남구 테헤란로 538',mapx:'1270276200',mapy:'374979500'}]});
   if(query==='광화문역')return Response.json({items:[{title:'광화문역',category:'교통>지하철역',roadAddress:'서울특별시 종로구 세종대로',mapx:'1269764000',mapy:'375716000'}]});
   const row=source.restaurants.find(row=>query.startsWith(row.name+' '));
@@ -183,6 +184,17 @@ try{
   const euljiCards185=await turn('1km');assert.equal(euljiCards185.restaurants.length,3);assert.ok(euljiCards185.restaurants.every(c=>c.distanceMeters<=1000));
   await turn('을지로역에서 다시 찾아줘',{changes:[change('location','을지로역')]});
   const fullArea185=await turn('서울 중구 전체에서 찾아줘');assert.equal(state.phase1.conditions.location.kind,'region');assert.equal(fullArea185.restaurants.length,3);assert.ok(fullArea185.restaurants.every(c=>c.registeredRegionId==='서울:중구'));
+  state=null;history=[];coords={latitude:37.5661,longitude:126.9825};
+  await turn('을지로 주변 맛집 추천해줘',{changes:[change('location','을지로')]});
+  const delegate187=await turn('아무데나',{action:'clarify',locationCardinality:'alternatives',clarificationReason:'ambiguous_location'});
+  assert.equal(state.phase1.conditions.location.label,'을지로입구역');assert.equal(state.phase1.conditionOrigins.location,'delegated');assert.equal(delegate187.meta.turnPolicy.next_question.slot,'radiusMeters');assert.match(delegate187.meta.turnPolicy.acknowledgement,/을지로입구역/);
+  const radius187=await turn('상관없어',{action:'clarify',clarificationReason:'missing_radius'});assert.equal(state.phase1.conditions.radiusMeters,1000);assert.equal(state.phase1.conditionOrigins.radiusMeters,'delegated');assert.equal(radius187.restaurants.length,3);
+  await turn('음식 변경');
+  const menus187=await turn('네가 골라줘',{foodScope:'unrestricted'});assert.equal(menus187.restaurants.length,0);assert.equal(menus187.meta.turnPolicy.next_question.slot,'food');assert.ok(menus187.meta.turnPolicy.answerChoices.length);
+  const selected187=await turn('아무거나');assert.ok(state.phase1.conditions.food);assert.equal(state.phase1.conditionOrigins.food,'delegated');assert.ok(selected187.restaurants.length||state.phase1.pendingUnknowns?.length);
+  assert.equal(state.phase1.conditions.location.label,'을지로입구역');assert.equal(state.phase1.conditions.radiusMeters,1000);
+  state=null;history=[];
+  const empty187=await turn('아무데나');assert.equal(state.phase1.conditions.location,null);assert.equal(empty187.restaurants.length,0);assert.equal(empty187.meta.turnPolicy.next_question.slot,'region');
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

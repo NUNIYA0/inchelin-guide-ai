@@ -49,6 +49,7 @@ const requestTiming=await readFile(join(root,'worker','request-timing.js'),'utf8
 const responseRules=await readFile(join(root,'worker','response-rules.js'),'utf8');
 const menuMatching=await readFile(join(root,'worker','menu-matching.js'),'utf8');
 const semanticContract=await readFile(join(root,'worker','semantic-contract.js'),'utf8');
+const choiceDelegation=await readFile(join(root,'worker','choice-delegation.js'),'utf8');
 const conversationPlanner=await readFile(join(root,'worker','conversation-planner.js'),'utf8');
 const locationResolver=await readFile(join(root,'worker','location-resolver.js'),'utf8');
 const phase1Core=await readFile(join(root,'worker','phase1-core.js'),'utf8');
@@ -112,6 +113,8 @@ await Promise.all([
   writeFile(join(hostingOutputRoot, 'server', 'registered-search.js'), registeredSearch),
   writeFile(join(outputRoot, 'dist', 'server', 'food-change.js'), foodChange),
   writeFile(join(hostingOutputRoot, 'server', 'food-change.js'), foodChange),
+  writeFile(join(outputRoot, 'dist', 'server', 'choice-delegation.js'), choiceDelegation),
+  writeFile(join(hostingOutputRoot, 'server', 'choice-delegation.js'), choiceDelegation),
   writeFile(join(outputRoot, 'dist', 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'condition-evidence.js'), conditionEvidence),
   writeFile(join(hostingOutputRoot, 'server', 'recommendations.js'), recommendations),

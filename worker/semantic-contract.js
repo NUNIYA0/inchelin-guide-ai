@@ -1,4 +1,5 @@
 // All meaning is model-selected. The executor checks evidence/types/readiness.
+import {applyChoiceDelegation} from './choice-delegation.js';
 const tasks=['recommend','change_conditions','information','consent','reset','conversation'];
 export function actionSchema(faqIds,actions,slots){
   const update={anyOf:[{type:'null'},{type:'object',properties:{op:{type:'string',enum:['set','clear']},value:{type:['string','number','boolean','null']},evidence:{type:'string'}},required:['op','value','evidence'],additionalProperties:false}]};
@@ -9,6 +10,7 @@ export function actionSchema(faqIds,actions,slots){
     informationRequest:{type:['string','null'],enum:[null,'compare_places','place_details','map','service','general']},referencePositions:{type:'array',maxItems:3,items:{type:'integer',minimum:1,maximum:3}},openingTimeBasis:{type:['string','null'],enum:[null,'current','requested_visit']},
     locationReference:{type:['string','null'],enum:[null,'current','named']},locationCardinality:{type:['string','null'],enum:[null,'single','alternatives']},referenceCardinality:{type:['string','null'],enum:[null,'single','multiple']},peopleBasis:{type:['string','null'],enum:[null,'explicit_count','solo']},budgetRelation:{type:['string','null'],enum:[null,'cheaper']},
     resultRequest:{type:['string','null'],enum:[null,'new_results']},referenceKind:{type:['string','null'],enum:[null,'name','ordinal','focus','all','ambiguous']},
+    delegation:{anyOf:[{type:'null'},{type:'object',properties:{slot:{type:'string',enum:['location','radiusMeters','food','budget','companion']},evidence:{type:'string'}},required:['slot','evidence'],additionalProperties:false}]},
     acknowledgement:{type:['string','null']},foodScope:{type:['string','null'],enum:[null,'specific','unrestricted']},visitPrecision:{type:['string','null'],enum:[null,'date','meal','exact']},resultEvidence:{type:['string','null']},
     answer:{type:['string','null']},faqId:{type:['string','null'],enum:[null,...faqIds]},targetIds:{type:'array',maxItems:3,items:{type:'string'}},detailFields:{type:'array',maxItems:6,items:{type:'string',enum:['menus','hours','phone','parking','seating','address']}},unknownConsent:{type:['boolean','null']},consentEvidence:{type:['string','null']},clearContext:{type:'boolean'}};
   return {type:'object',properties,required:Object.keys(properties),additionalProperties:false};
@@ -27,6 +29,7 @@ const singularDeictic=text=>/(?:^|\s)(?:거기|그\s*(?:곳|식당|집)|저기)(
 export function readModelPlan(raw,messages,state={},facts={}){
   if(!raw||!tasks.includes(raw.task)||!raw.changes||Array.isArray(raw.changes))throw new Error('invalid_semantic_contract');
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'',literals=distanceLiterals(latest);
+  raw=applyChoiceDelegation({...raw,delegatedSlot:null},latest,state);
   // A reply to a button we actually emitted is a typed action contract. It is
   // not a global keyword classifier, and a free-text response still uses AI.
   const choice=state.phase1?.pendingQuestion?.choices?.find(c=>normalized(c.message)===normalized(latest));
@@ -97,7 +100,7 @@ export function readModelPlan(raw,messages,state={},facts={}){
     // quote. Rejecting this delta preserves the rest of the current conditions.
     if(update.op==='clear'&&/^(?:그|이|저|해당)\s*(?:조건|거|것)(?:은|는|을|를)?\s*(?:빼|제거|취소|없애)/.test(latest.trim())){unclearClear=true;continue;}
     // Numeric unit validation is input validation, not intent classification.
-    if(slot==='radiusMeters'&&update.op==='set'){
+    if(slot==='radiusMeters'&&update.op==='set'&&raw.delegatedSlot!=='radiusMeters'){
       const quote=normalized(update.evidence),matches=[...quote.matchAll(/(\d+(?:\.\d+)?)(km|킬로미터|킬로|키로|m|미터)/g)];
       const spelledOut=!/\d/.test(quote)&&/(?:킬로|키로|미터)/.test(quote);
       if(!spelledOut&&!matches.some(m=>Math.abs(Number(m[1])*(['km','킬로미터','킬로','키로'].includes(m[2])?1000:1)-update.value)<.01)){rejected.push(slot);continue;}
@@ -160,6 +163,7 @@ export function chooseExecution(plan,c){
   return plan.action;
 }
 export const PLANNER_INSTRUCTIONS=`너는 인슐랭가이드의 대화 이해기다. acknowledgement에는 먼저 사용자의 뜻을 짧게 받아주는 자연스러운 해요체 한 문장을 쓴다. 억지 감정 추측, 과장 공감, 매번 같은 '이해해요'나 칭찬은 쓰지 않는다. 예: '예산 부담을 줄이고 싶으시군요.', '영업시간이 궁금하셨군요.', '좋아요, 음식은 가리지 않고 찾아볼게요.' 검색 결과·인기·시설·영업 확인 사실은 acknowledgement에 만들지 않는다.
+delegation은 직전 pendingQuestion의 범위에서 선택을 맡기는 답이다. '아무데나/어디든 좋아/상관없어/네가 골라줘/잘 모르겠으니 추천해줘'처럼 문맥상 선택 위임이면 delegation={slot:pendingQuestion.slot,evidence:이번 발화 원문}을 반환한다. 서버가 실제 제시한 선택지 안에서 결정하며 다른 조건은 유지한다. 을지로 역 선택 뒤 '아무데나'는 을지로 안의 선택 위임이지 전국 아무 지역이나 정해도 된다는 뜻이 아니다. 거리 질문 뒤 '상관없어'는 기존 기본 반경을 쓰고, 음식 변경 질문 뒤 '추천해줘'는 메뉴 제안으로 이어간다. 미확인 조건 표시 동의·삭제 확인·식당 대상 모호성에는 위임으로 동의를 만들지 않는다. '아무데나 말고 을지로3가역/상관없다는 뜻이 아니야' 같은 부정이나 구체 조건 변경은 delegation=null로 정확한 변경을 처리한다. 위임할 실제 질문이 없으면 뜻을 확인하고 이전 대화의 질문을 임의로 사용하지 않는다.
 새 음식을 정하지 않고 음식만 바꾸고 싶다는 요청은 task=change_conditions/action=clarify/clarificationReason=food_change/question.slot=food다. 무엇으로 바꿀지 또는 메뉴를 추천받을지 한 질문으로 묻는다. 이 단계에서는 기존 음식·지역·반경·예산을 지우거나 새 음식으로 추측해 채우지 않는다. '지금 조건에서 메뉴 몇 가지 골라줘/추천받을래'처럼 메뉴 제안을 요청하면 food_suggestions로 서버의 실제 메뉴 선택지를 보여주고 식당을 무작위 검색하지 않는다. 사용자가 '냉면으로/한식 말고 중식'처럼 구체 음식으로 바꾸면 food=set 새 음식, update_search다. '음식 조건은 빼줘/아무거나 찾아줘'라는 명시적인 제한 해제와 음식 변경 의사만 말한 것을 구분한다. 음식이 선택되지 않은 변경 확인은 선택 조건을 필수로 묻는 일반 흐름과 다르므로, 기존 위치가 있다는 이유로 검색을 강행하지 않는다.
 foodScope는 음식 지정이면 specific, '아무거나/종류 상관없어/음식 제한 없이'면 unrestricted다. 무관 표현을 food 값으로 저장하지 않는다.
 visitPrecision은 사용자가 시·분을 말하면 exact, 점심/저녁만 말하면 meal, 날짜만 말하면 date다. meal/date에서는 visitAt=null이다. 점심을 12시로 만들지 않는다. 현재 영업 조건은 openingTimeBasis=current로 서버 시각을 쓴다.
