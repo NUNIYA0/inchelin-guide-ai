@@ -80,7 +80,8 @@ export async function applyPlan(plan,previous,context,resolveLocation){
       conditions.radiusMeters=op==='clear'?1000:value;conditions.radiusConfirmed=op!=='clear';if(op==='clear')origins[slot]='default';
     }else if(slot==='budget')conditions.budget=op==='clear'?null:value.toLocaleString('ko-KR')+'원 이하';
     else conditions[slot]=op==='clear'?(slot==='requireOpen'?false:null):slot==='people'&&typeof value==='string'?value+'명':value;
-    if(slot==='visit'&&!plan.changes.some(c=>c.slot==='visitAt'))conditions.visitAt=null;
+    if((slot==='visit'||slot==='visitAt')&&(op==='clear'||!plan.changes.some(c=>c.slot==='visitAt')))conditions.visitAt=null;
+    if(slot==='visitAt'&&op==='clear')conditions.visit=null;
     if(op==='clear'&&slot!=='radiusMeters')origins[slot]='unset';
   }
   const soloSet=plan.changes.some(c=>c.slot==='companion'&&c.op==='set'&&c.value==='혼밥'),peopleSet=plan.changes.find(c=>c.slot==='people');

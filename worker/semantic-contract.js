@@ -21,6 +21,9 @@ export function budgetLiterals(text){
  return [...String(text||'').matchAll(/(?<![가-힣\d])(?:(\d+(?:\.\d+)?|한|일)?\s*만\s*(?:(\d+)\s*천)?\s*원|(\d+(?:\.\d+)?)\s*천\s*원|(\d[\d,]*)\s*원)/g)].map(m=>({value:m[4]?Number(m[4].replace(/,/g,'')):m[3]?Number(m[3])*1000:(/한|일/.test(m[1]||'')?1:Number(m[1]||1))*10000+Number(m[2]||0)*1000,evidence:m[0].trim()}));
 }
 export function stationLiterals(text){return [...String(text||'').matchAll(/(?:^|\s|,)([가-힣0-9·]{2,20}역)(?=$|\s|에서|으로|근처|주변|[,.!?])/g)].map(m=>m[1]).filter(name=>!['지역','지하철역','전철역'].includes(name));}
+const requiresOpeningHours=text=>/(?:지금|현재|오늘|내일|\d{1,2}시(?:\s*\d{1,2}분?)?)[^.!?]{0,24}(?:영업\s*(?:중|하(?:는|고\s*있는)|할)|문\s*연)|영업\s*(?:중|하(?:는|고\s*있는)|할)[^.!?]{0,24}(?:곳|식당|집|만)/.test(String(text||''));
+const mentionsPeople=text=>/(?:혼자|혼밥|1\s*인|한\s*명|두\s*명|2\s*명|세\s*명|3\s*명|\d+\s*명|회식|가족|데이트|동료|친구)/.test(String(text||''));
+const singularDeictic=text=>/(?:^|\s)(?:거기|그\s*(?:곳|식당|집)|저기)(?:[은는이가을를]?|\s|$)/.test(String(text||''));
 export function readModelPlan(raw,messages,state={},facts={}){
   if(!raw||!tasks.includes(raw.task)||!raw.changes||Array.isArray(raw.changes))throw new Error('invalid_semantic_contract');
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'',literals=distanceLiterals(latest);
@@ -29,6 +32,7 @@ export function readModelPlan(raw,messages,state={},facts={}){
   const choice=state.phase1?.pendingQuestion?.choices?.find(c=>normalized(c.message)===normalized(latest));
   if(choice?.contract==='unknown_consent'&&state.phase1?.pendingUnknowns?.length)raw={...raw,task:'consent',action:'search',unknownConsent:true,consentEvidence:latest,clarificationReason:null,question:null,changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,null]))};
   const recommendation=['recommend','change_conditions'].includes(raw.task);
+  if(raw.changes.companion?.op==='set'&&raw.changes.companion.value==='혼자')raw={...raw,changes:{...raw.changes,companion:{...raw.changes.companion,value:'혼밥'}}};
   if(recommendation&&raw.foodScope==='unrestricted')raw={...raw,changes:{...raw.changes,food:{op:'clear',value:null,evidence:latest}}};
   if(recommendation&&raw.changes.food?.op==='set'&&/^(아무거나|뭐든|상관없음|무관|맛있는\s*거)$/.test(raw.changes.food.value||''))raw={...raw,changes:{...raw.changes,food:{...raw.changes.food,op:'clear',value:null}}};
   // Provider/catalogue literals only repair omitted tool inputs after the model
@@ -71,6 +75,8 @@ export function readModelPlan(raw,messages,state={},facts={}){
     if(update.op==='clear'&&!quotedLatest(update.evidence)){rejected.push(slot);continue;}
     if(slot==='visitAt'&&update.op==='set'&&raw.visitPrecision!==undefined&&raw.visitPrecision!=='exact'&&raw.openingTimeBasis!=='current'){rejected.push(slot);continue;}
     if(slot==='budget'&&raw.clarificationReason==='missing_budget'&&update.op==='set'){rejected.push(slot);continue;}
+    if(slot==='requireOpen'&&update.op==='set'&&update.value===true&&!requiresOpeningHours(latest)){rejected.push(slot);continue;}
+    if(slot==='people'&&!mentionsPeople(latest)){rejected.push(slot);continue;}
     // Unknown amount is a question, not an invalid attempt to store null.
     if(update.op==='set'&&update.value===null){rejected.push(slot);continue;}
     if(slot==='radiusMeters'&&update.op==='set'&&(!Number.isFinite(update.value)||update.value<=0||update.value>100000))throw new Error('invalid_number');
@@ -112,7 +118,7 @@ export function readModelPlan(raw,messages,state={},facts={}){
   }
   // A singular deictic reference needs one established focus. Multiple IDs
   // returned by the model are not permission to answer for all compared places.
-  if(['details','map','compare'].includes(action)&&(['ambiguous'].includes(raw.referenceKind)||(raw.referenceKind==='focus'||raw.referenceCardinality==='single')&&!state.phase1?.focusCardId&&raw.referenceKind!=='name'&&raw.referenceKind!=='ordinal')){
+  if(['details','map','compare'].includes(action)&&(['ambiguous'].includes(raw.referenceKind)||singularDeictic(latest)&&!state.phase1?.focusCardId&&(raw.targetIds||[]).length>1||(raw.referenceKind==='focus'||raw.referenceCardinality==='single')&&!state.phase1?.focusCardId&&raw.referenceKind!=='name'&&raw.referenceKind!=='ordinal')){
     targetIds=[];action='clarify';raw={...raw,task:'information',clarificationReason:'ambiguous_place',question:{slot:'clarify',text:'어느 식당을 말씀하시는지 이름을 알려주시겠어요?',choices:(state.lastCards||[]).slice(0,3).map(c=>({label:c.name.slice(0,24),message:c.name+' 자세히 알려줘'})),replaceExisting:true}};
   }
   if(['details','map'].includes(action)&&raw.referenceKind==='focus'&&state.phase1?.focusCardId)targetIds=[state.phase1.focusCardId];

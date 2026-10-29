@@ -2439,8 +2439,10 @@ async function phase1ChatResponse(latest,context,env,execution){
   }
   const unknownLabels=[...new Set(selected.flatMap(card=>card.conditionVerification.checks.filter(check=>check.status==='unknown').map(check=>check.key==='budget'?'가격':check.label)))];
   const notice=unknownLabels.length?unknownLabels.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'';
-  const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':selected.length&&c.location.kind==='region'?`${c.location.label}에 등록된 식당 ${selected.length}곳을 골라봤어요.`:selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.${selected.some(card=>card.conditionVerification.status==='unconfirmed')?' 아직 확인되지 않은 조건은 카드에 따로 적었어요.':''}`:directive&&searchDiagnostics?.menuRegionCandidates===0&&c.food?`등록된 메뉴 정보에서 ${c.food} 조건에 맞는 곳을 확인하지 못했어요. 다른 음식이나 지역을 골라볼까요?`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
-  return plan(message,selected,{choices:api.followups(c,{empty:!selected.length}),notice:selected.length?notice:'',error});
+  const exhausted=directive?.action==='search_more'&&!selected.length&&!error;
+  const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':exhausted?'같은 조건에서 새로 보여드릴 곳은 여기까지예요. 지역이나 음식 조건을 바꿔볼까요?':selected.length&&c.location.kind==='region'?`${c.location.label}에 등록된 식당 ${selected.length}곳을 골라봤어요.`:selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.${selected.some(card=>card.conditionVerification.status==='unconfirmed')?' 아직 확인되지 않은 조건은 카드에 따로 적었어요.':''}`:directive&&searchDiagnostics?.menuRegionCandidates===0&&c.food?`등록된 메뉴 정보에서 ${c.food} 조건에 맞는 곳을 확인하지 못했어요. 다른 음식이나 지역을 골라볼까요?`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
+  const choices=exhausted?[{label:'지역 바꾸기',message:'지역을 바꿔서 찾아줘'},{label:'음식 바꾸기',message:'다른 음식으로 찾아줘'}]:api.followups(c,{empty:!selected.length});
+  return plan(message,selected,{choices,notice:selected.length?notice:'',error});
 }
 
 // Semantic decisions belong to the planner; these branches execute its validated
