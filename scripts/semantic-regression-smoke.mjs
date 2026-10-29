@@ -6,7 +6,7 @@ import {finalizeConversationCopy} from '../worker/conversation-copy.js';
 import {createRecommendationCatalog} from '../worker/recommendations.js';
 import {resolveRegisteredCards} from '../worker/registered-search.js';
 import {menuMatches} from '../worker/menu-matching.js';
-import {resolveLocation,ambiguousLocationQuestion} from '../worker/location-resolver.js';
+import {resolveLocation,ambiguousLocationQuestion,ambiguousLocationMention} from '../worker/location-resolver.js';
 const keys=Object.keys(defaults()).filter(k=>k!=='radiusConfirmed');
 const raw=extra=>({task:'recommend',action:'search',confidence:0,changes:Object.fromEntries(keys.map(k=>[k,null])),question:null,clarificationReason:null,unknownConsent:null,consentEvidence:null,...extra});
 const read=(plan,text)=>readModelPlan(plan,[{role:'user',content:text}]);
@@ -116,6 +116,7 @@ for(const text of ['다른 걸 먹고 싶은데 아직 못 정했어','뭘로 �
 const decidedFood=read(raw({task:'change_conditions',action:'clarify',clarificationReason:'food_change',changes:{...raw().changes,food:{op:'set',value:'냉면',evidence:'냉면'}}}),'그럼 냉면으로 바꿔줘');assert.equal(decidedFood.action,'search');assert.equal(decidedFood.clarificationReason,null);
 assert.equal(read(raw({task:'change_conditions',foodScope:'unrestricted'}),'음식 제한 없이 아무거나 찾아줘').changes.find(c=>c.slot==='food').op,'clear','explicit unrestricted request remains supported');
 const euljiQuestion=ambiguousLocationQuestion('을지로역');assert.equal(euljiQuestion.choices.length,4);assert.equal(ambiguousLocationQuestion('을지로3가역'),null);
+assert.equal(ambiguousLocationMention('을지로쪽에 맛집은 없어?').query,'을지로쪽');assert.equal(ambiguousLocationMention('을지로3가역에서 찾아줘'),null);assert.equal(ambiguousLocationMention('을지로 말고 강남으로'),null);
 const ambiguousEulji=await applyPlan({changes:[{slot:'location',op:'set',value:'을지로역'}]},{phase1:{conditions}}, {},q=>resolveLocation(q,{},{}));assert.equal(ambiguousEulji.conditions.location,null);assert.equal(ambiguousEulji.locationError,'ambiguous');assert.equal(ambiguousEulji.locationQuestion.slot,'location');
 for(const spread of [0.0001,0.1]){
  const resolved=await resolveLocation('을지로3가역',{}, {NAVER_API_HUB_CLIENT_ID:'mock',NAVER_API_HUB_CLIENT_SECRET:'mock'},async()=>Response.json({items:[0,spread].map(offset=>({title:'을지로3가역 2호선',category:'교통>지하철역',roadAddress:'서울 중구 을지로',mapx:String(Math.round((126.9925+offset)*1e7)),mapy:'375665000'}))}));

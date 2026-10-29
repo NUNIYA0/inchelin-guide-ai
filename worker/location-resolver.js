@@ -1,10 +1,15 @@
 import {findRegisteredRegion} from './region-catalog.js';
+export function ambiguousLocationMention(text){
+  const match=String(text||'').match(/을지로(?:역)?(?:쪽|일대|근처|주변)?(?=에서|에|은|는|\s|맛집|$)/);
+  if(!match||/^\s*(?:말고|아닌|제외)/.test(String(text).slice(match.index+match[0].length)))return null;
+  return {query:match[0],evidence:match[0]};
+}
 // Ambiguous geography aliases are location data, not an intent classifier.
 // No station coordinates are inferred from this list; selections use lookup.
 export function ambiguousLocationQuestion(query){
   const name=String(query||'').normalize('NFKC').replace(/\s/g,'').replace(/^서울(?:특별시)?(?:중구)?/,'');
   if(!['을지로','을지로역','을지로쪽','을지로일대','을지로근처','을지로주변'].includes(name))return null;
-  return {slot:'location',text:'을지로는 어느 쪽이 편하세요? 역을 고르거나 서울 중구 전체에서 찾아볼 수 있어요.',choices:[
+  return {slot:'location',locationHint:'을지로',text:'을지로는 어느 쪽이 편하세요? 역을 고르거나 서울 중구 전체에서 찾아볼 수 있어요.',choices:[
     ...['을지로입구역','을지로3가역','을지로4가역'].map(name=>({label:name,message:name+'에서 찾아줘',contract:'location_selection',locationValue:name})),
     {label:'서울 중구 전체',message:'서울 중구 전체에서 찾아줘',contract:'location_selection',locationValue:'서울 중구'}
   ]};

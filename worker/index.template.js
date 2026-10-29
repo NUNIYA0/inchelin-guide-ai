@@ -1,6 +1,6 @@
 import { chooseExecution } from './semantic-contract.js';
 import { analyzePlan, applyPlan, isolateState } from './conversation-planner.js';
-import { resolveLocation,ambiguousLocationQuestion } from './location-resolver.js';
+import { resolveLocation,ambiguousLocationQuestion,ambiguousLocationMention } from './location-resolver.js';
 import {searchRegionStations,findRegisteredRegion} from './region-catalog.js';
 const registeredRegions=__REGION_CATALOG__;
 const stationDiscoveries=new Map();
@@ -2469,7 +2469,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   const state={...emptyResponseState(),...previous,conversationId:id,phase1:{...(previous.phase1||{})}};
   const textResponse=(message,{question=null,error=false,intent='general'}={})=>{
     message=message||(question?'한 가지만 더 알려주세요.':'말씀을 조금 더 알려주세요.');
-    state.phase1.pendingQuestion=question?{slot:question.slot,text:question.text,choices:question.choices||[]}:null;
+    state.phase1.pendingQuestion=question?{slot:question.slot,text:question.text,choices:question.choices||[],...(question.locationHint?{locationHint:question.locationHint}:{})}:null;
     if(question)state.phase1.askedQuestions=[...(state.phase1.askedQuestions||[]),state.phase1.pendingQuestion].slice(-8);
     const choices=question?.choices||[];
     return chatResponse(message,choices.map(c=>c.label),[],{phase1:true,copySource:directive?.action==='answer'?'model':'program',mode:question?'B':'GENERAL',intent,...(intent==='service'?{variant:'service'}:{}),responseModeState:state,recoverable:error,phase1Failure:error,
@@ -2491,7 +2491,7 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   state.phase1={...state.phase1,conditions:applied.conditions,conditionOrigins:applied.conditionOrigins};
   if(applied.locationError&&env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'location_resolution',query:directive.changes.find(c=>c.slot==='location')?.value?.slice(0,80)||null,status:applied.locationError,choiceCount:applied.locationQuestion?.choices?.length||0}));
   const locationDelta=directive.changes.find(c=>c.slot==='location'&&c.op==='set');
-  const locationQuestion=applied.locationQuestion||(!applied.conditions.location&&['recommend','change_conditions'].includes(directive.task)?ambiguousLocationQuestion(locationDelta?.value):null);
+  const locationQuestion=applied.locationQuestion||(!applied.conditions.location&&['recommend','change_conditions'].includes(directive.task)?ambiguousLocationQuestion(locationDelta?.value)||ambiguousLocationQuestion(ambiguousLocationMention(latest)?.query):null);
   if(locationQuestion)return textResponse('을지로 일대에도 등록된 맛집이 있어요. 찾을 범위만 정해볼게요.',{question:locationQuestion});
   if(directive.action==='reset')return textResponse('좋아요, 새로 시작해볼게요.',{question:{slot:'location',text:'어디에서 드실 예정이세요?',choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역 선택',message:'지역·역 선택'}]}});
   if(directive.action==='service'){
@@ -2504,6 +2504,8 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   if(directive.action==='clarify'){
     const reason=directive.clarificationReason;
     let q=directive.question;
+    const pendingLocation=previous.phase1?.pendingQuestion;
+    if(['missing_location','ambiguous_location'].includes(reason)&&pendingLocation?.slot==='location'&&pendingLocation.locationHint&&latest.includes(pendingLocation.locationHint)&&pendingLocation.choices?.length)return textResponse('을지로 일대에도 등록된 맛집이 있어요. 아래에서 찾을 범위를 골라주세요.',{question:pendingLocation});
     if(reason==='missing_budget')q={slot:'budget',text:'한 끼 예산은 얼마까지 생각하세요?',choices:[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'2만 원 이하',message:'2만 원 이하로 찾아줘'}],replaceExisting:true};
     if(reason==='food_change')return textResponse('음식을 바꿔서 찾아볼게요.',{question:{slot:'food',text:'어떤 음식으로 바꿀까요? 생각나는 메뉴가 없으면 몇 가지 골라드릴게요.',choices:[{label:'메뉴 추천받기',message:'지금 조건에 맞는 메뉴를 몇 가지 추천해줘',contract:'food_suggestions'}]}});
     if(reason==='food_suggestions'){
