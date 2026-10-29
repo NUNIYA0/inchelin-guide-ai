@@ -25,6 +25,7 @@ globalThis.fetch=async(value,options)=>{
   }
   assert.equal(url.hostname,'naverapihub.apigw.ntruss.com','only mocked planner and actual tool contract');
   const query=url.searchParams.get('query');
+  if(query==='을지로3가역')return Response.json({items:[{title:'을지로3가역 2호선',category:'교통>지하철역',roadAddress:'서울 중구 을지로',mapx:'1269925000',mapy:'375665000'},{title:'을지로3가역 3호선',category:'교통>지하철역',roadAddress:'서울 중구 을지로',mapx:'1269926000',mapy:'375666000'}]});
   if(query==='서울 강남구 삼성역')return Response.json({items:[{title:'삼성역 2호선',category:'교통>지하철역',roadAddress:'서울 강남구 테헤란로 538',mapx:'1270276200',mapy:'374979500'}]});
   if(query==='광화문역')return Response.json({items:[{title:'광화문역',category:'교통>지하철역',roadAddress:'서울특별시 종로구 세종대로',mapx:'1269764000',mapy:'375716000'}]});
   const row=source.restaurants.find(row=>query.startsWith(row.name+' '));
@@ -174,6 +175,14 @@ try{
   assert.deepEqual(state.phase1.conditions.location,beforeFoodChange.location);assert.equal(state.phase1.conditions.radiusMeters,beforeFoodChange.radiusMeters);
   assert.ok(chosenFood184.restaurants.length||state.phase1.pendingUnknowns?.length,'food selection resumes normal evidence-checked search');
   const freeChange184=await turn('別の料理にしたいけど、まだ決めていない',{task:'change_conditions',action:'clarify',clarificationReason:'food_change'});assert.equal(freeChange184.meta.turnPolicy.next_question.slot,'food');assert.equal(freeChange184.restaurants.length,0);
+  state=null;history=[];coords={latitude:37.5665,longitude:126.9925};
+  const eulji185=await turn('을지로역 맛집 추천해줘');assert.equal(eulji185.restaurants.length,0);assert.equal(state.phase1.conditions.location,null);assert.equal(eulji185.meta.turnPolicy.answerChoices.length,4);assert.deepEqual(calls,['api.openai.com'],'ambiguous alias asks before any provider request');
+  const area185=await turn('을지로쪽에 맛집은 없어?',{changes:[change('location','을지로')]});assert.equal(area185.meta.turnPolicy.answerChoices.length,4);assert.doesNotMatch(area185.meta.turnPolicy.questionText,/어느 지역의 역/);
+  const stationChoice185=area185.meta.turnPolicy.answerChoices.find(c=>c.label==='을지로3가역');
+  const station185=await turn(stationChoice185.message,{action:'clarify',clarificationReason:'missing_location',question:question('location','어디인가요?')});assert.equal(state.phase1.conditions.location.label,'을지로3가역');assert.equal(station185.meta.turnPolicy.next_question.slot,'radiusMeters');
+  const euljiCards185=await turn('1km');assert.equal(euljiCards185.restaurants.length,3);assert.ok(euljiCards185.restaurants.every(c=>c.distanceMeters<=1000));
+  await turn('을지로역에서 다시 찾아줘',{changes:[change('location','을지로역')]});
+  const fullArea185=await turn('서울 중구 전체에서 찾아줘');assert.equal(state.phase1.conditions.location.kind,'region');assert.equal(fullArea185.restaurants.length,3);assert.ok(fullArea185.restaurants.every(c=>c.registeredRegionId==='서울:중구'));
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

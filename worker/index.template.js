@@ -1,6 +1,6 @@
 import { chooseExecution } from './semantic-contract.js';
 import { analyzePlan, applyPlan, isolateState } from './conversation-planner.js';
-import { resolveLocation } from './location-resolver.js';
+import { resolveLocation,ambiguousLocationQuestion } from './location-resolver.js';
 import {searchRegionStations,findRegisteredRegion} from './region-catalog.js';
 const registeredRegions=__REGION_CATALOG__;
 const stationDiscoveries=new Map();
@@ -2489,6 +2489,10 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
     Object.assign(state,emptyResponseState(),{conversationId:id});state.phase1={resetBoundary:latest};
   }
   state.phase1={...state.phase1,conditions:applied.conditions,conditionOrigins:applied.conditionOrigins};
+  if(applied.locationError&&env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'location_resolution',query:directive.changes.find(c=>c.slot==='location')?.value?.slice(0,80)||null,status:applied.locationError,choiceCount:applied.locationQuestion?.choices?.length||0}));
+  const locationDelta=directive.changes.find(c=>c.slot==='location'&&c.op==='set');
+  const locationQuestion=applied.locationQuestion||(!applied.conditions.location&&['recommend','change_conditions'].includes(directive.task)?ambiguousLocationQuestion(locationDelta?.value):null);
+  if(locationQuestion)return textResponse('을지로 일대에도 등록된 맛집이 있어요. 찾을 범위만 정해볼게요.',{question:locationQuestion});
   if(directive.action==='reset')return textResponse('좋아요, 새로 시작해볼게요.',{question:{slot:'location',text:'어디에서 드실 예정이세요?',choices:[{label:'현재 위치로 찾기',message:'지금 내 주변에서 찾아줘'},{label:'지역 선택',message:'지역·역 선택'}]}});
   if(directive.action==='service'){
     const row=SERVICE_FAQ.items.find(row=>row.id===directive.faqId),answer=row?.answer;

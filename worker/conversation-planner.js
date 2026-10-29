@@ -70,12 +70,15 @@ export function validatePlan(plan,state,faq){
 }
 export async function applyPlan(plan,previous,context,resolveLocation){
   const prior=plan.clearContext||plan.action==='reset'?{}:previous.phase1||{};
-  const conditions={...defaults(),...(prior.conditions||{})},origins={...(prior.conditionOrigins||{})};let locationError=null;
+  const conditions={...defaults(),...(prior.conditions||{})},origins={...(prior.conditionOrigins||{})};let locationError=null,locationQuestion=null;
   for(const change of plan.changes){
     const {slot,op,value}=change;origins[slot]='explicit';
     if(slot==='location'){
       conditions.location=null; // Clear stale coordinates before any lookup, even on failure.
-      if(op==='set'){try{conditions.location=await resolveLocation(value,context);}catch{locationError='lookup_failed';}if(!conditions.location)locationError||='not_found';}
+      if(op==='set'){try{
+        const resolved=await resolveLocation(value,context);
+        if(resolved?.kind==='ambiguous'){locationError='ambiguous';locationQuestion=resolved.question;}else conditions.location=resolved;
+      }catch{locationError='lookup_failed';}if(!conditions.location)locationError||='not_found';}
     }else if(slot==='radiusMeters'){
       conditions.radiusMeters=op==='clear'?1000:value;conditions.radiusConfirmed=op!=='clear';if(op==='clear')origins[slot]='default';
     }else if(slot==='budget')conditions.budget=op==='clear'?null:value.toLocaleString('ko-KR')+'원 이하';
@@ -96,5 +99,5 @@ export async function applyPlan(plan,previous,context,resolveLocation){
     conditions.visit='지금';conditions.visitAt=typeof context.currentLocalDatetime==='string'&&Number.isFinite(Date.parse(context.currentLocalDatetime))?context.currentLocalDatetime.slice(0,40):null;
     origins.visit='explicit';origins.visitAt=conditions.visitAt?'explicit':'unset';
   }
-  return {conditions,conditionOrigins:origins,locationError};
+  return {conditions,conditionOrigins:origins,locationError,locationQuestion};
 }

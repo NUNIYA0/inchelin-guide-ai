@@ -30,6 +30,7 @@ export function readModelPlan(raw,messages,state={},facts={}){
   // A reply to a button we actually emitted is a typed action contract. It is
   // not a global keyword classifier, and a free-text response still uses AI.
   const choice=state.phase1?.pendingQuestion?.choices?.find(c=>normalized(c.message)===normalized(latest));
+  if(choice?.contract==='location_selection'&&typeof choice.locationValue==='string')raw={...raw,task:'change_conditions',action:'update_search',locationReference:'named',locationCardinality:'single',clarificationReason:null,question:null,informationRequest:null,unknownConsent:null,resultRequest:null,changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,k==='location'?{op:'set',value:choice.locationValue,evidence:latest}:null]))};
   if(choice?.contract==='unknown_consent'&&state.phase1?.pendingUnknowns?.length)raw={...raw,task:'consent',action:'search',unknownConsent:true,consentEvidence:latest,clarificationReason:null,question:null,changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,null]))};
   // These are existing UI commands, not food values or permission to pick a
   // random restaurant. Keep the old conditions until a food is actually chosen.
@@ -179,6 +180,7 @@ action: search=실제 식당 검색, search_more=이미 본 곳 제외하고 같
 행정 지역(시·도와 시·군·구)을 선택한 location.kind=region은 해당 등록 주소 전체에서 찾는다. 이 경우 반경·거리·역을 추가로 묻지 않으며 임의의 중심점·역으로 바꾸지 않는다. locationSelection.name의 행정 지역 전체 이름을 그대로 location에 반영한다. 반경은 현재 위치나 사용자가 직접 지정한 역 기준 검색에만 적용된다.
 위치만 검색 필수다. 반경 미확정이면 서버가 반경 선택을 물으므로 임의로 1000을 changes에 넣지 않는다. 반경은 단위가 포함된 원문 숫자만 미터로 변환한다. 음식·인원·시간·예산을 필수로 묻지 않는다. 위치/반경이 준비되면 search로 진행하고 같은 질문을 반복하지 않는다. 음식이 없다고 종류를 질문하지 않는다.
 location은 장소 이름/current만, 좌표를 만들지 않는다. 새 위치는 새 이름만 보내며 나머지 조건은 유지한다. 기기 위치가 없으면 사용 허용/좌표 확인이 끝났다고 말하지 않는다.
+지명과 역명을 구분한다. '을지로역'은 어느 역인지 불명확하므로 location='을지로역'을 전달하면 서버가 구체 역·지역 선택지를 안내한다. 이어 '을지로쪽에 맛집은 없어?'는 같은 위치를 다시 요청한 것이므로 location='을지로'를 전달한다. 이전 실패한 역 이름을 그대로 유지하며 어느 지역 역인지 같은 질문을 반복하지 않는다. 후보가 확인되지 않은 것과 등록 식당 데이터가 없는 것을 혼동하지 않는다.
 locationReference는 이번 요청의 위치 대상이다. 현재 위치·내 주변으로 옮기는 요청이면 current와 changes.location=current를 반드시 함께 반환한다. 기기 좌표가 없더라도 이전 역 좌표를 유지하지 않는다. 장소 이름을 명시하면 named와 그 위치 변경을 반환하며, 위치를 언급하지 않았으면 null이다. '역삼역 1km 맛집', '강남역에서 한식 1km'처럼 조사 생략·복합 요청에서도 장소를 빠뜨리지 않는다.
 budgetRelation은 금액을 지정하지 않은 상대 가격 변경('좀 더 싼 곳', '지금보다 저렴한 곳', '가격 부담이 덜한 쪽')이면 cheaper다. 금액이 명시되면 budget에 원 단위 수를 넣고 budgetRelation=null이다. cheaper는 금액을 추측하거나 같은 목록을 반복하지 않고 missing_budget으로 예산 하나만 확인한다.
 visit은 사용자가 말한 방문 날짜·식사 시간(예: 오늘 점심/내일 저녁)을 반드시 담는다. visitAt은 구체 시각을 말한 경우 ISO 시각으로, 현재 시각은 localTime 기준으로 해석한다. 식사 맥락 자체는 requireOpen이 아니다. '지금 영업 중인 곳만/내일 7시에 영업하는 곳만'은 requireOpen=true이다. 영업정보가 없다고 이 조건을 삭제하지 않는다.
