@@ -5,7 +5,7 @@ export function actionSchema(faqIds,actions,slots){
   const question={anyOf:[{type:'null'},{type:'object',properties:{slot:{type:'string',enum:[...slots,'clarify']},text:{type:'string'},choices:{type:'array',maxItems:6,items:{type:'object',properties:{label:{type:'string'},message:{type:'string'}},required:['label','message'],additionalProperties:false}},replaceExisting:{type:'boolean'}},required:['slot','text','choices','replaceExisting'],additionalProperties:false}]};
   const properties={task:{type:'string',enum:tasks},action:{type:'string',enum:actions},confidence:{type:'number',minimum:0,maximum:1},
     changes:{type:'object',properties:Object.fromEntries(slots.map(slot=>[slot,update])),required:slots,additionalProperties:false},
-    clarificationReason:{type:['string','null'],enum:[null,'missing_location','missing_radius','missing_budget','ambiguous_condition','ambiguous_place','ambiguous_location','other']},question,
+    clarificationReason:{type:['string','null'],enum:[null,'missing_location','missing_radius','missing_budget','food_change','food_suggestions','ambiguous_condition','ambiguous_place','ambiguous_location','other']},question,
     informationRequest:{type:['string','null'],enum:[null,'compare_places','place_details','map','service','general']},referencePositions:{type:'array',maxItems:3,items:{type:'integer',minimum:1,maximum:3}},openingTimeBasis:{type:['string','null'],enum:[null,'current','requested_visit']},
     locationReference:{type:['string','null'],enum:[null,'current','named']},locationCardinality:{type:['string','null'],enum:[null,'single','alternatives']},referenceCardinality:{type:['string','null'],enum:[null,'single','multiple']},peopleBasis:{type:['string','null'],enum:[null,'explicit_count','solo']},budgetRelation:{type:['string','null'],enum:[null,'cheaper']},
     resultRequest:{type:['string','null'],enum:[null,'new_results']},referenceKind:{type:['string','null'],enum:[null,'name','ordinal','focus','all','ambiguous']},
@@ -31,6 +31,12 @@ export function readModelPlan(raw,messages,state={},facts={}){
   // not a global keyword classifier, and a free-text response still uses AI.
   const choice=state.phase1?.pendingQuestion?.choices?.find(c=>normalized(c.message)===normalized(latest));
   if(choice?.contract==='unknown_consent'&&state.phase1?.pendingUnknowns?.length)raw={...raw,task:'consent',action:'search',unknownConsent:true,consentEvidence:latest,clarificationReason:null,question:null,changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,null]))};
+  // These are existing UI commands, not food values or permission to pick a
+  // random restaurant. Keep the old conditions until a food is actually chosen.
+  const foodChangeButton=['음식 종류 변경','음식 변경','음식 바꾸기','메뉴 바꾸기','다른 메뉴로','음식을 바꾸고 싶어'].includes(latest.trim());
+  const foodSuggestions=choice?.contract==='food_suggestions';
+  if(foodChangeButton||foodSuggestions)raw={...raw,task:'change_conditions',action:'clarify',acknowledgement:null,clarificationReason:foodSuggestions?'food_suggestions':'food_change',question:{slot:'food',text:'어떤 음식으로 바꿔볼까요? 생각나는 메뉴가 없으면 몇 가지 골라드릴게요.',choices:[],replaceExisting:true},informationRequest:null,unknownConsent:null,resultRequest:null,foodScope:null,changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,null]))};
+  if(choice?.contract==='food_selection'&&typeof choice.foodValue==='string')raw={...raw,task:'change_conditions',action:'update_search',clarificationReason:null,question:null,informationRequest:null,unknownConsent:null,resultRequest:null,foodScope:'specific',changes:Object.fromEntries(Object.keys(raw.changes).map(k=>[k,k==='food'?{op:'set',value:choice.foodValue,evidence:latest}:null]))};
   // An explicit device-location command supplies a tool input, even if the
   // model needlessly asks about the discourse marker "그럼". Explanations and
   // negated/quoted location mentions do not satisfy this complete command.
@@ -107,6 +113,11 @@ export function readModelPlan(raw,messages,state={},facts={}){
   if(!unclearClear&&changes.some(c=>c.op==='clear')&&['other','ambiguous_condition'].includes(raw.clarificationReason))raw={...raw,action:'search',clarificationReason:null,question:null};
   if(raw.clarificationReason==='ambiguous_location'&&state.phase1?.conditions?.location&&raw.locationCardinality!=='alternatives'&&!changes.some(c=>c.slot==='location')&&changes.length)raw={...raw,action:'search',clarificationReason:null,question:null};
   if(raw.clarificationReason==='missing_budget')raw={...raw,question:{slot:'budget',text:'한 끼 예산을 얼마까지 생각하세요?',choices:[],replaceExisting:true}};
+  if(['food_change','food_suggestions'].includes(raw.clarificationReason)){
+    const chosen=changes.some(c=>c.slot==='food'&&c.op==='set'&&quotedLatest(c.evidence));
+    if(chosen)raw={...raw,action:'search',clarificationReason:null,question:null};
+    else{for(let i=changes.length-1;i>=0;i--)if(changes[i].slot==='food')changes.splice(i,1);raw={...raw,action:'clarify',resultRequest:null,question:{slot:'food',text:raw.question?.text||'어떤 음식으로 바꿔볼까요?',choices:[],replaceExisting:true}};}
+  }
   else if(raw.action==='clarify'&&!raw.question&&raw.clarificationReason)raw={...raw,question:{slot:'clarify',text:'어떤 조건을 말씀하시는지 알려주시겠어요?',choices:[],replaceExisting:false}};
   let action=raw.action;
   const requested={compare_places:'compare',place_details:'details',map:'map',service:'service'}[raw.informationRequest];
@@ -141,13 +152,14 @@ export function chooseExecution(plan,c){
   if(plan.unknownConsent!==null)return 'search';
   if(['recommend','change_conditions'].includes(plan.task)){
     if(plan.clarificationReason==='other'&&plan.question&&['food','companion','people','purpose','visit','vibe','parking'].includes(plan.question.slot))return 'search';
-    if(['missing_budget','ambiguous_condition','ambiguous_place','ambiguous_location','other'].includes(plan.clarificationReason))return 'clarify';
+    if(['missing_budget','food_change','food_suggestions','ambiguous_condition','ambiguous_place','ambiguous_location','other'].includes(plan.clarificationReason))return 'clarify';
     // Optional food/party/time never block a request whose actual inputs are ready.
     return plan.action==='search_more'?'search_more':'search';
   }
   return plan.action;
 }
 export const PLANNER_INSTRUCTIONS=`너는 인슐랭가이드의 대화 이해기다. acknowledgement에는 먼저 사용자의 뜻을 짧게 받아주는 자연스러운 해요체 한 문장을 쓴다. 억지 감정 추측, 과장 공감, 매번 같은 '이해해요'나 칭찬은 쓰지 않는다. 예: '예산 부담을 줄이고 싶으시군요.', '영업시간이 궁금하셨군요.', '좋아요, 음식은 가리지 않고 찾아볼게요.' 검색 결과·인기·시설·영업 확인 사실은 acknowledgement에 만들지 않는다.
+새 음식을 정하지 않고 음식만 바꾸고 싶다는 요청은 task=change_conditions/action=clarify/clarificationReason=food_change/question.slot=food다. 무엇으로 바꿀지 또는 메뉴를 추천받을지 한 질문으로 묻는다. 이 단계에서는 기존 음식·지역·반경·예산을 지우거나 새 음식으로 추측해 채우지 않는다. '지금 조건에서 메뉴 몇 가지 골라줘/추천받을래'처럼 메뉴 제안을 요청하면 food_suggestions로 서버의 실제 메뉴 선택지를 보여주고 식당을 무작위 검색하지 않는다. 사용자가 '냉면으로/한식 말고 중식'처럼 구체 음식으로 바꾸면 food=set 새 음식, update_search다. '음식 조건은 빼줘/아무거나 찾아줘'라는 명시적인 제한 해제와 음식 변경 의사만 말한 것을 구분한다. 음식이 선택되지 않은 변경 확인은 선택 조건을 필수로 묻는 일반 흐름과 다르므로, 기존 위치가 있다는 이유로 검색을 강행하지 않는다.
 foodScope는 음식 지정이면 specific, '아무거나/종류 상관없어/음식 제한 없이'면 unrestricted다. 무관 표현을 food 값으로 저장하지 않는다.
 visitPrecision은 사용자가 시·분을 말하면 exact, 점심/저녁만 말하면 meal, 날짜만 말하면 date다. meal/date에서는 visitAt=null이다. 점심을 12시로 만들지 않는다. 현재 영업 조건은 openingTimeBasis=current로 서버 시각을 쓴다.
 resultRequest=new_results는 이번 발화에서 이미 본 식당 외의 다른 곳을 명시할 때만 쓰고 resultEvidence에 이번 사용자 말의 원문을 넣는다. 조건 해제만 말한 경우 resultRequest=null, action=update_search이며 이전 추천을 제외하지 않는다.

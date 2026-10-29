@@ -159,6 +159,21 @@ try{
   assert.equal(state.lastCards.length,3,'clearing conditions reuses eligible cards instead of exhausting the pool');
   const noGps182=await turn('그럼 현재 위치로 찾아줘',{task:'conversation',action:'clarify',clarificationReason:'other',question:question('clarify','그럼이 무슨 뜻인가요?')});
   assert.equal(state.phase1.conditions.location,null);assert.equal(noGps182.meta.turnPolicy.next_question.slot,'region');assert.equal(noGps182.meta.phase1Failure,false);
+  state=null;history=[];
+  await turn('서울 강남구에서 한식 먹을 곳 추천해줘',{changes:[change('food','한식')]});
+  const beforeFoodChange=structuredClone(state.phase1.conditions),beforeFoodCards=state.lastCards.map(c=>c.id);
+  const askFood184=await turn('음식 종류 변경',{task:'change_conditions',action:'search_more',resultRequest:'new_results',resultEvidence:'음식 종류 변경',foodScope:'unrestricted',changes:[{slot:'food',op:'clear',value:null}]});
+  assert.deepEqual(state.phase1.conditions,beforeFoodChange);assert.deepEqual(state.lastCards.map(c=>c.id),beforeFoodCards);
+  assert.equal(askFood184.restaurants.length,0);assert.equal(askFood184.meta.turnPolicy.next_question.slot,'food');assert.deepEqual(calls,['api.openai.com']);
+  assert.equal(askFood184.meta.turnPolicy.answerChoices[0].label,'메뉴 추천받기');
+  const suggestFood184=await turn('지금 조건에 맞는 메뉴를 몇 가지 추천해줘',{changes:[change('food','무작위 음식')]});
+  assert.equal(suggestFood184.restaurants.length,0);assert.deepEqual(state.phase1.conditions,beforeFoodChange);assert.deepEqual(calls,['api.openai.com']);
+  const foodOptions184=suggestFood184.meta.turnPolicy.answerChoices;assert.ok(foodOptions184.length>0&&foodOptions184.length<=3);
+  for(const choice of foodOptions184)assert.ok(source.restaurants.some(row=>row.roadAddress?.includes('강남구')&&row.menus.some(menu=>menu.name===choice.foodValue&&menu.mainDish)),'suggest only authored local main dishes');
+  const chosenFood184=await turn(foodOptions184[0].message);assert.equal(state.phase1.conditions.food,foodOptions184[0].foodValue);
+  assert.deepEqual(state.phase1.conditions.location,beforeFoodChange.location);assert.equal(state.phase1.conditions.radiusMeters,beforeFoodChange.radiusMeters);
+  assert.ok(chosenFood184.restaurants.length||state.phase1.pendingUnknowns?.length,'food selection resumes normal evidence-checked search');
+  const freeChange184=await turn('別の料理にしたいけど、まだ決めていない',{task:'change_conditions',action:'clarify',clarificationReason:'food_change'});assert.equal(freeChange184.meta.turnPolicy.next_question.slot,'food');assert.equal(freeChange184.restaurants.length,0);
   const unavailable=await worker.fetch(new Request('https://example.test/api/chat',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({conversationId:'without-runtime-key',messages:[{role:'user',content:'강남역 1km 추천'}]})}),{CHAT_TIMING_LOGS:'false'},{});assert.equal((await unavailable.json()).meta.recoverable,true);
   console.log('Context planner smoke passed: structured-output contract, 7-turn context flow, actual catalogue/tool execution, partial updates, ambiguous clarification, chat isolation, bounded history, invalid plans, failure/timeout safety and verified map links. All AI/provider outputs mocked; no real keys/API calls.');
 }finally{globalThis.fetch=original;}

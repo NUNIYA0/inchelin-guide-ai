@@ -41,6 +41,7 @@ const recommendationData = __RECOMMENDATION_DATA__;
 const photoSource = __PHOTO_SOURCE__;
 const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
 import {resolveRegisteredCards,registeredRegionCards} from './registered-search.js';
+import {foodChangeOptions} from './food-change.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2441,7 +2442,7 @@ async function phase1ChatResponse(latest,context,env,execution){
   const notice=unknownLabels.length?unknownLabels.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'';
   const exhausted=directive?.action==='search_more'&&!selected.length&&!error;
   const message=error?'식당을 불러오지 못했어요. 조건은 그대로 두었으니 다시 시도해 주세요.':exhausted?'같은 조건에서 새로 보여드릴 곳은 여기까지예요. 지역이나 음식 조건을 바꿔볼까요?':selected.length&&c.location.kind==='region'?`${c.location.label}에 등록된 식당 ${selected.length}곳을 골라봤어요.`:selected.length?`${c.location.label} 기준으로 직선 ${c.radiusMeters<1000?c.radiusMeters+'m':c.radiusMeters/1000+'km'} 안에서 ${selected.length}곳을 골라봤어요.${selected.some(card=>card.conditionVerification.status==='unconfirmed')?' 아직 확인되지 않은 조건은 카드에 따로 적었어요.':''}`:directive&&searchDiagnostics?.menuRegionCandidates===0&&c.food?`등록된 메뉴 정보에서 ${c.food} 조건에 맞는 곳을 확인하지 못했어요. 다른 음식이나 지역을 골라볼까요?`:'현재 조건에 맞는 식당을 찾지 못했어요. 검색 조건을 바꿔볼까요?';
-  const choices=exhausted?[{label:'지역 바꾸기',message:'지역을 바꿔서 찾아줘'},{label:'음식 바꾸기',message:'다른 음식으로 찾아줘'}]:api.followups(c,{empty:!selected.length});
+  const choices=exhausted?[{label:'지역 바꾸기',message:'지역을 바꿔서 찾아줘'},{label:'음식 변경',message:'음식을 바꾸고 싶어'}]:api.followups(c,{empty:!selected.length});
   return plan(message,selected,{choices,notice:selected.length?notice:'',error});
 }
 
@@ -2500,6 +2501,11 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
     const reason=directive.clarificationReason;
     let q=directive.question;
     if(reason==='missing_budget')q={slot:'budget',text:'한 끼 예산은 얼마까지 생각하세요?',choices:[{label:'1만 원 이하',message:'1만 원 이하로 찾아줘'},{label:'2만 원 이하',message:'2만 원 이하로 찾아줘'}],replaceExisting:true};
+    if(reason==='food_change')return textResponse('음식을 바꿔서 찾아볼게요.',{question:{slot:'food',text:'어떤 음식으로 바꿀까요? 생각나는 메뉴가 없으면 몇 가지 골라드릴게요.',choices:[{label:'메뉴 추천받기',message:'지금 조건에 맞는 메뉴를 몇 가지 추천해줘',contract:'food_suggestions'}]}});
+    if(reason==='food_suggestions'){
+      const choices=foodChangeOptions(registeredRecommendationCatalog,applied.conditions,globalThis.InchelinPhase1,previous.lastCards||[]);
+      return textResponse(choices.length?'지금 정한 지역의 등록 메뉴에서 다른 음식을 골라봤어요.':'지금 조건에서 제안할 다른 등록 메뉴는 아직 확인하지 못했어요.',{question:{slot:'food',text:choices.length?'이 중에 끌리는 메뉴가 있나요? 다른 음식도 편하게 말씀해 주세요.':'어떤 음식을 드시고 싶으세요?',choices}});
+    }
     if(reason==='ambiguous_condition')q={slot:'clarify',text:'어떤 조건을 빼드릴까요?',choices:[...(applied.conditions.food?[{label:'음식 조건',message:'음식 조건만 빼줘'}]:[]),...(applied.conditions.budget?[{label:'예산 조건',message:'예산 조건만 빼줘'}]:[])],replaceExisting:false};
     if(!q)q={slot:'clarify',text:'어떤 부분을 바꾸고 싶으세요?',choices:[]};
     return textResponse('',{question:q});

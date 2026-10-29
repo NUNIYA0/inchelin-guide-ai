@@ -104,3 +104,13 @@ for(const [text,slot] of [['음식 종류 제한은 빼줘','food'],['예산도 
 }
 const clearAndMore=read(raw({task:'change_conditions',resultRequest:'new_results',resultEvidence:'다른 곳도 보여줘',changes:{...raw().changes,food:{op:'clear',value:null,evidence:'음식 조건 빼고'}}}),'음식 조건 빼고 다른 곳도 보여줘');assert.equal(clearAndMore.action,'search_more','explicit new-place request still excludes previous cards');
 console.log('v182 feedback regressions passed: current-location recovery, order-independent meal change, removal without stale exclusions and explicit search-more preserved.');
+
+const changeIntent=read(raw({task:'change_conditions',foodScope:'unrestricted',changes:{...raw().changes,food:{op:'clear',value:null,evidence:'음식 종류 변경'}}}),'음식 종류 변경');
+assert.equal(chooseExecution(changeIntent,conditions),'clarify');assert.equal(changeIntent.clarificationReason,'food_change');assert.equal(changeIntent.changes.length,0,'food change button cannot clear current food or search');
+for(const text of ['다른 걸 먹고 싶은데 아직 못 정했어','뭘로 바꿀지 추천 좀 해줄래']){
+ const reason=text.includes('추천')?'food_suggestions':'food_change';
+ const p=read(raw({task:'change_conditions',action:'clarify',clarificationReason:reason}),text);
+ assert.equal(chooseExecution(p,conditions),'clarify');assert.equal(p.question.slot,'food');
+}
+const decidedFood=read(raw({task:'change_conditions',action:'clarify',clarificationReason:'food_change',changes:{...raw().changes,food:{op:'set',value:'냉면',evidence:'냉면'}}}),'그럼 냉면으로 바꿔줘');assert.equal(decidedFood.action,'search');assert.equal(decidedFood.clarificationReason,null);
+assert.equal(read(raw({task:'change_conditions',foodScope:'unrestricted'}),'음식 제한 없이 아무거나 찾아줘').changes.find(c=>c.slot==='food').op,'clear','explicit unrestricted request remains supported');

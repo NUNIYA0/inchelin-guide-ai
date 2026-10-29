@@ -75,12 +75,12 @@
     return [missing.length?missing.join('·')+' 정보는 확인되지 않아 방문 전 매장 확인이 필요해요.':'',c.visit&&visitExplicitThisTurn?'말씀하신 시간의 영업 여부는 확인되지 않았어요.':''].filter(Boolean).join(' ');
   }
   function followups(c,{empty=false,detail=false}={}){
-    if(c.location?.kind==='region')return [empty?{label:'지역 선택',message:'지역·역 선택'}:!c.food?{label:'한식으로',message:'한식으로 찾아줘'}:{label:'음식 종류 변경',message:'음식 종류 변경'},!c.budget?{label:'1만 원 이하로',message:'1만 원 이하로 찾아줘'}:{label:'예산 변경',message:'예산 변경'},empty?{label:'음식 종류 변경',message:'음식 종류 변경'}:{label:'다른 곳 보기',message:'다른 곳도 보여줘'}].filter((x,i,a)=>a.findIndex(y=>y.message===x.message)===i);
+    if(c.location?.kind==='region')return [empty?{label:'지역 선택',message:'지역·역 선택'}:!c.food?{label:'한식으로',message:'한식으로 찾아줘'}:{label:'음식 변경',message:'음식을 바꾸고 싶어'},!c.budget?{label:'1만 원 이하로',message:'1만 원 이하로 찾아줘'}:{label:'예산 변경',message:'예산 변경'},empty?{label:'음식 변경',message:'음식을 바꾸고 싶어'}:{label:'다른 곳 보기',message:'다른 곳도 보여줘'}].filter((x,i,a)=>a.findIndex(y=>y.message===x.message)===i);
     if(detail)return[{label:'네이버지도 보기',message:'네이버지도 보기'}];
-    if(empty)return[{label:'2km로 확대',message:'2km 이내로 찾아줘'},...(c.food?[{label:'음식 변경',message:'음식 종류 변경'}]:[]),...(c.budget?[{label:'예산 변경',message:'예산 변경'}]:[]),{label:'지역·역 선택',message:'지역·역 선택'}].filter(x=>!(c.radiusMeters>=2000&&x.label==='2km로 확대')).slice(0,3);
-    if(c.radiusMeters<=500)return[{label:'1km로 확대',message:'1km 이내로 찾아줘'},{label:'예산 변경',message:'예산 변경'},{label:'음식 종류 변경',message:'음식 종류 변경'}];
-    if(c.food&&c.budget)return[{label:'500m 이내로',message:'500m 이내로 찾아줘'},{label:'다른 메뉴로',message:'음식 종류 변경'},{label:'다시 추천',message:'다시 추천해줘'}];
-    return [!c.food?{label:'한식으로',message:'한식으로 찾아줘'}:{label:'음식 종류 변경',message:'음식 종류 변경'},!c.budget?{label:'1만 원 이하로',message:'1만 원 이하로 찾아줘'}:{label:'500m 이내로',message:'500m 이내로 찾아줘'},!c.companion?{label:'혼밥하기 좋은 곳',message:'혼자 먹을 거야'}:{label:'다시 추천',message:'다시 추천해줘'}];
+    if(empty)return[{label:'2km로 확대',message:'2km 이내로 찾아줘'},...(c.food?[{label:'음식 변경',message:'음식을 바꾸고 싶어'}]:[]),...(c.budget?[{label:'예산 변경',message:'예산 변경'}]:[]),{label:'지역·역 선택',message:'지역·역 선택'}].filter(x=>!(c.radiusMeters>=2000&&x.label==='2km로 확대')).slice(0,3);
+    if(c.radiusMeters<=500)return[{label:'1km로 확대',message:'1km 이내로 찾아줘'},{label:'예산 변경',message:'예산 변경'},{label:'음식 변경',message:'음식을 바꾸고 싶어'}];
+    if(c.food&&c.budget)return[{label:'500m 이내로',message:'500m 이내로 찾아줘'},{label:'다른 메뉴로',message:'음식을 바꾸고 싶어'},{label:'다시 추천',message:'다시 추천해줘'}];
+    return [!c.food?{label:'한식으로',message:'한식으로 찾아줘'}:{label:'음식 변경',message:'음식을 바꾸고 싶어'},!c.budget?{label:'1만 원 이하로',message:'1만 원 이하로 찾아줘'}:{label:'500m 이내로',message:'500m 이내로 찾아줘'},!c.companion?{label:'혼밥하기 좋은 곳',message:'혼자 먹을 거야'}:{label:'다시 추천',message:'다시 추천해줘'}];
   }
   const defaults={morning:['아침으로 가볍게 먹을 곳 추천해줘','혼자 아침 먹기 좋은 곳 찾아줘','아침으로 든든한 국밥 먹고 싶어'],lunch:['오늘 점심 맛집 추천해줘','혼밥하기 좋은 점심 맛집 찾아줘','동료와 점심 먹기 좋은 곳 추천해줘'],afternoon:['늦은 점심 먹을 곳 찾아줘','지금 가기 좋은 카페 추천해줘','이른 저녁으로 가볍게 먹을 곳 찾아줘'],evening:['오늘 저녁 맛집 추천해줘','친구와 저녁 먹기 좋은 곳 찾아줘','혼자 저녁 먹기 좋은 곳 추천해줘'],lateNight:['야식 먹을 곳 추천해줘','늦은 시간 가볍게 먹을 곳 추천해줘','친구와 늦은 밤 먹을 곳 찾아줘']};
   const period=hour=>hour>=5&&hour<10?'morning':hour>=10&&hour<14?'lunch':hour>=14&&hour<17?'afternoon':hour>=17&&hour<21?'evening':'lateNight';
