@@ -394,8 +394,6 @@
     .message.status .ai-bubble { display: flex; align-items: center; gap: 10px; padding: 0; }
     .message.error { color: #555; }
     .message.error .ai-bubble { padding: 0; }
-    .retry-button { display: block; margin-top: 10px; padding: 7px 11px; border: 1px solid #d8d8d8; border-radius: 999px; background: #fff; color: #333; font: inherit; font-size: 13px; cursor: pointer; }
-    .retry-button:hover { background: #f7f7f7; }
     .thinking-dots { flex: 0 0 auto; min-width: 40px; height: 26px; padding: 0 9px; display: flex; align-items: center; justify-content: center; gap: 3px; border-radius: 999px; background: #f1f1f1; }
     .thinking-dots i { width: 4px; height: 4px; border-radius: 50%; background: #aaa; animation: blink 1.1s infinite; }
     .thinking-dots i:nth-child(2) { animation-delay: .15s; }
@@ -883,7 +881,7 @@
     /* v135 shared type/touch scale: controls 14, body 16, titles 16, support 13. */
     button, .restaurant-map-link { font-family:system-ui,sans-serif; font-size:14px; min-height:44px; }
     button:not(.menu-choice):not(.restaurant-title-link) { font-size:14px !important; }
-    .start-btn, .quick-reply-chip, .meal-chip, .retry-button, .comparison-item, .comparison-submit { font:500 14px/1.4 system-ui,sans-serif; min-height:44px; }
+    .start-btn, .quick-reply-chip, .meal-chip, .comparison-item, .comparison-submit { font:500 14px/1.4 system-ui,sans-serif; min-height:44px; }
     .quick-reply-title, .question-category .quick-reply-title, .question-region .quick-reply-title { font-size:14px; }
     .quick-reply-chip, .meal-chip { border:1px solid #bbb; border-radius:999px; white-space:nowrap; min-width:fit-content; }
     .related-question { font:400 14px/1.5 system-ui,sans-serif; min-height:44px; text-align:left; }
@@ -2210,10 +2208,6 @@
           });
           bubble.appendChild(actions);
         }
-        if(message.meta?.recoverable) {
-          const retry=document.createElement('button');retry.type='button';retry.className='retry-button';retry.textContent='다시 시도';
-          retry.addEventListener('click',()=>{const index=chatMessages.indexOf(message);generateAnswer(buildAIRequest(chatMessages.slice(0,index)));});bubble.appendChild(retry);
-        }
         item.appendChild(bubble);
       } else {
         item.appendChild(copy);
@@ -2363,17 +2357,13 @@
       const text = document.createElement('span');
       const changed=error?.message==='response_rules_changed';
       text.textContent = error?.userMessage || (changed?'새 버전으로 바뀌었어요. 새로고침한 뒤 다시 시도해 주세요.':error?.message==='answer_timeout'?'45초 안에 답변을 받지 못했어요. 다른 조건을 고르거나 다시 시도해 주세요.':error?.message==='answer_stopped'?'답변 생성을 멈췄어요. 다른 조건을 고르거나 다시 시도해 주세요.':'답변을 불러오지 못했어요. 다른 조건을 고르거나 다시 시도해 주세요.');
-      const retry = document.createElement('button');
-      retry.type = 'button';
-      retry.className = 'retry-button';
-      retry.textContent='다시 시도';retry.setAttribute('aria-label','다시 시도');
-      retry.addEventListener('click', () => { if(changed){try{sessionStorage.setItem(scopedKey('inchelin-resume-chat'),currentId);saveConversation();}catch{}location.reload();return;}item.remove(); generateAnswer(request); });
+      if(changed){try{sessionStorage.setItem(scopedKey('inchelin-resume-chat'),currentId);saveConversation();}catch{}}
       const alternatives=document.createElement('div');alternatives.className='quick-replies alternative-chips';
       for(const [label,axis] of [['다른 지역','region'],['다른 음식','food']]) {
         const button=document.createElement('button');button.type='button';button.className='quick-reply quick-reply-chip';button.textContent=label;
         button.addEventListener('click',()=>openSearchPicker(axis));alternatives.appendChild(button);
       }
-      bubble.append(text, alternatives, retry);
+      bubble.append(text, alternatives);
       item.append(avatar, bubble);
       messagesEl.appendChild(item);
       if (shouldFollow) followConversation(item);

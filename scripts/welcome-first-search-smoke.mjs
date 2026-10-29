@@ -80,12 +80,12 @@ export async function testWelcomeFirstSearch(runCase){
       assert.doesNotMatch(client.elements.messages.textContent,/새 버전/);
     }
   }
-  const partial=await app(true);partial.api.clickRow(0);await partial.api.done();assert.equal(cls(partial.elements.messages,'retry-button').length,1,'incomplete response goes through real request rejection → generation catch → retry UI');assert.equal(partial.api.messages.length,1,'do not persist incomplete text as a successful answer');assert.doesNotMatch(partial.elements.messages.textContent,/새 버전/,'missing metadata is a generic error, not a version mismatch');
+  const partial=await app(true);partial.api.clickRow(0);await partial.api.done();assert.equal(cls(partial.elements.messages,'retry-button').length,0,'incomplete response shows guidance without a retry pill');assert.equal(partial.api.messages.length,1,'do not persist incomplete text as a successful answer');assert.doesNotMatch(partial.elements.messages.textContent,/새 버전/,'missing metadata is a generic error, not a version mismatch');
   const check=new Function(fn('assertCompleteAnswer')+';return assertCompleteAnswer;')();
   assert.throws(()=>check({content:'홍대에서 냉면 먹을 곳 3곳을 골라봤어요.',restaurants:[],meta:null}),/incomplete_answer/);
   assert.throws(()=>check({content:'3곳을 골라봤어요.',restaurants:[],meta:{answer_plan:['text']}}),/incomplete_answer/);
   const errorHost=new Node(),retry=new Function('document','messagesEl','isNearConversationBottom','followConversation','generateAnswer',fn('uiIcon')+html.match(/    function setIconLabel[^\n]+/)[0]+fn('showRequestError')+';return showRequestError;')({createElement:tag=>new Node(tag)},errorHost,()=>false,()=>{},()=>{});
-  retry({});assert.equal(cls(errorHost,'retry-button')[0].textContent,'다시 시도');assert.match(html,/answer_timeout/);assert.match(html,/45000/);
+  retry({});assert.equal(cls(errorHost,'retry-button').length,0);assert.match(errorHost.textContent,/다시 시도/);assert.match(html,/answer_timeout/);assert.match(html,/45000/);
   const desktop=(width,fine,coarse)=>new Function('window',fn('shouldSendOnEnter')+';return shouldSendOnEnter;')({innerWidth:width,matchMedia:q=>({matches:q.includes('fine')?fine:coarse})});
   for(const [width,fine,coarse,expected] of [[1024,true,false,true],[768,false,false,true],[600,true,false,true],[390,false,true,false],[1024,false,true,true]]){
     const send=desktop(width,fine,coarse);assert.equal(send({key:'Enter'}),expected);assert.equal(send({key:'Enter',shiftKey:true}),false);assert.equal(send({key:'Enter',isComposing:true}),false);assert.equal(send({key:'Enter',keyCode:229}),false);
