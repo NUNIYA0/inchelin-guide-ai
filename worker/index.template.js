@@ -42,7 +42,7 @@ const photoSource = __PHOTO_SOURCE__;
 const registeredRecommendationCatalog = createRecommendationCatalog(recommendationData);
 import {resolveRegisteredCards,registeredRegionCards} from './registered-search.js';
 import {foodChangeOptions} from './food-change.js';
-import {cardDirectionScore,foodDirectionLabel,foodDirectionLead} from './food-preferences.js';
+import {cardDirectionScore,foodDirectionLabel,foodDirectionLead,directionDisplayMenu} from './food-preferences.js';
 
 const INDEX_HTML = __INDEX_HTML__;
 const ASSETS = __ASSETS__;
@@ -2351,7 +2351,7 @@ async function phase1ChatResponse(latest,context,env,execution){
     state.phase1.pendingQuestion=question?{slot:!c.location?'location':c.location?.kind!=='region'&&!c.radiusConfirmed?'radiusMeters':'clarify',text:question,choices:choices.map(({label,message,contract})=>({label,message,...(contract?{contract}:{})}))}:null;
     if(question)state.phase1.askedQuestions=[...(prior.askedQuestions||[]),state.phase1.pendingQuestion].slice(-8);
     const currentLinks=({naverPlaceCandidateUrl,...card})=>({...card,...globalThis.InchelinMapLinks.linkFields(card)});
-    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...currentLinks(card),photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
+    restaurants=recommendationCatalog.enrich(restaurants.filter(card=>!card.isDemo),c).map(card=>({...currentLinks(card),displayMenu:directionDisplayMenu(card,c),photoLookupEnabled:photoSource.enabled===true&&Boolean(card.registeredSourceId),conditionVerification:evaluateConditions(card,c)}));
     state.lastCards=recommendationCatalog.enrich(state.lastCards,c).map(currentLinks);
     state.shownPlaces=recommendationCatalog.enrich(state.shownPlaces,c).map(currentLinks);
     return chatResponse(message,choices.map(x=>x.label),restaurants,{phase1:true,copySource:'program',mode:restaurants.length?'C':question?'B':'GENERAL',intent,analysis:{intent,confidence:directive?.confidence??1,slots:state.slots},responseModeState:state,

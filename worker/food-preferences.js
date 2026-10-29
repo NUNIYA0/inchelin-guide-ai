@@ -1,6 +1,6 @@
 import {menuMatches} from './menu-matching.js';
 export const foodDirectionLabel=direction=>({warm:'따뜻한 음식',cold:'시원한 음식',broth:'국물 음식'}[direction]||'');
-const cold=/냉(?!동)|비빔국수|막국수|메밀소바|자루소바|물회|콩국수|아이스/;
+const cold=/냉(?!동)|비빔국수|비빔우동|막국수|메밀소바|자루(?:소바|우동)|물회|콩국수|아이스/;
 const broth=/국밥|순대국|설렁탕|곰탕|해장국|북어국|북엇국|국수|칼국수|우동|쌀국수|라멘|라면|짬뽕|찌개|전골|샤브|온모밀|온메밀|(?:탕)(?!수육)/;
 const cooked=/파스타|스파게티|리조토|리소토|볶음밥|제육|불고기|뚝배기|덮밥|돈까스|돈가스|돈카츠|스테이크|피자|떡볶이|볶음면/;
 // These are menu directions inferred from authored dish names, not measured
@@ -17,6 +17,11 @@ export function preferredMenus(menus,c){
  return (menus||[]).filter(m=>!c.food||broad||menuMatches(c.food,m.name)).map(m=>({...m,directionScore:foodDirectionScore(c.foodDirection,m.name)})).filter(m=>m.directionScore>0).sort((a,b)=>b.directionScore-a.directionScore);
 }
 export const cardDirectionScore=(card,c)=>Math.max(0,...preferredMenus(card.registeredFacts?.menus,c).map(m=>m.directionScore));
+export function directionDisplayMenu(card,c){
+ const limit=c.budget?Number(String(c.budget).replace(/[^\d]/g,'')):null;
+ const menu=preferredMenus(card.registeredFacts?.menus,c).find(m=>!limit||Number.isFinite(m.priceKRW)&&m.priceKRW<=limit);
+ return menu?{name:menu.name,priceKRW:menu.priceKRW}:null;
+}
 export function foodDirectionLead(cards,c){
  if(!c.foodDirection)return '';
  const menus=cards.flatMap(card=>preferredMenus(card.registeredFacts?.menus,c));

@@ -1994,7 +1994,8 @@
         if (restaurant.regionLabel) { const area = document.createElement('span'); area.className = 'restaurant-category restaurant-region'; area.textContent = restaurant.regionLabel; head.appendChild(area); }
         body.appendChild(head);
         const menus=restaurant.registeredFacts?.menus||[];
-        const representativeMenu=menus.find(m=>m.mainDish===true)||menus[0];
+        const requestedMenu=restaurant.displayMenu&&menus.find(m=>m.name===restaurant.displayMenu.name&&m.priceKRW===restaurant.displayMenu.priceKRW);
+        const representativeMenu=requestedMenu||menus.find(m=>m.mainDish===true)||menus[0];
         const menu=document.createElement('p');menu.className='registered-menu';menu.textContent=representativeMenu?representativeMenu.name+' · '+(Number.isFinite(representativeMenu.priceKRW)?representativeMenu.priceKRW.toLocaleString('ko-KR')+'원':'가격 정보 없음'):'메뉴·가격 정보 없음';body.appendChild(menu);
         if(Number.isFinite(restaurant.distanceMeters)&&restaurant.originLabel){const distance=document.createElement('p');distance.className='restaurant-distance';const label=document.createElement('span');label.textContent=restaurant.originLabel+'에서 직선 '+restaurant.distanceMeters+'m';distance.append(uiIcon('location'),label);body.appendChild(distance);}
         const address = document.createElement('p'); address.className = 'restaurant-address'; address.textContent = restaurant.roadAddress || restaurant.address || '주소 정보 없음'; address.setAttribute('title',address.textContent);
