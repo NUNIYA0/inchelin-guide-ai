@@ -19,7 +19,8 @@ export function preferredMenus(menus,c){
 export const cardDirectionScore=(card,c)=>Math.max(0,...preferredMenus(card.registeredFacts?.menus,c).map(m=>m.directionScore));
 export function directionDisplayMenu(card,c){
  const limit=c.budget?Number(String(c.budget).replace(/[^\d]/g,'')):null;
- const menu=preferredMenus(card.registeredFacts?.menus,c).find(m=>!limit||Number.isFinite(m.priceKRW)&&m.priceKRW<=limit);
+ const available=preferredMenus(card.registeredFacts?.menus,c).filter(m=>!limit||Number.isFinite(m.priceKRW)&&m.priceKRW<=limit);
+ const menu=available.find(m=>m.mainDish===true)||available[0];
  return menu?{name:menu.name,priceKRW:menu.priceKRW}:null;
 }
 export function foodDirectionLead(cards,c){

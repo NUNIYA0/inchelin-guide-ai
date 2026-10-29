@@ -7,7 +7,7 @@ import {createRecommendationCatalog} from '../worker/recommendations.js';
 import {resolveRegisteredCards} from '../worker/registered-search.js';
 import {menuMatches} from '../worker/menu-matching.js';
 import {resolveLocation,ambiguousLocationQuestion,ambiguousLocationMention} from '../worker/location-resolver.js';
-import {foodDirectionScore,foodDirectionLead} from '../worker/food-preferences.js';
+import {foodDirectionScore,foodDirectionLead,directionDisplayMenu} from '../worker/food-preferences.js';
 import {evaluateConditions} from '../worker/condition-evidence.js';
 const keys=Object.keys(defaults()).filter(k=>k!=='radiusConfirmed');
 const raw=extra=>({task:'recommend',action:'search',confidence:0,changes:Object.fromEntries(keys.map(k=>[k,null])),question:null,clarificationReason:null,unknownConsent:null,consentEvidence:null,...extra});
@@ -147,3 +147,4 @@ const temperatureCard={registeredFacts:{menus:[{name:'설렁탕',priceKRW:15000,
 const warmBudget={...conditions,foodDirection:'warm',food:null,budget:'10,000원 이하'};
 assert.equal(evaluateConditions(temperatureCard,warmBudget).checks.find(c=>c.key==='budget').status,'failed','budget must be met by a direction-matching main dish');
 assert.match(foodDirectionLead([temperatureCard],warmBudget),/설렁탕/);assert.doesNotMatch(foodDirectionLead([temperatureCard],warmBudget),/물냉면/);
+assert.equal(directionDisplayMenu({registeredFacts:{menus:[{name:'해물누룽지탕 中',priceKRW:50000,mainDish:false},{name:'고기짬뽕',priceKRW:12000,mainDish:true}]}},{foodDirection:'warm'}).name,'고기짬뽕','prefer a registered main dish over a sharing dish on the card');
