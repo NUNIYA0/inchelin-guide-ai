@@ -1,5 +1,5 @@
 import { chooseExecution } from './semantic-contract.js';
-import { analyzePlan, applyPlan, isolateState } from './conversation-planner.js';
+import { analyzePlan, applyPlan, isolateState, plannerFailure } from './conversation-planner.js';
 import { resolveLocation,ambiguousLocationQuestion,ambiguousLocationMention } from './location-resolver.js';
 import {searchRegionStations,findRegisteredRegion} from './region-catalog.js';
 const registeredRegions=__REGION_CATALOG__;
@@ -2474,18 +2474,18 @@ async function contextualChatResponse(messages,context,env,execution,conversatio
   }
   const latest=[...messages].reverse().find(m=>m.role==='user')?.content||'';
   const state={...emptyResponseState(),...previous,conversationId:id,phase1:{...(previous.phase1||{})}};
-  const textResponse=(message,{question=null,error=false,intent='general'}={})=>{
+  const textResponse=(message,{question=null,error=false,intent='general',failureCategory=null}={})=>{
     message=message||(question?'한 가지만 더 알려주세요.':'말씀을 조금 더 알려주세요.');
-    state.phase1.pendingQuestion=question?{slot:question.slot,text:question.text,choices:question.choices||[],...(question.locationHint?{locationHint:question.locationHint}:{})}:null;
+    if(!error)state.phase1.pendingQuestion=question?{slot:question.slot,text:question.text,choices:question.choices||[],...(question.locationHint?{locationHint:question.locationHint}:{})}:null;
     if(question)state.phase1.askedQuestions=[...(state.phase1.askedQuestions||[]),state.phase1.pendingQuestion].slice(-8);
     const choices=question?.choices||[];
-    return chatResponse(message,choices.map(c=>c.label),[],{phase1:true,copySource:directive?.action==='answer'?'model':'program',mode:question?'B':'GENERAL',intent,...(intent==='service'?{variant:'service'}:{}),responseModeState:state,recoverable:error,phase1Failure:error,
+    return chatResponse(message,choices.map(c=>c.label),[],{phase1:true,copySource:directive?.action==='answer'?'model':'program',mode:question?'B':'GENERAL',intent,...(intent==='service'?{variant:'service'}:{}),responseModeState:state,recoverable:error,phase1Failure:error,...(failureCategory?{failureCategory}:{}),
       answer_plan:['text',...(question?['question']:[]),...(choices.length?['chips']:[])],conditionChips:globalThis.InchelinPhase1.conditionChips(state.phase1.conditions||{}),
       turnPolicy:{acknowledgement:friendlyAcknowledgement(directive),intro:message,questionText:question?.text||'',next_question:question?{slot:question.slot==='location'?'region':question.slot,text:question.text,chips:choices}:null,answerChoices:choices,actionChips:[]}});
   };
   let directive;
   try{directive=await execution.measure('conversation_plan',()=>analyzePlan(env,messages,state,safeContext,SERVICE_FAQ));}
-  catch(error){if(env.CHAT_TIMING_LOGS!=='false')console.warn(JSON.stringify({event:'conversation_plan_failed',code:/^[a-z_]+$/.test(error.message)?error.message:error.name}));return textResponse('말씀을 이해하는 중 문제가 생겼어요. 조건은 그대로 두었으니 다시 시도해 주세요.',{error:true});}
+  catch(error){const failure=plannerFailure(error);console.error(JSON.stringify({event:'conversation_plan_failed',category:failure.category,...failure.diagnostic}));return textResponse(failure.message,{error:true,failureCategory:failure.category});}
   if((safeContext.verifiedRegionSelection||safeContext.verifiedAdministrativeRegion)&&['recommend','change_conditions'].includes(directive.task))directive={...directive,action:'search',clarificationReason:null,question:null,changes:[...directive.changes.filter(c=>c.slot!=='location'),{slot:'location',op:'set',value:(safeContext.verifiedAdministrativeRegion||safeContext.verifiedRegionSelection).label}]};
   execution.audit={task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),rejectedSlots:directive.rejectedSlots||[],clarificationReason:directive.clarificationReason,targetCount:directive.targetIds.length};
   if(env.CHAT_TIMING_LOGS!=='false')console.info(JSON.stringify({event:'conversation_plan_valid',task:directive.task,action:directive.action,changedSlots:directive.changes.map(c=>c.slot),clarificationReason:directive.clarificationReason,unknownConsent:directive.unknownConsent,targetCount:directive.targetIds.length}));

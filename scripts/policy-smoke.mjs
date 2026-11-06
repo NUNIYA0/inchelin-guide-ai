@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './planner-failure-smoke.mjs';
 import './history-more-smoke.mjs';
 import './history-manager-smoke.mjs';
 import './composer-smoke.mjs';

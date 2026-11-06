@@ -35,11 +35,26 @@ export function plannerInput(messages,state,context,faq){
   return {untrustedConversation:messages.slice(-12).map(m=>({role:m.role,content:String(m.content).slice(0,1800)})),currentConditions:conditions,conditionOrigins:origins,pendingQuestion:state.phase1?.pendingQuestion||null,askedQuestions:(state.phase1?.askedQuestions||[]).slice(-8).map(({slot,text})=>({slot,text})),pendingUnknowns:state.phase1?.pendingUnknowns||[],acceptedUnknowns:state.phase1?.acceptedUnknowns||[],focusCardId:state.phase1?.focusCardId||null,visibleCards:(state.lastCards||[]).slice(0,3).map((c,i)=>({position:i+1,id:c.id,name:c.name,address:c.roadAddress||c.address})),previousCards:(state.shownPlaces||[]).slice(-12).map(c=>({id:c.id,name:c.name,address:c.roadAddress||c.address})),localTime:typeof context.currentLocalDatetime==='string'?context.currentLocalDatetime.slice(0,40):null,locationSelection:context.locationSelection?{id:String(context.locationSelection.id||'').slice(0,100),name:String(context.locationSelection.label||context.locationSelection.name||'').slice(0,100)}:null,currentLocationAvailable:Boolean(globalThis.InchelinPhase1.coords(context.currentLocation)),literalFacts:{regions:registeredRegionMentions(context.registeredRegions,messages.findLast(m=>m.role==='user')?.content||'')},supportedLocations:globalThis.InchelinPhase1.centers.map(c=>({name:c.label,aliases:c.aliases})),faq:faq.items.map(row=>({id:row.id,examples:row.examples?.slice(0,2)||[]}))};
 }
 const instructions=PLANNER_INSTRUCTIONS;
+// Provider diagnostic identifiers only: no body, prompt, credential or free-form message.
+const diagnosticToken=value=>typeof value==='string'&&/^[a-zA-Z0-9_.:-]{1,120}$/.test(value)?value:null;
+export function plannerFailure(error){
+  const upstream=error?.plannerDiagnostic||{};
+  const status=upstream.status||null,code=upstream.upstreamCode||null;
+  const category=error?.message==='planner_unavailable'?'unavailable':code==='insufficient_quota'?'quota':status===401?'authentication':status===403||code==='model_not_found'?'access':status===429?'rate_limit':status>=500?'provider':status===400?'configuration':error?.name==='TimeoutError'||error?.name==='AbortError'?'timeout':error instanceof TypeError?'transport':'invalid_response';
+  const messages={quota:'지금은 AI 서비스 이용 한도 문제로 답변을 만들 수 없어요. 입력과 조건은 유지했어요.',authentication:'AI 서비스 연결에 문제가 있어 답변을 만들 수 없어요. 입력과 조건은 유지했어요.',access:'AI 서비스 연결에 문제가 있어 답변을 만들 수 없어요. 입력과 조건은 유지했어요.',configuration:'AI 서비스 연결에 문제가 있어 답변을 만들 수 없어요. 입력과 조건은 유지했어요.',unavailable:'AI 서비스 연결에 문제가 있어 답변을 만들 수 없어요. 입력과 조건은 유지했어요.',rate_limit:'잠시 요청이 몰려 답변을 만들지 못했어요. 잠시 후 답변 아래 다시 생성 버튼을 눌러 주세요.',timeout:'답변을 만드는 데 시간이 오래 걸렸어요. 입력과 조건은 유지했으니 답변 아래 다시 생성 버튼을 눌러 주세요.'};
+  return {category,message:messages[category]||'지금은 답변을 만들지 못했어요. 입력과 조건은 유지했으니 답변 아래 다시 생성 버튼을 눌러 주세요.',diagnostic:{status,upstreamCode:code,upstreamType:upstream.upstreamType||null,parameter:upstream.parameter||null,providerRequestId:upstream.providerRequestId||null}};
+}
 export async function analyzePlan(env,messages,state,context,faq,fetcher=fetch){
   if(!env.OPENAI_API_KEY||env.CONVERSATION_PLANNER_DISABLED==='true')throw new Error('planner_unavailable');
   const input=plannerInput(messages,state,context,faq);
   const response=await fetcher('https://api.openai.com/v1/responses',{method:'POST',headers:{authorization:`Bearer ${env.OPENAI_API_KEY}`,'content-type':'application/json'},signal:AbortSignal.timeout(16000),body:JSON.stringify({model:env.OPENAI_INTENT_MODEL||env.OPENAI_MODEL||'gpt-5-mini',store:false,instructions,input:[{role:'user',content:JSON.stringify(input)}],reasoning:{effort:'minimal'},max_output_tokens:2600,text:{format:{type:'json_schema',name:'inchelin_action_plan',strict:true,schema:planSchema(faq.items.map(row=>row.id))}}})});
-  if(!response.ok)throw new Error('planner_failed');const data=await response.json();
+  if(!response.ok){
+    let body;try{body=await response.json();}catch{}
+    const error=new Error('planner_failed');
+    error.plannerDiagnostic={status:response.status,upstreamCode:diagnosticToken(body?.error?.code),upstreamType:diagnosticToken(body?.error?.type),parameter:diagnosticToken(body?.error?.param),providerRequestId:diagnosticToken(response.headers.get('x-request-id'))};
+    throw error;
+  }
+  const data=await response.json();
   if(data.status&&data.status!=='completed')throw new Error('planner_incomplete');
   const parts=(data.output||[]).flatMap(item=>item.content||[]);if(parts.some(p=>p.type==='refusal'))throw new Error('planner_refused');
   const text=data.output_text||parts.filter(p=>p.type==='output_text').map(p=>p.text).join('');return validatePlan(readModelPlan(JSON.parse(text),input.untrustedConversation,state,input.literalFacts),state,faq);
